@@ -1,0 +1,37 @@
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Compiled object files
+*.o
+*.a
+*.out
+
+# Binaries and caches
+*.db
+*.log
+*.tmp
+*.swp
+*.bak
+
+# Go specific
+/go.sum
+/go.mod~
+/vendor/
+/bin/
+/dist/
+/build/
+/coverage.out
+
+# IDE and editor files
+.vscode/
+.idea/
+.DS_Store
+*.iml
+
+# Local environment
+.env
+.env.*
+*.local
