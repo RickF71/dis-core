@@ -1,0 +1,190 @@
+# ============================================================
+# DIS-CORE v1.0 — Canonical Baseline
+# Direct Individual Sovereignty (Core Ontology)
+# ------------------------------------------------------------
+# Frozen at version 1.0 — October 2025
+# ------------------------------------------------------------
+# This schema defines the immutable primitives of DIS:
+#   - Identity
+#   - Domain
+#   - Scope
+#   - Policy
+#   - Receipt
+# ------------------------------------------------------------
+# Extensions (inheritance, federation, SATs, freeze logic)
+# must reference these types but cannot mutate them.
+# ============================================================
+
+dis_core:
+  version: v1.0
+  status: frozen
+  description: >
+    The Core of Direct Individual Sovereignty establishes
+    the minimal lawful substrate for personal, domain,
+    and network-level authority. All future DIS modules
+    must preserve these primitives and extend outward from them.
+
+# ------------------------------------------------------------
+# 1. IDENTITY
+# ------------------------------------------------------------
+identity:
+  type: object
+  description: >
+    A unique, persistent actor recognized within DIS.
+    Every recorded action must originate from an Identity.
+  fields:
+    id:
+      type: string
+      format: uuid
+      description: Globally unique identifier for the individual.
+    created_at:
+      type: timestamp
+      description: UTC creation time of this identity record.
+  notes:
+    - The identity table is append-only.
+    - No mutable attributes; augmentation happens via domain extensions.
+
+# ------------------------------------------------------------
+# 2. DOMAIN
+# ------------------------------------------------------------
+domain:
+  type: object
+  description: >
+    A contextual space of authority. Domains define scope boundaries,
+    policies, and governance structures for actions and receipts.
+  fields:
+    name:
+      type: string
+      pattern: "domain.[a-z0-9.-]+"
+      description: Fully qualified domain name (e.g. domain.null, domain.terra).
+    parent:
+      type: string
+      nullable: true
+      description: Optional reference to a parent domain (for future inheritance).
+    status:
+      type: enum
+      values: [active, frozen, deprecated]
+      default: active
+  notes:
+    - Domain names are globally unique.
+    - Inheritance rules will live in dis-domain.v1+, not Core.
+
+# ------------------------------------------------------------
+# 3. SCOPE
+# ------------------------------------------------------------
+scope:
+  type: string
+  pattern: "[a-z0-9_.-]+"
+  description: >
+    A qualified verb or permission type, defining what can be done
+    under a specific domain (e.g. identity.confirm, land.transfer).
+  notes:
+    - Scopes are contextual to a domain.
+    - The combination (domain, scope) determines authorization.
+
+# ------------------------------------------------------------
+# 4. POLICY
+# ------------------------------------------------------------
+policy:
+  type: object
+  description: >
+    A declarative rule set defining which domains and scopes
+    are allowed or denied for consented action.
+  fields:
+    allowed:
+      type: map
+      keys: string
+      values: list
+      description: >
+        Domain → list of scopes explicitly permitted.
+        Example:
+          domain.null: [identity.confirm, identity.update]
+    deny:
+      type: list
+      items: string
+      description: >
+        Domains explicitly denied from any action.
+  metadata:
+    checksum:
+      type: string
+      format: sha256
+      description: >
+        Integrity hash of the full policy definition (for receipt binding).
+  notes:
+    - Policy interpretation may evolve, but structure is fixed.
+    - Future inheritance logic must read from allowed/deny; not alter them.
+
+# ------------------------------------------------------------
+# 5. RECEIPT
+# ------------------------------------------------------------
+receipt:
+  type: object
+  description: >
+    Immutable proof of a consented act within DIS.
+    Receipts are atomic units of verified authority.
+  fields:
+    id:
+      type: integer
+      description: Monotonic local identifier for the receipt.
+    identity_id:
+      type: string
+      format: uuid
+      description: ID of the acting Identity.
+    action:
+      type: string
+      description: Symbolic label for the event (e.g. consent:grant).
+    by_domain:
+      type: string
+      description: Domain asserting authority.
+    scope:
+      type: string
+      description: Specific permission or act performed.
+    nonce:
+      type: string
+      format: hex
+      description: Unique entropy for deduplication and replay protection.
+    timestamp:
+      type: timestamp
+      description: UTC time of the act.
+    policy_checksum:
+      type: string
+      format: sha256
+      description: The hash of the policy in force at the time of act.
+    signature:
+      type: string
+      format: sha256
+      description: Deterministic digest proving authenticity of the act.
+    created_at:
+      type: timestamp
+      description: Local storage timestamp.
+  notes:
+    - Receipts are immutable once written.
+    - Verification logic lives outside Core (see dis-verify.v1+).
+
+# ------------------------------------------------------------
+# 6. SIGNATURES AND CHECKSUMS
+# ------------------------------------------------------------
+signature_algorithm:
+  default: sha256
+  description: >
+    Core signing algorithm for receipts and policy hashes.
+    Future upgrades must maintain backward-compatible verification.
+
+# ------------------------------------------------------------
+# 7. EXTENSION CONTRACT
+# ------------------------------------------------------------
+extension_contract:
+  notes:
+    - New modules must declare:
+        imports: [dis-core.v1]
+        modifies: []
+        extends: [identity, domain, policy, receipt]
+    - No mutation or removal of Core fields permitted.
+    - Additive metadata allowed (e.g., SAT issuance, inheritance graphs).
+  enforcement:
+    versioning: strict
+    verification: cryptographic
+
+# ------------------------------------------------------------
+# END OF DIS-CORE v1.0
+# ============================================================

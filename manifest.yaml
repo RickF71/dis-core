@@ -1,0 +1,36 @@
+# dis-personal.v0.5 — Network Sovereignty
+version: v0.5
+name: DIS-PERSONAL
+description: |
+  Network Sovereignty — exposes a REST API for contextual consent and receipt queries.
+  Policy-validated actions with nonce/timestamp and policy checksum provenance.
+  Bind address configurable; defaults to 0.0.0.0:8080 for LAN access.
+
+modules:
+  - api:     internal/api/server.go
+  - config:  internal/config/config.go
+  - policy:  internal/policy/policy.go
+  - identity: internal/core/identity.go
+  - consent: internal/core/consent.go
+  - receipt: internal/core/receipt.go
+  - signer:  internal/util/signer.go
+  - nonce:   internal/util/nonce.go
+  - sum:     internal/util/checksum.go
+  - storage: internal/db/db.go
+
+dependencies:
+  - DIS-CORE
+  - DIS-PAIN
+  - DIS-DOMAINS (future linkage)
+
+domain_bindings:
+  - domain.null
+  - domain.simula-terra
+  - domain.terra
+
+config_file: config.yaml
+policy_file: policy.yaml
+entrypoint: main.go
+database: data/dis.db
+language: Go
+purpose: network-visible sovereignty node

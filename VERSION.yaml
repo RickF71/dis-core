@@ -1,0 +1,4 @@
+dis-core: v1.0
+dis-personal: v0.5.1
+status: synchronized
+notes: Integrated frozen DIS-CORE v1.0 schema. No logic changes.
