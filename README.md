@@ -1,26 +1,39 @@
-# DIS-PERSONAL v0.5 — Network Sovereignty
+# 🕊️ DIS-CORE  
+**Direct Individual Sovereignty — Core Constitutional Layer**
 
-## Run (server mode)
-```
-go mod tidy
+---
+
+## 📜 Overview
+
+**DIS-CORE** is the foundational layer of the *Direct Individual Sovereignty* (DIS) framework — a trust-anchored system that allows individuals and domains to operate under verifiable, self-declared authority.  
+
+This repository contains the **canonical DIS-CORE v1.0** schema and the **DIS-PERSONAL v0.5.1-core** implementation — the first self-verifying node that boots under its own constitution and proves its integrity at runtime.
+
+---
+
+## 🚀 Features
+
+- 🔐 **Frozen Constitutional Core** — `dis-core.v1.yaml` defines the unalterable foundation of DIS law.  
+- 🔏 **Cryptographic Verification** — the runtime computes and logs a SHA-256 hash of its Core schema at startup.  
+- 🌐 **Network Sovereignty Runtime** — Go-based service providing a minimal sovereign node capable of networked operation.  
+- 🧱 **Configurable Integrity Policy** — core verification is on by default (`--verify-core=true`), but can be skipped for NOTECH or test builds.  
+- 🪶 **Zero-Dependency Design** — built entirely on Go’s standard library and a local SQLite store.  
+
+---
+
+## 🧭 Version Lineage
+
+| Component | Version | Description |
+|------------|----------|-------------|
+| **DIS-CORE** | `v1.0` | Frozen schema (constitutional baseline) |
+| **DIS-PERSONAL** | `v0.5.1-core` | First self-verifying node bound to DIS-CORE v1.0 |
+| **Hash Verification** | Enabled | Startup integrity check of `schemas/dis-core.v1.yaml` |
+
+---
+
+## ⚙️ Quickstart
+
+### **1️⃣ Build and Run**
+
+```bash
 go run main.go --serve
-# Server listens on api_host:api_port from config.yaml (defaults 0.0.0.0:8080)
-```
-
-## Endpoints
-- `GET  /health`   → `{ "status": "ok", "version": "v0.5" }`
-- `GET  /policy`   → returns active policy and checksum
-- `GET  /receipts` → returns public receipts list (no identity_id)
-- `POST /act`      → JSON: `{ "by": "domain.null", "scope": "identity.confirm", "nonce": "optional" }`
-
-### Example (curl)
-```
-curl -X POST http://localhost:8080/act \
-  -H 'Content-Type: application/json' \
-  -d '{"by":"domain.null","scope":"identity.confirm"}'
-```
-
-## Privacy
-- No identity UUIDs are exposed via the API.
-- Receipts return: action, by, scope, timestamp, nonce, policy_checksum, signature, receipt_id.
-- Policy content is only exposed via the explicit `/policy` endpoint.
