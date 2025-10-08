@@ -44,3 +44,21 @@ func VerifyWithEmbeddedPub(jsonBytes []byte) (bool, error) {
 	s := &crypto.Signer{Pub: ed25519.PublicKey(pub)}
 	return s.Verify([]byte(r.Hash), r.Signature), nil
 }
+
+// DecodePublicKey converts a base64 string to an ed25519.PublicKey.
+func DecodePublicKey(b64 string) (ed25519.PublicKey, error) {
+	bytes, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, err
+	}
+	return ed25519.PublicKey(bytes), nil
+}
+
+// VerifySignature verifies an ed25519 signature against a given message.
+func VerifySignature(message []byte, pubKey ed25519.PublicKey, sigB64 string) (bool, error) {
+	sig, err := base64.StdEncoding.DecodeString(sigB64)
+	if err != nil {
+		return false, err
+	}
+	return ed25519.Verify(pubKey, message, sig), nil
+}

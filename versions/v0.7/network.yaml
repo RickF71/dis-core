@@ -1,0 +1,38 @@
+version: v0.7
+codename: "Network Ledger & Mutual Verification"
+release_date: 2025-10-09
+
+description: |
+  Defines the network trust graph for DIS Authority Consoles.
+  Each peer entry represents another domain authority whose
+  verification receipts can be validated or received.
+
+peers:
+  - name: domain.simula-terra
+    url: "https://simula-terra.dis.network"
+    public_key_b64: "rQvM1y4g0R1JkEY9G4Z7Nz5BnFHL1rKqv6ep3+pcd9M="
+    trust_level: "trusted"
+    last_seen: null
+    notes: "Primary development domain for simulated verification"
+
+  - name: domain.terra
+    url: "https://terra.dis.network"
+    public_key_b64: "toJTqxHV5yT90nUUApLZE/MXJT5bHo+gxMY3AqWEOSw="
+    trust_level: "self"
+    last_seen: "2025-10-08T19:33:08Z"
+    notes: "Local node (self)"
+
+  - name: domain.null
+    url: "https://null.dis.network"
+    public_key_b64: "B5kMeCpbItwX3P62+YbL2oDcJwrmyCmqZ4x0hEo0y2w="
+    trust_level: "observer"
+    last_seen: null
+    notes: "Null domain observer — baseline for unverified receipts"
+
+trust_levels:
+  self:
+    description: "The local domain authority (this node)."
+  trusted:
+    description: "Peers whose signatures are known and verified by SAT."
+  observer:
+    description: "Read-only peers not authorized for outbound verification."

@@ -1,0 +1,58 @@
+{
+  "entries": [
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-08T21:31:31.583566Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    },
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-08T21:54:28.256891Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    },
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-08T22:01:21.2145045Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    },
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-08T22:03:33.8204699Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    },
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-08T22:09:26.1240028Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    },
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-08T22:35:31.3087154Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    }
+  ]
+}

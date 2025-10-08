@@ -1,47 +1,27 @@
-# DIS-CORE v0.6 — Authority Console & Temporal Integrity
-**Release Date:** 2025-10-08  
-**Core Hash:** `15b437484377ac63cdb227b4fa264010aec06759f5808c699768cbe112f3c930`
+# DIS-PERSONAL Changelog
 
----
+## v0.7 — Authority Console (2025-10-08)
+### Summary
+A major release completing the Authority Console layer, bridging local sovereignty with peer-to-peer verification.  
+Bound to **DIS-CORE v1.0 (frozen schema)**.
 
-### ✨ New Features
-- **Authority Console API**
-  - `/api/console/action` → executes domain actions and generates signed receipts
-  - `/api/receipts` and `/api/receipts/{id}` → browse issued receipts
-  - `/api/verify/all` → runs verification sweeper and returns signed `domain.verify.v1` receipt
+### Added
+- 🔁 **Automated 30-minute verification cycle** — scheduled background audits that detect new receipts and self-verify integrity.
+- 🪶 **Heartbeat publisher** — broadcasts the latest verified receipt to trusted peers for distributed synchronization.
+- 🌍 **Peer ingestion endpoint** `/api/verify/external` — accepts and validates incoming verification receipts.
+- 📜 **Trust ledger** (`versions/v0.7/ledger/trust.json`) — persistent event log for peer exchanges, tracking network trust and status.
+- 🧭 **Network configuration file** (`versions/v0.7/network.yaml`) defining trusted peers and endpoints.
 
-- **Automated Verification Scheduler**
-  - Runs every 30 minutes
-  - Verifies all receipts under `versions/v0.6/receipts/generated/`
-  - Issues self-signed integrity receipts (`domain.verify.v1`)
+### Changed
+- Unified console startup with auto-verification trigger.
+- Improved startup logs and deterministic timestamps for verification state loading.
+- Enhanced receipt provenance output (consistent `by:` and `verified_at` fields).
 
-- **Smart Skip Logic**
-  - Detects when no new receipts have been added or modified
-  - Skips redundant verification cycles, reducing overhead
+### Fixed
+- Graceful handling of missing verification receipts and invalid peers.
+- Avoided redundant re-verification runs on startup.
+- Corrected path resolution for internal ledger and schema consistency.
 
-- **Persistent Verification State**
-  - `last_verification.txt` stores the timestamp of the last successful audit
-  - Reloaded automatically on startup so the node remembers its previous state
-
-- **Filesystem-based Awareness**
-  - Verification tied to actual receipt modification times
-  - 5-second tolerance buffer prevents near-simultaneous false triggers
-
----
-
-### 🔐 Security & Integrity
-- All receipts signed with Ed25519
-- Provenance chain includes SAT, domain, and policy refs
-- Verification receipts include embedded public key for independent checking
-
----
-
-### 🧠 Design Principles
-- Deterministic, auditable state changes
-- Minimal background overhead (< 1 ms per run)
-- No redundant ledger writes during idle periods
-- “Do nothing when stable” behavior — first expression of autonomous sovereignty
-
----
-
-### 📁 Directory Layout
+### Status
+Stable. Recommended baseline for distributed network testing.  
+Next milestone: **v0.8 — Peer handshake and trust synchronization**.
