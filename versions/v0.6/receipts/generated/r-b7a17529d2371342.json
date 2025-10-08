@@ -1,0 +1,33 @@
+{
+  "receipt_id": "r-b7a17529d2371342",
+  "by": "domain.terra",
+  "action": "domain.verify.v1",
+  "timestamp": "2025-10-08T01:40:20Z",
+  "hash": "12bcf7138a5a4311a04b460bf8261361927cdcbd472e8a5c7a351dbb5e02a281",
+  "provenance": [
+    {
+      "type": "SAT",
+      "ref": "sat-demo-001",
+      "status": "valid"
+    },
+    {
+      "type": "domain",
+      "ref": "domain.terra",
+      "status": "valid"
+    },
+    {
+      "type": "policy",
+      "ref": "policy.freeze.rego",
+      "status": "valid"
+    }
+  ],
+  "signature": "Mx3oyhP15YWf2Y3EBFjBZnZU1tEhEOoNkzLG8TNTh/uxbTFzbH+KUBNAOsuEs2Rr0yJn6NRIjLWpqeStz6+aAg==",
+  "frozen_core_hash": "DIS-CORE v1.0",
+  "metadata": {
+    "issued_from_console": "ac-b51ba3b7",
+    "issuer_seat": "uid-terracouncil-001",
+    "verified_at": "2025-10-08T01:40:20Z",
+    "verification_method": "SAT-check",
+    "signer_public_key_b64": "toJTqxHV5yT90nUUApLZE/MXJT5bHo+gxMY3AqWEOSw="
+  }
+}

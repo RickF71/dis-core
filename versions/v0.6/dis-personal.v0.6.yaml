@@ -1,0 +1,67 @@
+version: 0.6
+codename: "Authority Console & Receipts"
+bound_core: "DIS-CORE v1.0"
+extends: "DIS-PERSONAL v0.5.1"
+hash: TBD
+status: "development"
+
+summary: >
+  Establishes Authority Console schema and signed receipt flow (ci.call.v1).
+  Integrates SAT provenance, NOTECH proxy handling, and freeze enforcement
+  into the DIS-PERSONAL module.
+
+objectives:
+  - Define Authority Console schema (UI/CLI parity)
+  - Generate signed receipts for all consent-invoked actions
+  - Bind provenance to SAT + redaction chain
+  - Bridge NOTECH actions via domain.ghost.limen
+  - Enforce freeze validation via receipt presence
+
+schemas:
+  - name: authority_console.schema.v1
+    path: schema/authority_console.schema.v1.json
+    description: Console structure for planning, applying, and freezing actions
+  - name: receipt.ci.call.v1
+    path: schema/receipt.ci.call.v1.json
+    description: Standard receipt format for consent invocation events
+
+receipts:
+  - path: receipts/sample_core_action.json
+    description: Signed receipt for frozen core action
+  - path: receipts/sample_personal_action.json
+    description: Signed receipt for personal domain action
+  - path: receipts/sample_delegated_action.json
+    description: Multi-domain delegated consent receipt
+
+tests:
+  - id: T1
+    name: Core Freeze Receipt Validation
+    expect: "receipt valid and linked to frozen core hash"
+  - id: T2
+    name: Personal Domain Receipt Validation
+    expect: "signature verified for personal domain"
+  - id: T3
+    name: Delegated Consent Provenance
+    expect: "multi-source SAT chain verified"
+  - id: T4
+    name: Ghost Domain Proxy Test
+    expect: "proxy receipt valid but limited"
+  - id: T5
+    name: Breakglass Override
+    expect: "reason code recorded and authorized"
+
+events:
+  - domain.freeze.v1
+  - domain.unfreeze.v1
+  - domain.freeze.override.v1
+
+dependencies:
+  - DIS-CORE v1.0
+  - SAT v0.2 (identity binding)
+  - Provenance Pack v0.3 (redaction + chain)
+
+metadata:
+  author: "Richard Fleischman"
+  created: "2025-10-07"
+  dis_uid: "TBD"
+  integrity_note: "This version binds consent and authority via signed receipts."

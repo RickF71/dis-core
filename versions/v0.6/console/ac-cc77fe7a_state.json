@@ -1,0 +1,53 @@
+{
+  "ID": "ac-cc77fe7a",
+  "BoundDomain": "domain.terra",
+  "BoundCore": "DIS-CORE v1.0",
+  "SeatHolders": [
+    "uid-terracouncil-001",
+    "uid-terracouncil-002"
+  ],
+  "Actions": [
+    {
+      "ID": "act-6c15d1eecf25",
+      "Type": "domain.freeze.v1",
+      "PolicyRef": "policy.freeze.rego",
+      "Timestamp": "2025-10-07T23:47:40Z",
+      "Initiator": "uid-terracouncil-001",
+      "Status": "executed",
+      "Reason": "",
+      "Receipt": {
+        "receipt_id": "r-72b95fd7d6388186",
+        "by": "domain.terra",
+        "action": "domain.freeze.v1",
+        "timestamp": "2025-10-07T23:47:40Z",
+        "hash": "4a5ae4eccc66d9b13a907c671cdee764d8dc8de22b206c49e3a9dabd8998afc8",
+        "provenance": [
+          {
+            "type": "SAT",
+            "ref": "sat-demo-001",
+            "status": "valid"
+          },
+          {
+            "type": "domain",
+            "ref": "domain.terra",
+            "status": "valid"
+          },
+          {
+            "type": "policy",
+            "ref": "policy.freeze.rego",
+            "status": "valid"
+          }
+        ],
+        "signature": "qrP4sAfQQy2D0wkZoH4lv6fvhEbhfqKE3GcBuKwMbDs+WLbHMpOd2imJW76tMllhzKJ12U7O3TUNSX6NHKEoDQ==",
+        "frozen_core_hash": "DIS-CORE v1.0",
+        "metadata": {
+          "issued_from_console": "ac-cc77fe7a",
+          "issuer_seat": "uid-terracouncil-001",
+          "verified_at": "2025-10-07T23:47:40Z",
+          "verification_method": "SAT-check",
+          "signer_public_key_b64": "toJTqxHV5yT90nUUApLZE/MXJT5bHo+gxMY3AqWEOSw="
+        }
+      }
+    }
+  ]
+}

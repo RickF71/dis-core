@@ -1,0 +1,62 @@
+version: v0.6
+codename: "Authority Console & Temporal Integrity"
+release_date: 2025-10-08
+core_hash: "15b437484377ac63cdb227b4fa264010aec06759f5808c699768cbe112f3c930"
+
+description: |
+  DIS-CORE v0.6 introduces the Authority Console and full temporal self-verification.
+  The node now maintains continuous self-awareness through automated verification cycles,
+  persistent state memory, and minimal activity during stable operation.
+
+  This release establishes the foundation for inter-domain verification in v0.7.
+
+components:
+  - name: AuthorityConsole
+    type: module
+    path: cmd/console_server
+    description: >
+      Provides REST API for domain actions, receipts, and self-verification.
+      Includes scheduled verification daemon and integrity reporting.
+
+  - name: Receipts
+    type: internal
+    path: internal/receipts
+    description: >
+      Handles Ed25519 signing, provenance embedding, and verification routines.
+
+  - name: ConsoleCore
+    type: internal
+    path: internal/console
+    description: >
+      Implements verification scheduler, persistence, and temporal integrity logic.
+
+key_features:
+  - Self-signed integrity receipts (`domain.verify.v1`)
+  - Automated verification scheduler (30-minute interval)
+  - Smart skip mechanism with 5-second buffer
+  - Persistent verification state (`last_verification.txt`)
+  - Provenance tracking (SAT, domain, policy)
+  - Zero redundant computation during idle periods
+
+integrity:
+  signer: "uid-terracouncil-001"
+  by: "domain.terra"
+  frozen_core_hash: "DIS-CORE v1.0"
+  verification_method: "SAT-check"
+  verified_at: "2025-10-08T19:33:08Z"
+
+compatibility:
+  dis_core: v1.0
+  schema: "core/authority.console.v0.6"
+  supported_domains:
+    - domain.terra
+    - domain.simula-terra
+
+next_release_hint: v0.7
+next_release_focus: "Network Ledger and Peer Verification"
+
+notes: |
+  The node now functions as a sovereign authority capable of recording,
+  verifying, and skipping redundant checks based on real state change.
+  Future versions will extend verification receipts across domain boundaries,
+  forming the basis of distributed trust and network-ledger propagation.
