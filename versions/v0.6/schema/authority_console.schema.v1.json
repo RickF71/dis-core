@@ -1,0 +1,110 @@
+{
+  "$id": "dis://schema/authority_console.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DIS Authority Console",
+  "type": "object",
+  "description": "Defines the structure and validation logic for an Authority Console — the mechanism by which actions (plan, apply, freeze, etc.) are issued and tracked within a domain.",
+  "properties": {
+    "console_id": {
+      "type": "string",
+      "pattern": "^ac-[a-f0-9]{8}$",
+      "description": "Unique identifier for this console instance."
+    },
+    "bound_domain": {
+      "type": "string",
+      "description": "Domain in which this console operates (e.g., domain.terra or domain.usa.subdomain)."
+    },
+    "bound_core": {
+      "type": "string",
+      "description": "Identifier of the core version this console is bound to (e.g., DIS-CORE v1.0)."
+    },
+    "seat_holders": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "DIS_UIDs of authorized individuals or agents who can issue console actions."
+      },
+      "description": "List of authorized actors within this console."
+    },
+    "actions": {
+      "type": "array",
+      "description": "List of actions recorded in this console instance.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^act-[a-f0-9]{12}$",
+            "description": "Unique action identifier."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "apply",
+              "test",
+              "freeze",
+              "unfreeze",
+              "breakglass"
+            ],
+            "description": "The kind of action performed through the console."
+          },
+          "policy_ref": {
+            "type": "string",
+            "description": "Reference to the policy document, rule, or rego that governed this action."
+          },
+          "ci_ref": {
+            "type": "string",
+            "description": "Reference to the Consent Invocation (ci.call.v1) event this action belongs to."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC timestamp when this action occurred."
+          },
+          "initiator": {
+            "type": "string",
+            "description": "DIS_UID or domain reference of the entity initiating the action."
+          },
+          "receipt": {
+            "$ref": "dis://schema/receipt.ci.call.v1",
+            "description": "Linked receipt proving consent and provenance for this action."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "executed", "denied", "revoked"],
+            "description": "State of this action within the console."
+          },
+          "reason_code": {
+            "type": "string",
+            "description": "If denied or revoked, indicates why (e.g., deny:freeze:unverified)."
+          }
+        },
+        "required": ["id", "type", "timestamp", "initiator", "receipt"]
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "created": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "integrity_hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hash of this console configuration for immutability tracking."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version tag of this schema instance."
+        }
+      },
+      "required": ["created", "created_by", "version"]
+    }
+  },
+  "required": ["console_id", "bound_domain", "bound_core", "seat_holders", "actions", "metadata"]
+}

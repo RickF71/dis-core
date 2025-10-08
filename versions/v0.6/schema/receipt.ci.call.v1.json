@@ -1,0 +1,110 @@
+{
+  "$id": "dis://schema/receipt.ci.call.v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Consent Invocation Receipt",
+  "description": "Defines the signed proof-of-consent record produced whenever an authorized action occurs within DIS.",
+  "type": "object",
+  "properties": {
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^r-[a-f0-9]{16}$",
+      "description": "Unique receipt identifier."
+    },
+    "by": {
+      "type": "string",
+      "description": "Domain or actor issuing this action (e.g., domain.terra, domain.usa, domain.ghost.limen)."
+    },
+    "action": {
+      "type": "string",
+      "description": "The action this receipt corresponds to, such as 'domain.freeze.v1' or 'plan.apply'."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the consent event (UTC)."
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the full action payload for immutability."
+    },
+    "provenance": {
+      "type": "array",
+      "description": "Chain of tokens, domains, and policies that establish provenance for this consent action.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["SAT", "domain", "policy", "user_consent"],
+            "description": "The kind of entity contributing to the provenance chain."
+          },
+          "ref": {
+            "type": "string",
+            "description": "Reference to the token, domain, or consent document involved."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["valid", "expired", "revoked"],
+            "description": "Verification result for this element in the provenance chain."
+          },
+          "redacted_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of fields that were redacted for privacy or security reasons."
+          }
+        },
+        "required": ["type", "ref", "status"]
+      }
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/=]{64,}$",
+      "description": "Base64-encoded digital signature of the receipt by the issuing domain or actor."
+    },
+    "frozen_core_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Integrity hash of the DIS-CORE version this receipt is bound to."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Supplemental details about the consent process and audit trail.",
+      "properties": {
+        "issued_from_console": {
+          "type": "string",
+          "pattern": "^ac-[a-f0-9]{8}$",
+          "description": "The Authority Console instance that issued this receipt."
+        },
+        "issuer_seat": {
+          "type": "string",
+          "description": "The DIS_UID of the seat holder who executed the action."
+        },
+        "verified_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this receipt was verified."
+        },
+        "verification_method": {
+          "type": "string",
+          "enum": ["SAT-check", "Domain-ledger", "Policy-engine", "Manual-review"],
+          "description": "Indicates how the receipt's authenticity was verified."
+        }
+      },
+      "required": ["issued_from_console", "issuer_seat"]
+    }
+  },
+  "required": [
+    "receipt_id",
+    "by",
+    "action",
+    "timestamp",
+    "hash",
+    "signature",
+    "frozen_core_hash",
+    "provenance",
+    "metadata"
+  ]
+}
