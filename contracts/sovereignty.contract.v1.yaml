@@ -1,0 +1,165 @@
+# DIS-PERSONAL / contracts/sovereignty.contract.v1.yaml
+# Spec: Sovereignty Contract — recognition & containment of entities (DIS / NODIS / NOTECH).
+version: 1
+kind: contract
+name: dis-personal.sovereignty.contract.v1
+dis_core_binding: v1.0
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+additionalProperties: false
+required:
+  - contract_id
+  - sovereign_entity
+  - recognition
+  - containment
+  - obligations
+  - termination
+properties:
+  contract_id:
+    type: string
+    pattern: "^scx-[a-z0-9]{8,}$"
+
+  sovereign_entity:
+    type: object
+    additionalProperties: false
+    required: [entity_id, type, status, tech_participation]
+    properties:
+      entity_id: { type: string }
+      type: { type: string, enum: [individual, corporation, ai, community] }
+      status: { type: string, enum: [dis, nodis] }
+      tech_participation: { type: string, enum: [full, limited, notech] }
+      classification:
+        type: string
+        enum: [default, phantom, investigatory]
+        default: default
+
+  recognition:
+    type: object
+    additionalProperties: false
+    required: [is_recognized, scope]
+    properties:
+      is_recognized: { type: boolean }
+      scope:
+        type: string
+        enum: [sovereign, contained, none]
+        description: >
+          'sovereign' for DIS entities with full rights;
+          'contained' for NODIS entities interacting via gates;
+          'none' for unrecognized/blocked actors.
+      notes: { type: ["string","null"] }
+
+  containment:
+    type: object
+    additionalProperties: false
+    required: [required_if, protocols]
+    properties:
+      required_if:
+        type: string
+        enum: ["status==nodis", "classification==phantom", "never"]
+      protocols:
+        type: array
+        items:
+          type: string
+          enum: [audit, gate, receipt_mirroring, rate_limit, sandbox, freeze]
+      interface_contract_ref:
+        type: ["string","null"]
+        description: "Reference to interface ruleset enabling limited operations."
+      mirror_to_seat_chain:
+        type: boolean
+        description: "If true, every cross-boundary act is mirrored to a designated Seat chain."
+
+  obligations:
+    type: object
+    additionalProperties: false
+    required: [transparency, lineage, data_rights, action_rights]
+    properties:
+      transparency:
+        type: object
+        additionalProperties: false
+        required: [public_policy_ref]
+        properties:
+          public_policy_ref: { type: string }
+          periodic_disclosure_days: { type: integer, minimum: 0, default: 90 }
+      lineage:
+        type: object
+        additionalProperties: false
+        required: [human_anchor_required]
+        properties:
+          human_anchor_required: { type: boolean, const: true }
+          human_anchor_ref: { type: ["string","null"] }
+      data_rights:
+        type: object
+        additionalProperties: false
+        required: [collect, process, share]
+        properties:
+          collect: { type: string, enum: [deny, consent, limited] }
+          process: { type: string, enum: [deny, consent, limited] }
+          share:   { type: string, enum: [deny, consent, limited] }
+      action_rights:
+        type: object
+        additionalProperties: false
+        required: [market, governance]
+        properties:
+          market: { type: string, enum: [deny, consent, limited] }
+          governance: { type: string, enum: [deny, consent] }
+
+  termination:
+    type: object
+    additionalProperties: false
+    required: [triggers, effect]
+    properties:
+      triggers:
+        type: array
+        items:
+          type: string
+          enum:
+            - phantom_detected
+            - lineage_broken
+            - containment_breach
+            - disclosure_failure
+            - willful_deception
+      effect:
+        type: string
+        enum: [freeze, revoke, quarantine]
+      post_effect_notice_days:
+        type: integer
+        minimum: 0
+        default: 7
+
+# --- Example (non-normative) ---
+example:
+  contract_id: "scx-9c34ab52"
+  sovereign_entity:
+    entity_id: "did:dis:corp:acme"
+    type: "corporation"
+    status: "nodis"
+    tech_participation: "full"
+    classification: "default"
+  recognition:
+    is_recognized: true
+    scope: "contained"
+    notes: "Limited market interface via containment."
+  containment:
+    required_if: "status==nodis"
+    protocols: [audit, gate, receipt_mirroring, rate_limit]
+    interface_contract_ref: "icx-acme-market-v1"
+    mirror_to_seat_chain: true
+  obligations:
+    transparency:
+      public_policy_ref: "policy://acme/transparency-v1"
+      periodic_disclosure_days: 90
+    lineage:
+      human_anchor_required: true
+      human_anchor_ref: null
+    data_rights:
+      collect: consent
+      process: consent
+      share: limited
+    action_rights:
+      market: limited
+      governance: deny
+  termination:
+    triggers: [lineage_broken, containment_breach]
+    effect: freeze
+    post_effect_notice_days: 7

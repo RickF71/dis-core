@@ -1,0 +1,27 @@
+# DIS-PERSONAL / indexes/domain.sovereignty.index.yaml
+# Aggregated sovereignty status of a domain — the "heartbeat" of its legitimacy.
+version: 1
+kind: index
+name: dis-personal.domain.sovereignty.index
+dis_core_binding: v1.0
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+required: [domain_ref, seats_active, individuals_registered, nodis_links, last_audit]
+additionalProperties: false
+
+properties:
+  domain_ref: { type: string }
+  seats_active: { type: integer }
+  individuals_registered: { type: integer }
+  nodis_links: { type: integer }
+  last_audit: { type: string, format: date-time }
+  audit_result: { type: string, enum: [clean, warnings, violations] }
+
+example:
+  domain_ref: "terra"
+  seats_active: 5
+  individuals_registered: 1203
+  nodis_links: 2
+  last_audit: "2025-10-09T06:30:00Z"
+  audit_result: "clean"

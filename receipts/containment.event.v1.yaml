@@ -1,0 +1,46 @@
+# DIS-PERSONAL / receipts/containment.event.v1.yaml
+# Record of a containment action between DIS and NODIS entities.
+version: 1
+kind: receipt
+name: dis-personal.containment.event.v1
+dis_core_binding: v1.0
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+required: [event_id, initiator, target, action, result, timestamp]
+additionalProperties: false
+
+properties:
+  event_id:
+    type: string
+    pattern: "^cev-[a-z0-9]{6,}$"
+  initiator:
+    type: string
+    description: "Seat ID or authority initiating containment."
+  target:
+    type: string
+    description: "NODIS entity identifier or reference."
+  action:
+    type: string
+    enum: [audit, mirror, freeze, quarantine, release]
+  result:
+    type: string
+    enum: [success, partial, failure]
+  reason:
+    type: string
+  timestamp:
+    type: string
+    format: date-time
+  receipt_ref:
+    type: ["string","null"]
+    description: "Optional hash linking to authority approval receipt."
+
+example:
+  event_id: "cev-39acbe"
+  initiator: "seat_terra_core"
+  target: "nodis:corp:grokai"
+  action: "freeze"
+  result: "success"
+  reason: "Unanchored AI trading activity"
+  timestamp: "2025-10-09T05:00:00Z"
+  receipt_ref: "0xdef456..."

@@ -1,4 +1,9 @@
 dis-core: v1.0
-dis-personal: v0.8-dev
-status: in-progress
-notes: Begin scaffold for personal node authority; integrate signed receipts and domain sync hooks.
+dis-personal: v0.8.2
+status: stabilized
+notes: >
+  Seats of Power activated with per-seat lineage.
+  Sovereignty Contracts and containment events introduced.
+  DIS/NODIS/NOTECH model unified.
+  Personal and domain manifests defined for individual sovereignty tracking.
+  Finance scaffold reserved for future DIS-FINANCE v0.1 module.

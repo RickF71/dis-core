@@ -1,0 +1,42 @@
+# DIS-PERSONAL / policies/finance.policy.v1.yaml
+# Scaffold: Placeholder for DIS-FINANCE integration.
+# Purpose: Establish a structural interface for future currency, trade, and value flow.
+version: 1
+kind: policy
+name: dis-personal.finance.policy.v1
+dis_core_binding: v1.0
+
+scaffold: true
+status: "inactive"
+notes: >
+  This file scaffolds the conceptual framework for consentful economic actions
+  within DIS. No monetary or trade logic is active in v0.8.2.
+  All references to finance or currency are symbolic placeholders until
+  DIS-FINANCE v0.1 is instantiated.
+
+concepts:
+  - Consent precedes currency.
+  - All value flows must originate from a verified Seat of Power.
+  - Future DIS currency units will represent consent energy, not fiat equivalence.
+  - NODIS and NOTECH actors will have conditional or non-technological economies.
+  - Every economic action will ultimately generate a ledger receipt.
+
+interfaces:
+  - ledger_anchor: "seat_receipts"
+  - authority_source: "dis-core.v1.0/authority.root"
+  - module_future: "dis-finance.v0.1"
+
+placeholder_fields:
+  market_actions: []
+  enforcement: []
+  nodis_interface: []
+  currency_model: null
+  token_logic: null
+  audit_requirements: null
+
+roadmap:
+  next_module: "dis-finance.v0.1"
+  target_milestone: "v0.9"
+  description: >
+    DIS-FINANCE will introduce consent-linked value units (SAT tokens),
+    trade receipts, and containment protocols for financial automation.

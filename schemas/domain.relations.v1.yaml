@@ -1,0 +1,41 @@
+version: 1
+kind: schema
+name: dis-personal.domain.relations.v1
+dis_core_binding: v1.0
+
+description: >
+  Defines relationships between domains or seats, allowing Seats
+  to operate as micro-domains with explicit relational mappings.
+
+type: object
+required: [domain_id, relations]
+properties:
+  domain_id: { type: string }
+  relations:
+    type: array
+    items:
+      type: object
+      required: [target_domain, relation_type]
+      properties:
+        target_domain: { type: string }
+        relation_type:
+          type: string
+          enum:
+            - peer
+            - parent
+            - child
+            - federated
+            - disputed
+            - isolated
+        relation_proof:
+          type: ["string","null"]
+          description: "Optional hash or receipt linking to proof of this relation."
+example:
+  domain_id: "seat_terra_core"
+  relations:
+    - target_domain: "simula.terra"
+      relation_type: "federated"
+      relation_proof: "0xabc123..."
+    - target_domain: "seat_terra_judicial"
+      relation_type: "child"
+      relation_proof: null
