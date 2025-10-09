@@ -1,13 +1,4 @@
 dis-core: v1.0
-dis-personal: v0.7
-status: stable
-notes: >
-  Major upgrade from v0.5.1 introducing Authority Console architecture.
-  Features include:
-    - Automated 30-minute verification cycle.
-    - On-demand integrity check skipping logic.
-    - Heartbeat publisher broadcasting verification receipts to peers.
-    - Peer ingestion endpoint (/api/verify/external) with JSON validation.
-    - Trust ledger (versions/v0.7/ledger/trust.json) for network events.
-  Bound to DIS-CORE v1.0 (frozen schema).
-released: 2025-10-08
+dis-personal: v0.8-dev
+status: in-progress
+notes: Begin scaffold for personal node authority; integrate signed receipts and domain sync hooks.

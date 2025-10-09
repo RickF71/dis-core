@@ -1,4 +1,3 @@
-# Demo policy for v0.5 — Policy-Driven Sovereignty
 allowed:
   domain.null:
     - identity.confirm
@@ -6,6 +5,7 @@ allowed:
   domain.terra:
     - land.register
     - land.transfer
+    - verify       # ✅ add this
   domain.simula-terra:
     - identity.confirm
 deny:

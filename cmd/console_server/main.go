@@ -140,7 +140,7 @@ func main() {
 					log.Printf("🌐 Failed to reach %s (%s): %v", peer.Name, peer.URL, err)
 					continue
 				}
-				defer resp.Body.Close()
+				//defer resp.Body.Close()
 
 				var result map[string]any
 				_ = json.NewDecoder(resp.Body).Decode(&result)
