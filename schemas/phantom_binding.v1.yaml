@@ -1,0 +1,34 @@
+# schemas/phantom_binding.v1.yaml
+phantom_binding:
+  id: string
+  version: v1
+  layer: DIS
+  title: "Phantom Power Containment Schema"
+  description: >
+    Defines the containment and conditional validation of a phantom (unverified)
+    power structure—corporate, governmental, or AI—within DIS.  Enables
+    limited interoperability through oversight seats without granting
+    full legitimacy.  A Phantom Binding establishes verifiable boundaries,
+    audit schedules, and expiry for unverified entities operating within
+    or alongside DIS.
+
+  fields:
+    phantom_domain_ref: string           # External or NODIS domain being bound.
+    oversight_seat_ref: string           # DIS seat responsible for containment.
+    verification_level: [symbolic, partial, full]
+    verified_scope: [string]             # Declared, limited areas of interaction.
+    audit_cycle: string                  # Required audit frequency (e.g., annual).
+    expiry: datetime                     # Expiration of authorization window.
+    renewal_policy:
+      allowed: boolean
+      requires_audit: boolean
+    legitimacy_status: [phantom, shadow]
+    sealed_content_hash: string          # Optional hash for sealed agreements.
+    receipts:
+      - phantom.boundary.receipt.v1
+      - phantom.scope.receipt.v1
+    commentary: >
+      Phantom bindings permit mapping and containment of power that operates
+      outside verifiable consent lineage.  They formalize its existence without
+      endorsing its legitimacy.  Oversight seats define boundaries, frequency
+      of review, and expiry, ensuring unverified power cannot persist unbounded.

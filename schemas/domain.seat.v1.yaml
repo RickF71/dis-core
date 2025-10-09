@@ -1,0 +1,74 @@
+# schemas/domain.seat.v1.yaml
+seat:
+  id: string
+  version: v1
+  layer: DIS
+  title: "Seat of Authority Schema"
+  description: >
+    A Seat is a locus of legitimate authority within a domain. It represents
+    the structural capacity through which sovereignty becomes actionable.
+    Seats may also engage with shadow or phantom domains through verified
+    oversight bindings that preserve accountability and limit influence.
+
+  fields:
+    domain: string
+    purpose: string
+    occupant_id: string
+    consent_ref: string
+    delegation_ref: string
+    mode: [inactive, active, delegated]
+    status: [vacant, occupied, suspended, dissolved]
+    term_duration: string
+    lineage_ref: string
+    policy_scope: [string]
+    ethics_ref: string
+    audit_interval: string
+    legitimacy_status: [verified, shadow, phantom]     # harmonized term
+    phantom_binding_ref: string                        # replaces ghost_binding_ref
+
+  accession:
+    method: [elected, appointed, assumed, procedural]
+    authority_ref: string
+    process_ref: string
+    eligibility_criteria:
+      - description: string
+        requirement_type: [qualification, lineage, consent]
+    commentary: >
+      Declares how the Seat’s authority is lawfully established.  Each method
+      must produce verifiable receipts and be auditable through lineage.
+
+  delegator_policy:
+    mode: [dormant, delegative, procedural]
+    delegate_ref: string
+    conditions:
+      - trigger: string
+        action: string
+        target: string
+    commentary: >
+      Defines behavior when unoccupied.  Delegation never bypasses lineage
+      or consent verification.
+
+  rules:
+    - must_belong_to_domain: true
+    - activation_requires: [consent_ref | delegation_ref]
+    - inherits_scope_from_domain: true
+    - vacancy_behavior: dormant_or_delegative
+    - emits_receipt_on_state_change: true
+    - term_duration_required_for_activation: true
+    - lineage_integrity_must_verify: true
+    - accession_must_produce_receipt: true
+    - if_legitimacy_phantom_requires_phantom_binding: true  # updated rule
+
+  receipts:
+    - seat.occupation.receipt.v1
+    - seat.appointment.receipt.v1
+    - seat.vacancy.receipt.v1
+    - seat.audit.receipt.v1
+    - seat.election.receipt.v1
+    - seat.assumption.receipt.v1
+    - phantom.boundary.receipt.v1
+    - phantom.scope.receipt.v1
+
+  commentary: >
+    Seats define where and how authority is instantiated inside DIS.
+    They maintain continuity

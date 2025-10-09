@@ -1,0 +1,70 @@
+# Folder: /fdis/forms/ecology.form.yaml
+form:
+  id: ecology
+  layer: fDIS
+  title: "The Form of Ecology"
+  essence: "Interdependence of all living systems within and across domains."
+  principles:
+    - balance
+    - adaptation
+    - regeneration
+  instantiates:
+    - domain.science.ecology
+    - domain.terra.biome
+  commentary: >
+    fDIS:Ecology defines the conceptual basis for all ecological domains in DIS.
+    It informs ethics, sustainability policies, and sovereignty contracts related
+    to environmental stewardship.
+
+# Folder: /fdis/forms/justice.form.yaml
+form:
+  id: justice
+  layer: fDIS
+  title: "The Form of Justice"
+  essence: "Balance between individual sovereignty and collective harmony."
+  principles:
+    - fairness
+    - proportionality
+    - restoration
+  instantiates:
+    - domain.civic.judicial
+    - domain.civic.rights
+  commentary: >
+    fDIS:Justice defines the conceptual foundation for judicial and civic domains.
+    It informs conflict resolution, equitable treatment, and societal trust.
+
+# Folder: /fdis/forms/communication.form.yaml
+form:
+  id: communication
+  layer: fDIS
+  title: "The Form of Communication"
+  essence: "Transmission and translation of meaning between sovereign entities."
+  principles:
+    - clarity
+    - reciprocity
+    - authenticity
+  instantiates:
+    - domain.culture.media
+    - domain.culture.language
+  commentary: >
+    fDIS:Communication defines the structure for all expressive and interpretive domains.
+    It governs interaction, information flow, and cultural continuity.
+
+# Folder: /fdis/relations/form_domain.map.yaml
+relations:
+  - form: fdis:ecology
+    domains: [science.ecology, terra.biome]
+  - form: fdis:justice
+    domains: [civic.judicial, civic.rights]
+  - form: fdis:communication
+    domains: [culture.media, culture.language]
+
+# Folder: /fdis/README.md
+# fDIS — DeclarationIS Layer (Forms)
+
+**fDIS** (Forms / DeclarationIS) represents the reflective layer of DIS.
+It defines the *Forms* — archetypal declarations of meaning and legitimacy —
+that inform the operational **DIS** (DirectIS) domains.
+
+- `/forms/` → The archetypal blueprints (Forms)
+- `/relations/` → Mappings between Forms and operational dom
