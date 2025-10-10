@@ -1,0 +1,33 @@
+{
+  "receipt_id": "r-5aabe031faaa6992",
+  "by": "domain.terra",
+  "action": "freeze_core_v0.8.4",
+  "timestamp": "2025-10-10T01:50:46Z",
+  "hash": "8ee8eec3e7cb9405571e181d20e29b00be1dc54d1ca5bc50bfb80427ec341b89",
+  "provenance": [
+    {
+      "type": "SAT",
+      "ref": "sat-demo-001",
+      "status": "valid"
+    },
+    {
+      "type": "domain",
+      "ref": "domain.terra",
+      "status": "valid"
+    },
+    {
+      "type": "policy",
+      "ref": "policy.freeze.rego",
+      "status": "valid"
+    }
+  ],
+  "signature": "3zpEAwARmBDQ0Z5+iDnfUZI0tEpfxSrxNk8l8bjyRKH3g2QgIjwq9Laogv9s7ehhjpGqFoJGg1zvG9Ks+WmMDA==",
+  "frozen_core_hash": "6a2f815d18cad568f3e46b5760de0eef9dd34d980ef5d52e7bcc4419b29b6fe7",
+  "metadata": {
+    "issued_from_console": "console-001",
+    "issuer_seat": "seat.core.architect",
+    "verified_at": "2025-10-10T01:50:46Z",
+    "verification_method": "SAT-check",
+    "signer_public_key_b64": "toJTqxHV5yT90nUUApLZE/MXJT5bHo+gxMY3AqWEOSw="
+  }
+}
