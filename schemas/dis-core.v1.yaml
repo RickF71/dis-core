@@ -1,7 +1,3 @@
-# ============================================================
-# DIS-CORE v1.0 — Canonical Baseline
-# Direct Individual Sovereignty (Core Ontology)
-# ------------------------------------------------------------
 # Frozen at version 1.0 — October 2025
 # ------------------------------------------------------------
 # This schema defines the immutable primitives of DIS:
@@ -10,10 +6,19 @@
 #   - Scope
 #   - Policy
 #   - Receipt
-# ------------------------------------------------------------
-# Extensions (inheritance, federation, SATs, freeze logic)
-# must reference these types but cannot mutate them.
 # ============================================================
+
+meta:
+  schema_id: dis-core
+  schema_version: v1.0
+  status: frozen
+  description: >
+    Defines the immutable primitives and lawful substrate of
+    Direct Individual Sovereignty. All other DIS modules must
+    reference this schema as their root of legitimacy.
+  author: dis-core.committee
+  date_frozen: 2025-10-10
+  integrity_hash: "<auto-filled-by-registry>"
 
 dis_core:
   version: v1.0

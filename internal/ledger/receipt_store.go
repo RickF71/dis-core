@@ -10,6 +10,15 @@ import (
 
 var ledgerLock sync.Mutex
 
+// Receipt is a minimal placeholder for ledger entries.
+// Replace or expand with your existing receipt struct when integrated.
+type Receipt struct {
+	ID        string
+	Action    string
+	Timestamp string
+	Hash      string
+}
+
 // SaveReceipt writes receipt JSON bytes both as an individual JSON file
 // and as a single-line entry in a rolling ledger file (ledger.jsonl).
 func SaveReceipt(data []byte) error {

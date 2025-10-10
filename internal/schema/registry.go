@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Entry represents a single registered schema.
 type Entry struct {
 	ID      string `json:"id"`
 	Version string `json:"version"`
@@ -21,13 +22,18 @@ type Entry struct {
 	Path    string `json:"path"`
 }
 
+// Registry holds all loaded schemas in memory.
 type Registry struct {
 	byKey map[string]Entry // key = id@version
 }
 
+// NewRegistry creates an empty registry.
 func NewRegistry() *Registry { return &Registry{byKey: map[string]Entry{}} }
 
-func (r *Registry) key(id, version string) string { return id + "@" + version }
+// key builds the canonical lookup key for a schema.
+func (r *Registry) key(id, version string) string {
+	return fmt.Sprintf("%s@%s", strings.TrimSpace(id), strings.TrimSpace(version))
+}
 
 // LoadDir walks a directory and registers any YAML matching a DIS schema header.
 func (r *Registry) LoadDir(dir string) error {
@@ -50,26 +56,28 @@ func (r *Registry) LoadDir(dir string) error {
 		// Expect "meta.schema_id" and "meta.schema_version"
 		var hdr struct {
 			Meta struct {
-				SchemaID      string `json:"schema_id" yaml:"schema_id"`
-				SchemaVersion string `json:"schema_version" yaml:"schema_version"`
-			} `json:"meta" yaml:"meta"`
+				SchemaID      string `yaml:"schema_id"`
+				SchemaVersion string `yaml:"schema_version"`
+			} `yaml:"meta"`
 		}
 		if err := yaml.Unmarshal(b, &hdr); err != nil {
 			return err
 		}
 
-		//fmt.Printf("🧩 scanning schema file: %s\n", path)
-
 		if hdr.Meta.SchemaID == "" || hdr.Meta.SchemaVersion == "" {
-			//fmt.Printf("⚠️  skipped schema: %s (missing meta.schema_id/version)\n", path)
 			return nil // skip non-schema YAMLs
+		}
+
+		// Strict version enforcement: must start with 'v' and contain '.'
+		if !strings.HasPrefix(hdr.Meta.SchemaVersion, "v") || !strings.Contains(hdr.Meta.SchemaVersion, ".") {
+			return fmt.Errorf("❌ invalid schema version in %s: '%s' (must be like v1.0)",
+				path, hdr.Meta.SchemaVersion)
 		}
 
 		// Compute content hash
 		h := sha256.Sum256(b)
 		hashHex := hex.EncodeToString(h[:])
 
-		// Register entry
 		e := Entry{
 			ID:      hdr.Meta.SchemaID,
 			Version: hdr.Meta.SchemaVersion,
@@ -78,20 +86,18 @@ func (r *Registry) LoadDir(dir string) error {
 		}
 		r.byKey[r.key(e.ID, e.Version)] = e
 
-		fmt.Printf("✅ registered schema: %s@%s (hash=%s)\n",
-			e.ID, e.Version, e.Hash[:12])
-
+		fmt.Printf("📜 Registered schema: %s (%s)\n", e.ID, e.Version)
 		return nil
 	})
 }
 
-// Get retrieves a schema by id+version.
+// Get retrieves a schema by id + version.
 func (r *Registry) Get(id, version string) (Entry, bool) {
 	e, ok := r.byKey[r.key(id, version)]
 	return e, ok
 }
 
-// Verify compares the stored hash with a recomputed hash.
+// Verify recomputes and checks a schema’s hash.
 func (r *Registry) Verify(id, version string) error {
 	e, ok := r.Get(id, version)
 	if !ok {
@@ -108,7 +114,7 @@ func (r *Registry) Verify(id, version string) error {
 	return nil
 }
 
-// HashAll returns a deterministic hash of every schema registered.
+// HashAll returns a deterministic hash of all schemas.
 func (r *Registry) HashAll() string {
 	h := sha256.New()
 	keys := make([]string, 0, len(r.byKey))
