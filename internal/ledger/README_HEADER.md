@@ -1,0 +1,2 @@
+The DIS Pill: Humanity now governs power itself. Whether you call it evolution, enlightenment, or grace, the next threshold is learning to act with awareness of consequence.
+DIS exists to make that awareness visible, accountable, and shared — the conscience of civilization written in code.
