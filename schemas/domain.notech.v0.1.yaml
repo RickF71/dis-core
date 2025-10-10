@@ -1,3 +1,10 @@
+meta:
+  schema_id: domain.notech
+  schema_version: v0.1
+  schema_hash: "<filled-by-registry>"
+  name: "NOTECH Domain Schema"
+  uuid: "00000000-0000-4000-8000-00000000NOTECH"
+
 id: domain.notech
 version: v0.1
 $schema: "https://json-schema.org/draft/2020-12/schema"

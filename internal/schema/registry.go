@@ -3,12 +3,12 @@ package schema
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -41,23 +41,46 @@ func (r *Registry) LoadDir(dir string) error {
 		if !strings.HasSuffix(d.Name(), ".yaml") && !strings.HasSuffix(d.Name(), ".yml") {
 			return nil
 		}
+
 		b, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
+
+		// Expect "meta.schema_id" and "meta.schema_version"
 		var hdr struct {
-			ID      string `json:"id" yaml:"id"`
-			Version string `json:"version" yaml:"version"`
+			Meta struct {
+				SchemaID      string `json:"schema_id" yaml:"schema_id"`
+				SchemaVersion string `json:"schema_version" yaml:"schema_version"`
+			} `json:"meta" yaml:"meta"`
 		}
-		if err := yamlUnmarshalHeader(b, &hdr); err != nil {
-			return nil
-		} // skip non-schema files
-		if hdr.ID == "" || hdr.Version == "" {
-			return nil
+		if err := yaml.Unmarshal(b, &hdr); err != nil {
+			return err
 		}
+
+		//fmt.Printf("🧩 scanning schema file: %s\n", path)
+
+		if hdr.Meta.SchemaID == "" || hdr.Meta.SchemaVersion == "" {
+			//fmt.Printf("⚠️  skipped schema: %s (missing meta.schema_id/version)\n", path)
+			return nil // skip non-schema YAMLs
+		}
+
+		// Compute content hash
 		h := sha256.Sum256(b)
-		e := Entry{ID: hdr.ID, Version: hdr.Version, Hash: hex.EncodeToString(h[:]), Path: path}
+		hashHex := hex.EncodeToString(h[:])
+
+		// Register entry
+		e := Entry{
+			ID:      hdr.Meta.SchemaID,
+			Version: hdr.Meta.SchemaVersion,
+			Hash:    hashHex,
+			Path:    path,
+		}
 		r.byKey[r.key(e.ID, e.Version)] = e
+
+		fmt.Printf("✅ registered schema: %s@%s (hash=%s)\n",
+			e.ID, e.Version, e.Hash[:12])
+
 		return nil
 	})
 }
@@ -85,29 +108,16 @@ func (r *Registry) Verify(id, version string) error {
 	return nil
 }
 
-// yamlUnmarshalHeader extracts minimal header fields without strict schema types.
-func yamlUnmarshalHeader(b []byte, v any) error {
-	// Lazy approach: use a JSON round-trip via yq-like heuristic.
-	// In production, import a YAML lib. Here we avoid extra deps in the snippet.
-	// Replace with: gopkg.in/yaml.v3
-	return json.Unmarshal(YAMLtoJSON(b), v)
-}
-
-// YAMLtoJSON is a placeholder adapter; replace with proper YAML decoding.
-func YAMLtoJSON(b []byte) []byte {
-	var v any
-	if err := yaml.Unmarshal(b, &v); err != nil {
-		return b // fallback
-	}
-	j, _ := json.Marshal(v)
-	return j
-}
-
 // HashAll returns a deterministic hash of every schema registered.
-// This lets the --freeze command produce a single hash representing the full registry state.
 func (r *Registry) HashAll() string {
 	h := sha256.New()
-	for _, e := range r.byKey {
+	keys := make([]string, 0, len(r.byKey))
+	for k := range r.byKey {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		e := r.byKey[k]
 		h.Write([]byte(e.ID))
 		h.Write([]byte(e.Version))
 		h.Write([]byte(e.Hash))

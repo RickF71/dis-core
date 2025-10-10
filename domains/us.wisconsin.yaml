@@ -1,0 +1,78 @@
+meta:
+  schema_id: domain.government
+  schema_version: v0.1
+  schema_hash: "<filled-by-registry>"
+  name: "State of Wisconsin"
+  uuid: "00000000-0000-4000-8000-00000000WI01"
+  parent_domain_ref: usa
+  description: >
+    The State of Wisconsin, a semi-autonomous federated domain within the
+    United States of America. Bound to the domain.government@v0.1 schema and
+    ethically constrained by the NOTECH framework via its parent domain.
+
+authority:
+  seats:
+    - id: s1
+      title: Governor
+      holder: "44444444-4444-4444-8444-444444444444"
+      term: P4Y
+      powers: [enact_state_policy, allocate_budget, appoint_cabinet]
+      constraints: [ethics_gate_required]
+      receipt_policy:
+        binding:
+          schema_id: dis-core
+          version: v1.0
+
+    - id: s2
+      title: Legislature
+      holder: "55555555-5555-4555-8555-555555555555"
+      term: P2Y
+      powers: [create_state_law, ratify_budget]
+      constraints: [public_consent_required]
+      receipt_policy:
+        binding:
+          schema_id: dis-core
+          version: v1.0
+
+    - id: s3
+      title: Judiciary
+      holder: "66666666-6666-4666-8666-666666666666"
+      term: P6Y
+      powers: [interpret_state_law, review_ethics]
+      constraints: [independent_judgment]
+      receipt_policy:
+        binding:
+          schema_id: dis-core
+          version: v1.0
+
+federation:
+  description: >
+    The Wisconsin domain maintains its own local consent and legislative
+    mechanisms but is bound by the federal domain’s NOTECH ethics throttle
+    and receipt-based accountability.
+
+  parent_ref: usa
+  interlinks:
+    - domain: usa
+      type: parent
+    - domain: domain.notech@v0.1
+      type: ethics_binding
+
+ethics_binding:
+  linked_domains: [domain.notech@v0.1]
+  enforcement: "State-level AI, nano, and environmental policies must align with federal NOTECH constraints."
+
+consent:
+  mechanisms:
+    - id: state_vote
+      method: digital
+    - id: local_convention
+      method: in_person
+  quorum: "majority of verified residents"
+  receipts_required: 2
+
+boundaries:
+  prohibited_actions:
+    - override_federal_ethics_gate
+    - unsanctioned_AI_deployment
+    - AI_autonomy_beyond_notech_throttle
