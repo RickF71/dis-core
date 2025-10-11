@@ -2,9 +2,14 @@ package consent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log"
+	"math"
 	"sync"
 	"time"
+
+	"dis-core/internal/ledger"
 )
 
 // ---- Public Types ----
@@ -16,6 +21,29 @@ type ActorRef struct {
 	Domain     string  `json:"domain"`
 	Trust      float64 `json:"trust"`      // 0.0 - 1.0
 	Legitimacy float64 `json:"legitimacy"` // 0.0 - 1.0 (domain or seat-derived)
+}
+
+type ConsentGate struct {
+	ID            string    `json:"id"`
+	DomainRef     string    `json:"domain_ref"`
+	ActionRef     string    `json:"action_ref"`
+	Threshold     float64   `json:"threshold"`    // 0.0–1.0
+	Quorum        int       `json:"quorum"`       // minimum participants
+	MoralWeight   float64   `json:"moral_weight"` // weight multiplier
+	LegitimacyRef string    `json:"legitimacy_ref"`
+	Result        string    `json:"result"`     // granted, denied, pending
+	Confidence    float64   `json:"confidence"` // 0.0–1.0
+	LastCheck     time.Time `json:"last_check"`
+	Comments      string    `json:"comments"`
+}
+
+type ConsentInput struct {
+	DomainRef   string
+	ActionRef   string
+	Approvals   int
+	Rejections  int
+	MoralWeight float64
+	Quorum      int
 }
 
 // ConsentRequest is the input to the Gate.
@@ -105,6 +133,45 @@ type Gate struct {
 	poster  ReceiptPoster
 	timeNow func() time.Time
 	version string
+}
+
+// CheckConsent runs a basic threshold-based consent validation.
+// In v0.8.8 we simulate consensus inputs; later this will integrate
+// real domain voting or moral signal logic.
+func CheckConsent(input ConsentInput) (*ConsentGate, error) {
+	total := input.Approvals + input.Rejections
+	if total < input.Quorum {
+		return nil, errors.New("insufficient quorum")
+	}
+
+	ratio := float64(input.Approvals) / float64(total)
+	result := "pending"
+	conf := 0.0
+
+	if ratio >= 0.66 {
+		result = "granted"
+		conf = ratio
+	} else if ratio <= 0.33 {
+		result = "denied"
+		conf = 1.0 - ratio
+	}
+
+	gate := &ConsentGate{
+		ID:          ledger.GenerateUUID(),
+		DomainRef:   input.DomainRef,
+		ActionRef:   input.ActionRef,
+		Threshold:   0.66,
+		Quorum:      input.Quorum,
+		MoralWeight: input.MoralWeight,
+		Result:      result,
+		Confidence:  math.Round(conf*100) / 100,
+		LastCheck:   time.Now().UTC(),
+	}
+
+	data, _ := json.MarshalIndent(gate, "", "  ")
+	log.Printf("🧭 ConsentGate evaluated:\n%s", string(data))
+
+	return gate, nil
 }
 
 // NewGate constructs a Gate with injected sinks/posters (can be nil during bootstrapping).

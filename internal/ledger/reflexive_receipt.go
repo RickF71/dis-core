@@ -9,31 +9,47 @@ import (
 	"dis-core/internal/rules"
 )
 
-// ReflexiveReceipt represents a self-issued receipt triggered by domain cognition.
+// ReflexiveReceipt represents a self-issued moral action within a domain’s cognition loop.
+// It mirrors internal evaluation — actions, moral deltas, or domain state adjustments.
 type ReflexiveReceipt struct {
-	DomainID string                 `json:"domain_id"`
-	EventRef string                 `json:"event_ref"`
-	Type     string                 `json:"type"`
-	Value    float64                `json:"value"`
-	Time     time.Time              `json:"time"`
-	Context  map[string]interface{} `json:"context"`
+	DomainID   string                 `json:"domain_id"`
+	EventRef   string                 `json:"event_ref"`
+	ActionType string                 `json:"action_type"`
+	Value      float64                `json:"value"`
+	Time       time.Time              `json:"time"`
+	Context    map[string]interface{} `json:"context,omitempty"`
 }
 
+// EmitReflexiveReceipt creates and saves a self-issued receipt
+// tied to moral or trust feedback events. It integrates directly
+// with the unified v0.8.8 receipt structure.
 func EmitReflexiveReceipt(domainID string, e events.Event, a rules.Action) error {
 	r := ReflexiveReceipt{
-		DomainID: domainID,
-		EventRef: e.ID,
-		Type:     a.Type,
-		Value:    a.TrustDelta,
-		Time:     time.Now(),
-		Context:  a.Context,
+		DomainID:   domainID,
+		EventRef:   e.ID,
+		ActionType: a.Type,
+		Value:      a.TrustDelta,
+		Time:       time.Now().UTC(),
+		Context:    a.Context,
 	}
 
+	// Serialize for log visualization
 	data, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return err
 	}
-
 	log.Printf("🪞 ReflexiveReceipt [%s] — %s", domainID, string(data))
-	return SaveReceipt(data)
+
+	// Build the new authoritative ledger receipt
+	receipt := &Receipt{
+		Action:          e.Type + ":" + a.Type,
+		By:              domainID,
+		ConsentRef:      e.ConsentRef,  // optional if your Event struct has it
+		FeedbackRef:     a.FeedbackRef, // optional if your Action struct has it
+		TrustScoreAfter: a.TrustDelta,
+		Comments:        "Reflexive domain cognition event",
+	}
+
+	// Store with full integrity (UUID, hash, timestamp)
+	return SaveReceipt(receipt)
 }

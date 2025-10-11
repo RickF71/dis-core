@@ -8,11 +8,15 @@ import (
 
 // Action represents the result of interpreting an event.
 type Action struct {
-	Type        string
-	TrustDelta  float64
-	EthicsDelta float64
-	Receipt     bool
-	Context     map[string]any
+	Type        string         `json:"type"`
+	TrustDelta  float64        `json:"trust_delta"`
+	EthicsDelta float64        `json:"ethics_delta"`
+	Receipt     bool           `json:"receipt"`
+	Context     map[string]any `json:"context,omitempty"`
+
+	// --- v0.8.8 optional lineage fields ---
+	ConsentRef  string `json:"consent_ref,omitempty"`  // links to ConsentGate.ID
+	FeedbackRef string `json:"feedback_ref,omitempty"` // links to TrustFeedback.FeedbackID
 }
 
 // BehaviorRule defines one rule in the behavior set.

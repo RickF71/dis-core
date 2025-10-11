@@ -1,0 +1,54 @@
+dis_consent:
+  version: v0.2
+  description: >
+    Defines how domains evaluate and enforce consent before executing any action.
+    Integrates quorum thresholds, moral weighting, and legitimacy checks that
+    must pass before authority is exercised.
+
+  fields:
+    consent_id:
+      type: string
+      description: Unique ID for this consent evaluation
+    domain_ref:
+      type: string
+      description: Domain requesting the action
+    action_ref:
+      type: string
+      description: Action or policy identifier under review
+    threshold:
+      type: number
+      range: [0.0, 1.0]
+      default: 0.66
+      description: Minimum approval ratio required
+    quorum:
+      type: integer
+      default: 3
+      description: Minimum number of valid participants required
+    moral_weight:
+      type: number
+      range: [0.0, 1.0]
+      default: 1.0
+      description: Multiplier reflecting moral or ethical salience
+    legitimacy_ref:
+      type: string
+      description: Optional reference to a governing legitimacy schema
+    result:
+      type: enum
+      values: [granted, denied, pending]
+      description: Outcome of the consent evaluation
+    confidence:
+      type: number
+      range: [0.0, 1.0]
+      description: Confidence in the consent outcome (aggregated trust)
+    last_check:
+      type: timestamp
+      description: Last evaluation time
+    comments:
+      type: text
+      description: Optional notes or rationale from participants
+
+  binding:
+    - schema: dis_core_logic.v0.0
+      rule: consent_gate_required
+    - schema: dis_trust.v0.1
+      rule: trust_feedback_linked
