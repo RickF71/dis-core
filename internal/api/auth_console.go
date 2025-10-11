@@ -1,6 +1,7 @@
 package api
 
 import (
+	"dis-core/internal/db"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -22,7 +23,7 @@ func HandleConsoleAuth(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		sess.SessionID = "sess-" + time.Now().Format("20060102150405")
+		sess.SessionID = "sess-" + db.NowRFC3339Nano()
 		sess.Active = true
 		sess.ExpiresAt = time.Now().Add(2 * time.Hour).Format(time.RFC3339)
 		json.NewEncoder(w).Encode(sess)

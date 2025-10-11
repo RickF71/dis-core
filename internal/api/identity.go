@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"dis-core/internal/db"
 )
@@ -40,7 +39,7 @@ func HandleIdentityRegister(store *sql.DB) http.HandlerFunc {
 				"id":         id,
 				"dis_uid":    req.DISUID,
 				"namespace":  req.Namespace,
-				"created_at": time.Now().UTC().Format(time.RFC3339),
+				"created_at": db.NowRFC3339Nano(),
 			}
 			writeJSON(w, http.StatusCreated, resp)
 

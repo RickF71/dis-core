@@ -1,6 +1,7 @@
 package api
 
 import (
+	"dis-core/internal/db"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -30,7 +31,7 @@ func (s *Server) HandleDISAuthHandshake(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		h.HandshakeID = "hs-" + time.Now().Format("20060102150405")
+		h.HandshakeID = "hs-" + db.NowRFC3339Nano()
 		h.ResultToken = "tok-" + h.HandshakeID
 		h.ExpiresAt = time.Now().Add(1 * time.Hour).Format(time.RFC3339)
 

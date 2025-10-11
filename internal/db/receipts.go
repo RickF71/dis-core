@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
-	"time"
+	"fmt"
 )
 
 // Receipt matches the current receipts table schema.
@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_receipts_ts ON receipts(timestamp);
 // InsertReceipt adds a new receipt entry into the receipts table.
 func InsertReceipt(db *sql.DB, r *Receipt) (int64, error) {
 	if r.Timestamp == "" {
-		r.Timestamp = time.Now().UTC().Format(time.RFC3339Nano)
+		r.Timestamp = NowRFC3339Nano()
 	}
 	q := `INSERT INTO receipts(receipt_id, schema_ref, content, timestamp)
 	      VALUES(?, ?, ?, ?)`
@@ -79,4 +79,33 @@ func ListReceipts(db *sql.DB, opts ListOpts) ([]Receipt, error) {
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+//
+// === v0.9.3 Additions for AutoRevocation + /api/status ===
+//
+
+// SaveReceipt inserts a receipt directly using the default DB handle.
+func SaveReceipt(r Receipt) error {
+	if DefaultDB == nil {
+		return fmt.Errorf("db not initialized")
+	}
+	if r.Timestamp == "" {
+		r.Timestamp = NowRFC3339Nano()
+	}
+	_, err := DefaultDB.Exec(`
+		INSERT INTO receipts (receipt_id, schema_ref, content, timestamp)
+		VALUES (?, ?, ?, ?);
+	`, r.ReceiptID, r.SchemaRef, r.Content, r.Timestamp)
+	return err
+}
+
+// CountReceipts returns total count of receipts in the database.
+func CountReceipts() (int64, error) {
+	if DefaultDB == nil {
+		return 0, fmt.Errorf("db not initialized")
+	}
+	var n int64
+	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM receipts;`).Scan(&n)
+	return n, err
 }

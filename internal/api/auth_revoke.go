@@ -1,6 +1,7 @@
 package api
 
 import (
+	"dis-core/internal/db"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -29,8 +30,8 @@ func (s *Server) HandleAuthRevoke(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		entry.RevocationID = "rev-" + time.Now().Format("20060102150405")
-		entry.RevocationTime = time.Now().Format(time.RFC3339)
+		entry.RevocationID = "rev-" + db.NowRFC3339Nano()
+		entry.RevocationTime = db.NowRFC3339Nano()
 		if entry.ValidUntil == "" {
 			entry.ValidUntil = time.Now().Add(24 * time.Hour).Format(time.RFC3339)
 		}

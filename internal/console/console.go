@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"time"
 
+	"dis-core/internal/db"
 	"dis-core/internal/receipts"
 )
 
@@ -61,7 +61,7 @@ func (c *Console) LogAction(actionType, policyRef, initiator string) (*ConsoleAc
 		return nil, fmt.Errorf("unauthorized initiator: %s", initiator)
 	}
 
-	timestamp := time.Now().UTC().Format(time.RFC3339)
+	timestamp := db.NowRFC3339Nano()
 	actionID := generateActionID()
 
 	// Generate the receipt via receipts.NewReceipt

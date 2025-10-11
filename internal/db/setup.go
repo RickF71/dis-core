@@ -3,45 +3,44 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"os"
 
 	_ "modernc.org/sqlite"
 )
 
 // SetupDatabase ensures the SQLite DB file exists and all tables are created.
-func SetupDatabase(path string) (*sql.DB, error) {
-	firstCreate := false
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		firstCreate = true
-		fmt.Printf("🧩 No database found at %s — creating a new one...\n", path)
-	}
+// func SetupDatabase(path string) (*sql.DB, error) {
+// 	firstCreate := false
+// 	if _, err := os.Stat(path); os.IsNotExist(err) {
+// 		firstCreate = true
+// 		fmt.Printf("🧩 No database found at %s — creating a new one...\n", path)
+// 	}
 
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
+// 	db, err := sql.Open("sqlite", path)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to open database: %w", err)
+// 	}
 
-	// --- Initial creation path ---
-	if firstCreate {
-		if err := createSchema(db); err != nil {
-			return nil, fmt.Errorf("failed to initialize schema: %w", err)
-		}
-		if err := seedDefaults(db); err != nil {
-			return nil, fmt.Errorf("failed to seed defaults: %w", err)
-		}
-	}
+// 	// --- Initial creation path ---
+// 	if firstCreate {
+// 		if err := createSchema(db); err != nil {
+// 			return nil, fmt.Errorf("failed to initialize schema: %w", err)
+// 		}
+// 		if err := seedDefaults(db); err != nil {
+// 			return nil, fmt.Errorf("failed to seed defaults: %w", err)
+// 		}
+// 	}
 
-	// --- Always ensure critical schemas exist ---
-	if err := EnsureReceiptsSchema(db); err != nil {
-		return nil, err
-	}
-	if err := EnsureIdentitiesSchema(db); err != nil {
-		return nil, err
-	}
+// 	// --- Always ensure critical schemas exist ---
+// 	if err := EnsureReceiptsSchema(db); err != nil {
+// 		return nil, err
+// 	}
+// 	if err := EnsureIdentitiesSchema(db); err != nil {
+// 		return nil, err
+// 	}
 
-	fmt.Println("✅ Database ready.")
-	return db, nil
-}
+// 	fmt.Println("✅ Database ready.")
+// 	return db, nil
+// }
 
 // createSchema lays down all base DIS-CORE tables.
 func createSchema(db *sql.DB) error {

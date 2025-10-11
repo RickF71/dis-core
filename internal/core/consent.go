@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	"dis-core/internal/config"
+	"dis-core/internal/db"
 	dbpkg "dis-core/internal/db"
 	"dis-core/internal/policy"
 	"dis-core/internal/util"
@@ -38,7 +38,7 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 			return 0, "", "", "", genErr
 		}
 	}
-	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	ts := db.NowRFC3339Nano()
 
 	// Signature includes policy checksum
 	sig := util.Sign(action, id, by, scope, nonce, ts, polSum)

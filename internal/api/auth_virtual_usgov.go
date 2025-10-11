@@ -1,9 +1,9 @@
 package api
 
 import (
+	"dis-core/internal/db"
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 type VirtualUSGovCredential struct {
@@ -23,7 +23,7 @@ func HandleVirtualUSGovCredential(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		cred.CredentialID = "vusa-" + time.Now().Format("20060102150405")
+		cred.CredentialID = "vusa-" + db.NowRFC3339Nano()
 		resp := map[string]any{
 			"status":     "issued",
 			"credential": cred,

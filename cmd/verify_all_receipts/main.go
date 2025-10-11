@@ -1,6 +1,7 @@
 package main
 
 import (
+	"dis-core/internal/db"
 	"dis-core/internal/receipts"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type AuditResult struct {
@@ -42,7 +42,7 @@ func main() {
 		if err != nil {
 			results = append(results, AuditResult{
 				File: filepath.Base(path), Status: "error",
-				Reason: err.Error(), VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+				Reason: err.Error(), VerifiedAt: db.NowRFC3339Nano(),
 			})
 			continue
 		}
@@ -56,7 +56,7 @@ func main() {
 					File:       filepath.Base(path),
 					Status:     "archived",
 					Reason:     "legacy / unsigned receipt",
-					VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+					VerifiedAt: db.NowRFC3339Nano(),
 				})
 			} else {
 				os.Rename(path, filepath.Join(quarantineDir, filepath.Base(path)))
@@ -64,7 +64,7 @@ func main() {
 					File:       filepath.Base(path),
 					Status:     "quarantined",
 					Reason:     err.Error(),
-					VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+					VerifiedAt: db.NowRFC3339Nano(),
 				})
 				invalidCount++
 			}
@@ -74,14 +74,14 @@ func main() {
 		if ok {
 			results = append(results, AuditResult{
 				File: filepath.Base(path), Status: "valid",
-				Reason: "signature verified", VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+				Reason: "signature verified", VerifiedAt: db.NowRFC3339Nano(),
 			})
 			validCount++
 		} else {
 			os.Rename(path, filepath.Join(quarantineDir, filepath.Base(path)))
 			results = append(results, AuditResult{
 				File: filepath.Base(path), Status: "quarantined",
-				Reason: "signature mismatch", VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+				Reason: "signature mismatch", VerifiedAt: db.NowRFC3339Nano(),
 			})
 			invalidCount++
 		}
@@ -89,7 +89,7 @@ func main() {
 
 	// Write the ledger
 	ledger := map[string]any{
-		"verified_at":   time.Now().UTC().Format(time.RFC3339),
+		"verified_at":   db.NowRFC3339Nano(),
 		"total":         len(files),
 		"valid":         validCount,
 		"invalid":       invalidCount,
