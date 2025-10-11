@@ -62,10 +62,10 @@ func main() {
 		log.Fatal("Policy error:", err)
 	}
 
-	// --- Init DB ---
-	store, err := db.InitDB(cfg.DatabasePath)
+	// --- Init / Auto-Create DB ---
+	store, err := db.SetupDatabase(cfg.DatabasePath)
 	if err != nil {
-		log.Fatal("DB init failed:", err)
+		log.Fatal("DB setup failed:", err)
 	}
 	defer store.Close()
 

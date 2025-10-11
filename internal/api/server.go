@@ -40,6 +40,15 @@ func (s *Server) Start(addr string) error {
 	http.HandleFunc("/info", s.handleInfo)
 	http.HandleFunc("/verify", HandleExternalVerify) // now implemented as a stub below
 	http.HandleFunc("/receipts", s.handleReceipts)
+	http.HandleFunc("/api/auth/revoke", s.HandleAuthRevoke)
+
+	// --- NEW: DIS-Auth + Virtual USGOV endpoints ---
+	http.HandleFunc("/api/auth/handshake", s.HandleDISAuthHandshake)
+	http.HandleFunc("/api/auth/virtual_usgov", HandleVirtualUSGovCredential)
+	http.HandleFunc("/api/auth/console", HandleConsoleAuth)
+	// (optional later) http.HandleFunc("/api/auth/revoke", HandleAuthRevoke)
+	http.HandleFunc("/api/identity/register", HandleIdentityRegister(s.store))
+	http.HandleFunc("/api/identity/list", HandleIdentityList(s.store))
 
 	log.Printf("🛰️  DIS-PERSONAL REST API listening on %s\n", addr)
 	return http.ListenAndServe(addr, nil)
@@ -64,13 +73,11 @@ func (s *Server) handleReceipts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	offset, _ := strconv.Atoi(q.Get("offset"))
-	scope := q.Get("scope")
 
 	// Fetch from DB
 	list, err := db.ListReceipts(s.store, db.ListOpts{
 		Limit:  limit,
 		Offset: offset,
-		Scope:  scope,
 	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
