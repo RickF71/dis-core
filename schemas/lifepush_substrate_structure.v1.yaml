@@ -1,0 +1,67 @@
+schema: lifepush_substrate_structure
+version: v1
+description: >
+  Defines the formal coherence thresholds for entities and environments.
+  Substrates represent the living scaffolds of existence—from LifePush (base life drive)
+  through Terra (biospheric stability) to Limen (cognitive and moral reflection).
+  Each level defines thresholds for energy, coherence, and consent integrity.
+
+fields:
+  - name: id
+    type: string
+    description: Unique substrate ID (e.g., sub-lifepush-UUIDv7)
+  - name: layer
+    type: enum
+    values: [LifePush, Terra, Limen]
+    description: Substrate layer or domain of coherence
+  - name: coherence_threshold
+    type: float
+    description: Minimum coherence required for stability or growth (0–1 range)
+  - name: energy_flow_min
+    type: float
+    description: Minimum life-supporting energy flow (e.g., metabolic, ecological, cognitive)
+  - name: consent_integrity_min
+    type: float
+    description: Minimum acceptable consent alignment for the substrate to remain valid
+  - name: successor_layer
+    type: string
+    description: Next layer in substrate hierarchy (if any)
+  - name: observer_domain
+    type: string
+    description: Domain responsible for maintaining this substrate
+  - name: active
+    type: boolean
+    description: Whether substrate is currently active in ledger
+
+relationships:
+  - from: lifepush_substrate_structure.id
+    to: value_receipt.substrate_ref
+    type: one-to-many
+    description: Each substrate can produce multiple value receipts through actions
+
+threshold_profiles:
+  - layer: LifePush
+    coherence_threshold: 0.3
+    energy_flow_min: 0.1
+    consent_integrity_min: 0.0
+  - layer: Terra
+    coherence_threshold: 0.6
+    energy_flow_min: 0.4
+    consent_integrity_min: 0.5
+  - layer: Limen
+    coherence_threshold: 0.9
+    energy_flow_min: 0.7
+    consent_integrity_min: 0.9
+
+rules:
+  - name: threshold_validity
+    condition: coherence_threshold <= 1.0 and energy_flow_min <= 1.0 and consent_integrity_min <= 1.0
+    severity: error
+  - name: logical_hierarchy
+    condition: LifePush < Terra < Limen
+    severity: info
+
+indexes:
+  - [id]
+  - [layer]
+  - [observer_domain]
