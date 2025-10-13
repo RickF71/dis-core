@@ -1,0 +1,118 @@
+version: v0.9.5
+codename: "Scaffold & Moral Field Integration"
+resume_from: "v0.9.4 — Network Presence / Jikka Boundary Stable"
+branch: "dev-0.9.5-scaffold-moral-field"
+
+goal: >
+  Establish formal schema and Go struct scaffolding linking Jikka, DomainType, and Spotlight concepts.  
+  This version builds the moral field layer — the connective tissue between consent (Jikka),  
+  structure (DomainType), and observation (Spotlight).
+
+scope:
+  schemas:
+    - name: domain_type.v0.1.yaml
+      purpose: >
+        Defines classification and inheritance types for domains (e.g. terra, simula, virtual, corporate, personal).
+      links_to:
+        - spotlight.domain.v0.1.yaml
+        - jikka.boundary.v1.yaml
+      notes: >
+        DomainType becomes the type root used by both consent models and observational scaffolds.
+
+    - name: jikka.boundary.v1.yaml
+      purpose: >
+        Specifies bi-directional moral/consent interfaces between two DIS entities.
+      links_to:
+        - jikka.unilateral.v0.1.yaml
+        - jikka.collective.v0.1.yaml
+      notes: >
+        The boundary schema formalizes shared moral fields (two-sided Jikka) vs unilateral trust edges.
+
+    - name: jikka.unilateral.v0.1.yaml
+      purpose: >
+        Models one-way trust or moral projection — e.g. individual → organization, human → AI.
+      links_to:
+        - jikka.boundary.v1.yaml
+      notes: >
+        Represents the moral asymmetry field — when one side consents without reciprocity.
+
+    - name: jikka.collective.v0.1.yaml
+      purpose: >
+        Describes emergent moral fields formed by 3+ DIS domains (e.g. communal, civic, corporate groups).
+      links_to:
+        - jikka.boundary.v1.yaml
+        - spotlight.domain.v0.1.yaml
+      notes: >
+        Used to track “moral resonance” or shared ethical state within groups.
+
+    - name: spotlight.domain.v0.1.yaml
+      purpose: >
+        Provides observational metadata (“Spotlight”) about a domain’s active moral or consent state.
+      links_to:
+        - domain_type.v0.1.yaml
+        - jikka.collective.v0.1.yaml
+      notes: >
+        Spotlights are not moral actors; they are observation nodes — a way to visualize moral/consent fields.
+
+  go_scaffold:
+    base_dir: internal/scaffold
+    components:
+      - name: DomainType
+        struct: DomainType
+        fields:
+          - name: Name
+            type: string
+          - name: Class
+            type: string
+          - name: Parent
+            type: string
+          - name: Description
+            type: string
+        purpose: >
+          Simple structural definition describing what kind of domain something is and where it fits hierarchically.
+
+      - name: JikkaBoundary
+        struct: JikkaBoundary
+        fields:
+          - name: Source
+            type: string
+          - name: Target
+            type: string
+          - name: Mutual
+            type: bool
+          - name: Strength
+            type: float64
+          - name: Timestamp
+            type: time.Time
+        purpose: >
+          Defines consent/moral links between entities. Later versions will track resonance, drift, and history.
+
+      - name: Spotlight
+        struct: Spotlight
+        fields:
+          - name: DomainID
+            type: string
+          - name: ObservedState
+            type: string
+          - name: MoralSignal
+            type: float64
+          - name: UpdatedAt
+            type: time.Time
+        purpose: >
+          Observational node used to measure and display a domain’s active moral field presence.
+
+  cli_stub:
+    command: "dis scaffold <type>"
+    examples:
+      - "dis scaffold domain_type"
+      - "dis scaffold jikka.boundary"
+      - "dis scaffold spotlight"
+    output: >
+      Generates YAML templates under /schemas/ and Go struct stubs under /internal/scaffold/.
+      Templates will include metadata header, version, and linkage hints.
+
+integration_notes: |
+  - This version creates no logic or runtime behavior — only shapes.
+  - Serves as the base for moral field propagation, visual consent graphs, and Jikka simulation layers.
+  - All schema hashes to be registered with DIS Schema Registry upon load.
+

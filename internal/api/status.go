@@ -19,6 +19,18 @@ func RegisterStatusRoutes(mux *http.ServeMux) {
 }
 
 func HandleStatus(w http.ResponseWriter, r *http.Request) {
+	// --- CORS headers ---
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// --- Handle preflight ---
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// --- Only allow GET ---
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -28,7 +40,7 @@ func HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	rcpts, _ := db.CountReceipts()
 	hs, _ := db.CountHandshakes()
-	rev, _ := db.CountRevocations() // or derive from handshakes where revoked_at not null
+	rev, _ := db.CountRevocations()
 	ids, _ := db.CountIdentities()
 
 	out := statusPayload{
@@ -40,6 +52,7 @@ func HandleStatus(w http.ResponseWriter, r *http.Request) {
 			"identities":  int(ids),
 		},
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
 }

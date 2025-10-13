@@ -21,7 +21,7 @@ type Server struct {
 	policy   *policy.Policy
 	sum      string
 	coreHash string
-	mux      *http.ServeMux // ✅ added for scoped route registration
+	mux      *http.ServeMux
 }
 
 // NewServer constructs a new REST server instance.
@@ -34,6 +34,8 @@ func NewServer(store *sql.DB, cfg *config.Config, pol *policy.Policy, sum string
 		coreHash: coreHash,
 		mux:      http.NewServeMux(),
 	}
+
+	// Register all routes
 	s.registerRoutes()
 	return s
 }
@@ -41,13 +43,15 @@ func NewServer(store *sql.DB, cfg *config.Config, pol *policy.Policy, sum string
 // Start launches the REST API server for DIS-PERSONAL.
 func (s *Server) Start(addr string) error {
 	log.Printf("🛰️  DIS-PERSONAL REST API listening on %s\n", addr)
+
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      s.mux, // ✅ use local mux, not global
+		Handler:      WithCORS(s.mux), // ✅ global CORS middleware applied here
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 20 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+
 	return server.ListenAndServe()
 }
 
@@ -63,7 +67,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/auth/revoke", s.HandleAuthRevoke)
 	s.mux.HandleFunc("/api/auth/handshake", s.HandleDISAuthHandshake)
 	s.mux.HandleFunc("/api/auth/virtual_usgov", HandleVirtualUSGovCredential)
-	//s.mux.HandleFunc("/api/auth/console", HandleConsoleAuth)
 	s.mux.HandleFunc("/api/identity/register", HandleIdentityRegister(s.store))
 	s.mux.HandleFunc("/api/identity/list", HandleIdentityList(s.store))
 
