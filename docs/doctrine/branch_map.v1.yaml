@@ -1,0 +1,23 @@
+version: v1
+doctrine: branch_map
+summary: >
+  The canonical metaphysical-to-operational hierarchy of DIS.
+mapping:
+  domain.null:
+    lumen: illumination / awareness
+    limen: threshold / consent boundary
+    nima: structure / logic / compulsion
+    terra: manifestation / material reality
+relationships:
+  - from: nima
+    to: limen
+    meaning: structure creates space for decision
+  - from: limen
+    to: lumen
+    meaning: decision becomes aware of itself
+  - from: lumen
+    to: terra
+    meaning: awareness manifests into consequence
+notes: >
+  This hierarchy represents the functional and moral topology of DIS.
+  Each branch inherits from domain.null and forms part of the sovereignty chain.

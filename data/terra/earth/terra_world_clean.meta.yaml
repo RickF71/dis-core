@@ -1,0 +1,23 @@
+# data/terra/earth/terra_world_clean.meta.yaml
+dataset: terra_world_clean.geojson
+source:
+  name: "Natural Earth v5"
+  url: "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/"
+  license: "Public Domain"
+  download_date: "2025-10-14"
+projection: "EPSG:4326"
+preprocessing:
+  - included: "Antarctica (marked inactive)"
+  - merged: "admin_0_countries"
+  - toolchain: "GDAL 3.8.0"
+  - command: "ogr2ogr -f GeoJSON -t_srs EPSG:4326 -wrapdateline terra_world_clean.geojson"
+notes:
+  antarctica:
+    status: "inactive"
+    domain_hint: "terra.inactive"
+checksum:
+  sha1: "<insert hash here>"
+maintainer: "rickf71/dis-core"
+description: >
+  Complete Terra dataset with global political boundaries, including Antarctica.
+  Antarctica is retained as inactive landmass to preserve global topology integrity.

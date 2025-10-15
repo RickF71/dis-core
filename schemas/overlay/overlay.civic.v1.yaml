@@ -1,0 +1,132 @@
+schema: overlay.civic.v1
+version: 1.0
+summary: >
+  Defines the universal structure for civic overlays — how nations, states, or
+  simulated polities bind physical Terra boundaries to governance domains and
+  administer coherence among citizens.
+
+description: |
+  A civic overlay is a moral-administrative field projected upon a Terra biome.
+  It coordinates the flow of authority, consent, and trust among Life within a
+  bounded physical or virtual territory. Each overlay inherits Terra constants
+  (physical laws, constraints) and expresses Numen invariants (agency, consent,
+  coherence) through civic processes (law, representation, exchange).
+
+inheritance:
+  base: overlay.v1
+  depends_on:
+    - ontology/terra-numen-cycle.v1
+    - meaning.adhesion.v1
+    - identity.citizen.v1
+    - domain.jikka.v1
+
+core_principles:
+  - id: territorial_binding
+    description: |
+      Every civic overlay must declare its Terra base — the physical or virtual
+      region it governs — and align its jurisdictional boundaries with that
+      substrate. Administrative divisions (nation, state, city) are geometric
+      partitions of a single Terra field, not independent Terras.
+
+  - id: consent_projection
+    description: |
+      Civic legitimacy derives from the Numen field (the people) expressing
+      voluntary adhesion. Authority is valid only when the governed Life forms
+      maintain coherent consent receipts within the overlay.
+
+  - id: domain_alignment
+    description: |
+      Each civic overlay maps its internal structures (branches, ministries,
+      agencies) to DIS domains. Overlaps are resolved by inheritance precedence
+      from Terra boundaries first, then by adhesion density (population
+      consent), then by constitutional schema.
+
+  - id: energy_stewardship
+    description: |
+      Law, money, and trust are energy tokens within the overlay. Their use
+      must preserve total coherence: entropy of corruption or opacity cannot
+      exceed defined thresholds.
+
+  - id: subsidiarity
+    description: |
+      Decision-making authority should exist at the lowest viable domain level
+      capable of maintaining coherence. Higher overlays intervene only when
+      lower layers fail or request assistance.
+
+  - id: transparency
+    description: |
+      Every authoritative act must emit a civic.receipt identifying actor,
+      mandate, effect, and coherence delta. All receipts must be publicly
+      verifiable.
+
+structural_elements:
+  - id: territory
+    type: geometry.polygon
+    description: Physical or virtual boundary coordinates mapped to Terra base.
+  - id: population
+    type: list(identity.citizen)
+    description: Registered agents possessing adhesion within the overlay.
+  - id: government
+    type: domain.civic
+    description: Administrative domain implementing policy and law.
+  - id: economy
+    type: overlay.economic
+    description: Optional coupled overlay handling material energy exchange.
+  - id: judiciary
+    type: domain.judicial
+    description: Reconciliation and coherence enforcement system.
+  - id: trust_field
+    type: numeric
+    description: Mean public trust; proxy for overlay stability.
+
+bindings:
+  terra_ref: string  # e.g., terra.earth or terra.simula
+  overlay_id: string # globally unique civic overlay identifier
+  coordinates: list  # physical/geometric extent
+  parent_overlay: string | null
+  sub_overlays: list
+
+receipts:
+  - civic.receipt.v1
+  - meaning.adhesion.v1
+  - energy.transaction.v1
+
+coherence_metrics:
+  - population_trust_index
+  - adhesion_density
+  - governance_latency
+  - corruption_entropy
+  - legal_reflexivity
+  - energy_balance
+
+failure_modes:
+  - name: overlay_parasitism
+    description: Overlay consumes meaning faster than it returns coherence.
+  - name: boundary_drift
+    description: Administrative domain diverges from physical or population
+      boundaries.
+  - name: feedback_latency
+    description: Meaning flows slower than Terra/Numen dynamics demand.
+  - name: overcentralization
+    description: Subsidiarity violated; coherence collapse due to rigidity.
+
+policies:
+  - "Overlays may inherit structure from parent overlays but must declare
+     jurisdiction explicitly."
+  - "No civic overlay may supersede or rewrite DIS invariants
+     (agency, consent, coherence)."
+  - "Overlays must publish receipts of adhesion density annually or per
+     defined cycle."
+  - "Overlay legitimacy is evaluated by coherence metrics, not self-declared
+     authority."
+
+examples:
+  - id: overlay.civic.usgov
+    inherits: overlay.civic.v1
+    terra_ref: terra.earth
+    coordinates: usa.boundary.geojson
+    parent_overlay: overlay.civic.earth
+    sub_overlays: [overlay.civic.state.*, overlay.civic.local.*]
+    description: "United States Government overlay bound to Earth-Terra,
+      managing the U.S. civic biome under the Constitution schema."
+

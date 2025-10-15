@@ -14,7 +14,7 @@ import (
 	"dis-core/internal/policy"
 )
 
-// Server represents the DIS-PERSONAL REST node.
+// Server represents the DIS-CORE REST node.
 type Server struct {
 	store    *sql.DB
 	cfg      *config.Config
@@ -40,9 +40,9 @@ func NewServer(store *sql.DB, cfg *config.Config, pol *policy.Policy, sum string
 	return s
 }
 
-// Start launches the REST API server for DIS-PERSONAL.
+// Start launches the REST API server for DIS-CORE.
 func (s *Server) Start(addr string) error {
-	log.Printf("🛰️  DIS-PERSONAL REST API listening on %s\n", addr)
+	log.Printf("🛰️  DIS-CORE REST API listening on %s\n", addr)
 
 	server := &http.Server{
 		Addr:         addr,
@@ -74,13 +74,16 @@ func (s *Server) registerRoutes() {
 	RegisterConsoleAuthRoutes(s.mux)
 	RegisterStatusRoutes(s.mux)
 
+	// === Terra sync API ===
+	RegisterTerraRoutes(s.mux)
+
 	// === Root ===
 	s.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "🌐 DIS-CORE v0.9.3 — Self-Maintenance and Reflexive Identity\nTime: %s\n", db.NowRFC3339Nano())
 	})
 }
 
-// --- Handlers ---
+// --- Core Handlers ---
 
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
