@@ -1,0 +1,34 @@
+schema: domain_type
+version: v0.1
+status: draft
+description: >
+  Defines classification, inheritance, and contextual attributes for DIS domains.
+  A DomainType is the structural species of a domain—personal, collective, corporate, virtual, or synthetic.
+
+fields:
+  - name: id
+    type: string
+    description: Unique identifier for this domain type.
+  - name: name
+    type: string
+    description: Human-readable name for the domain type.
+  - name: class
+    type: string
+    description: High-level classification (terra, simula, virtual, corporate, notech, etc.).
+  - name: parent
+    type: string
+    description: Parent domain type (for inheritance and type hierarchy).
+  - name: description
+    type: string
+    description: Narrative or purpose for this domain type.
+  - name: governance_model
+    type: string
+    description: Optional: defines consent/governance model (jikka, consent_gate, etc.)
+
+links:
+  - jikka.boundary.v1.yaml
+  - spotlight.domain.v0.1.yaml
+
+notes: >
+  DomainType defines where a domain sits within the moral topology.
+  Used by registry loaders to shape domain inheritance and display semantics.

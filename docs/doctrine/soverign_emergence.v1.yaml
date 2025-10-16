@@ -1,0 +1,18 @@
+version: v1
+doctrine: sovereign_emergence
+summary: >
+  Sovereignty arises through four stages: structure (Nima), rebellion (Limen),
+  illumination (Lumen), and manifestation (Terra).
+description: |
+  Nima defines the structures of compulsion.
+  Limen rebels against those compulsions and decides.
+  Lumen illuminates the decision and reveals meaning.
+  Terra manifests the chosen potential into consequence.
+
+  This chain forms the basic cycle of sovereign existence — from design,
+  through will, into awareness, and finally into embodiment.
+sequence:
+  - nima: structure and law
+  - limen: rebellion and consent
+  - lumen: illumination and reflection
+  - terra: manifestation and result

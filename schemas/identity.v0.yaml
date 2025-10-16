@@ -1,0 +1,62 @@
+type: identity.v0
+description: >
+  The core DIS identity schema.
+  Each record represents a recognized individual, agent, or domain anchor.
+  Identity is defined by consent, not authority. The namespace field
+  provides a human-readable alias or context link, which may later
+  be cryptographically bound to the dis_uid.
+
+version: 0.1
+domain: domain.terra
+category: core-identity
+
+fields:
+  - name: dis_uid
+    type: string
+    required: true
+    unique: true
+    description: >
+      The universal DIS identifier for the individual or entity.
+      Form: dis_uid:<domain>:<namespace>:<hash>.
+
+  - name: namespace
+    type: string
+    required: false
+    description: >
+      A human-readable alias, nickname, or URI that contextualizes
+      the identity. May represent a simple handle (e.g., "rick") or
+      a link to a digital or immersive environment.
+      In future versions, this field may be cryptographically linked
+      to a namespace registry for verified ownership.
+
+  - name: created_at
+    type: timestamp
+    required: true
+    description: >
+      Timestamp of initial identity creation or binding.
+
+  - name: updated_at
+    type: timestamp
+    required: false
+    description: >
+      Timestamp of last update to this identity record.
+
+  - name: active
+    type: boolean
+    default: true
+    description: >
+      Whether this identity is currently active in the domain.
+
+metadata:
+  index: ["dis_uid", "namespace"]
+  unique_constraints:
+    - dis_uid
+  cryptographic_upgrade_note: >
+      Future versions (v0.2+) may add a foreign key to a `namespaces` table
+      and a signature field to prove ownership of namespace strings.
+
+examples:
+  - dis_uid: "dis_uid:terra:rick:bf72a8c19f"
+    namespace: "rick"
+    created_at: "2025-10-11T18:22:00Z"
+    active: true

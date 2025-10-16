@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"dis-core/internal/db"
 	"dis-core/internal/receipts"
 )
 
@@ -54,12 +55,12 @@ func (c *Console) RunVerification() (VerifyReport, *receipts.Receipt, error) {
 			"file":        filepath.Base(path),
 			"status":      status,
 			"reason":      reason,
-			"verified_at": time.Now().UTC().Format(time.RFC3339),
+			"verified_at": db.NowRFC3339Nano(),
 		})
 	}
 
 	report := VerifyReport{
-		VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+		VerifiedAt: db.NowRFC3339Nano(),
 		Total:      len(files),
 		Valid:      validCount,
 		Invalid:    invalidCount,

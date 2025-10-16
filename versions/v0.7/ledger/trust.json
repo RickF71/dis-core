@@ -53,6 +53,15 @@
       "core_hash": "DIS-CORE v1.0",
       "verified_at": "2025-10-08T22:35:31.3087154Z",
       "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
+    },
+    {
+      "peer": "domain.simula-terra",
+      "action": "sent",
+      "status": "unreachable",
+      "receipt_id": "r-57a05b4bad406611.json",
+      "core_hash": "DIS-CORE v1.0",
+      "verified_at": "2025-10-14T02:00:54.6725658Z",
+      "notes": "Post \"https://simula-terra.dis.network/api/verify/external\": dial tcp: lookup simula-terra.dis.network: no such host"
     }
   ]
 }

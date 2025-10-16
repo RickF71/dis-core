@@ -1,0 +1,30 @@
+schema: status_report
+version: v0
+description: |
+  Diagnostic snapshot for node health and DB counts.
+
+fields:
+  - name: time
+    type: timestamp
+    required: true
+
+  - name: counts
+    type: object
+    required: true
+    fields:
+      - name: receipts
+        type: integer
+        required: true
+      - name: handshakes
+        type: integer
+        required: true
+      - name: revocations
+        type: integer
+        required: true
+      - name: identities
+        type: integer
+        required: true
+
+  - name: notes
+    type: string
+    required: false

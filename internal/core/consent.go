@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	"dis-core/internal/config"
+	"dis-core/internal/db"
 	dbpkg "dis-core/internal/db"
 	"dis-core/internal/policy"
 	"dis-core/internal/util"
@@ -21,7 +21,7 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 		return 0, "", "", "", fmt.Errorf("no identity found, create one first")
 	}
 
-	// Policy checks
+	// --- Policy checks ---
 	if pol.IsDomainDenied(by) {
 		return 0, "", "", "", errors.New("deny:domain.denied")
 	}
@@ -38,19 +38,17 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 			return 0, "", "", "", genErr
 		}
 	}
-	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	ts := db.NowRFC3339Nano()
 
 	// Signature includes policy checksum
 	sig := util.Sign(action, id, by, scope, nonce, ts, polSum)
 
+	// 1️⃣ Construct new-style receipt record
 	r := &dbpkg.Receipt{
-		Ref:    "", // optional future use
-		By:     by,
-		Scope:  scope,
-		Result: "accepted", // or derive from policy result
-		Sig:    sig,
-		Nonce:  nonce,
-		TS:     ts,
+		ReceiptID: fmt.Sprintf("rcpt-%s", nonce[:8]),
+		SchemaRef: "bridge-receipt-template.v0",
+		Content:   fmt.Sprintf("Consent granted by %s for scope '%s'. Sig=%s", by, scope, sig[:16]),
+		Timestamp: ts,
 	}
 
 	recID, err := dbpkg.InsertReceipt(sqlDB, r)
@@ -58,9 +56,6 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 		return 0, "", "", "", err
 	}
 
-	if _, err := dbpkg.InsertReceipt(sqlDB, r); err != nil {
-		log.Printf("❌ Failed to insert receipt: %v", err)
-	}
-
+	log.Printf("✅ Consent action recorded: by=%s scope=%s receipt_id=%d", by, scope, recID)
 	return recID, nonce, ts, sig, nil
 }

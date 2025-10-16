@@ -1,0 +1,24 @@
+version: v1
+doctrine: lumen_principle
+summary: >
+  Lumen illuminates the decision-making process. It is the field of awareness
+  that renders decision visible to the mind that makes it.
+description: |
+  Lumen does not decide — that is Limen's role.
+  It does not compel — that is Nima's role.
+  It does not act — that is Terra's role.
+
+  Instead, Lumen reveals the process of choice as it occurs. It makes
+  sovereignty perceptible. Without Lumen, rebellion and consent are mechanical;
+  with Lumen, they become moral.
+
+  Lumen transforms motion into meaning and turns rebellion into reflection.
+sequence:
+  - name: nima
+    role: structure and compulsion
+  - name: limen
+    role: decision and consent
+  - name: lumen
+    role: illumination and understanding
+  - name: terra
+    role: manifestation and consequence
