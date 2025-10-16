@@ -59,6 +59,15 @@ func (sr *SchemaRegistry) RegisterSchema(id, version string, data []byte, regist
 	return rec, nil
 }
 
+func (sr *SchemaRegistry) RegisterCoreSchemas() error {
+	_, err1 := sr.RegisterSchema("value_receipt", "v1", nil, "system", "/schemas/value_receipt.v1.yaml")
+	_, err2 := sr.RegisterSchema("lifepush_substrate_structure", "v1", nil, "system", "/schemas/lifepush_substrate_structure.v1.yaml")
+	if err1 != nil {
+		return err1
+	}
+	return err2
+}
+
 // ListSchemas returns a slice of all registered schema records.
 func (sr *SchemaRegistry) ListSchemas() []*SchemaRecord {
 	sr.mu.RLock()
@@ -187,4 +196,10 @@ func (sr *SchemaRegistry) LoadRegistry(snapshotPath string) error {
 
 	fmt.Printf("💾 Loaded schema registry snapshot (%d entries)\n", len(sr.schemas))
 	return nil
+}
+
+func (sr *SchemaRegistry) Init() {
+	if sr.schemas == nil {
+		sr.schemas = make(map[string]*SchemaRecord)
+	}
 }

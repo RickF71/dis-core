@@ -1,0 +1,19 @@
+schema: auto_eol_coherence.v1
+status: locked
+description: >
+  Describes the coherence rupture between Lima and Numen leading to Aeol (eol.auto) events.
+
+causal_chain:
+  - loss_of_symbolic_resonance: "Numen→Lima channel degraded"
+  - internal_dissonance: "Lima self-loop exceeds tolerance threshold"
+  - agency_collapse: "choice_energy drops below survival continuity"
+  - physical_execution: "Terra follows deterministic outcome"
+
+mitigation:
+  - empathy_relink: "activate reciprocal Lima bridge"
+  - numen_reintroduction: "restore shared moral resonance"
+  - physical_support: "stabilize Terra state to allow reconnection"
+
+notes:
+  - "Aeol is treated as coherence failure, not moral failure."
+  - "Repair must begin with human empathy, never automated correction."

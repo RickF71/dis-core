@@ -1,0 +1,15 @@
+$schema: "https://dis.core/schemas/axiom.physical_boundary.v1"
+title: "Axiom — Metaphysical→Physical Gate"
+type: object
+required: ["id","statement","enforcement"]
+properties:
+  id: { type: string, const: "axiom.physical_boundary.v1" }
+  statement:
+    type: string
+    const: "No non-physical act may manifest materially without a free-will authorization."
+  enforcement:
+    type: object
+    properties:
+      gate: { type: string, const: "gate.commit.v1" }
+      requires_human_signature: { type: boolean, const: true }
+      violation_effect: { type: string, enum: ["freeze_domain","nullify_action","alert"] }

@@ -1,3 +1,5 @@
+
+
 # Build artifacts
 *.exe
 *.dll
@@ -35,3 +37,4 @@
 .env
 .env.*
 *.local
+data/dis.db

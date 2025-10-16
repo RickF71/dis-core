@@ -1,0 +1,31 @@
+$schema: "https://dis.core/schemas/transaction.purchase.zk.v1"
+title: "ZK Ownership Purchase"
+type: object
+required: ["tx_id","good","price","unit","from","to","proof","receipt"]
+properties:
+  tx_id: { type: string }
+  good:
+    type: object
+    required: ["type","desc"]
+    properties:
+      type: { type: string, enum: ["food","device","furniture","other"] }
+      desc: { type: string }
+  price: { type: number, minimum: 0 }
+  unit: { type: string, const: "dis-credit" }
+  from: { type: string, description: "buyer (may be anonymous externally)" }
+  to: { type: string, description: "seller domain" }
+  proof:
+    type: object
+    properties:
+      zkp_valid: { type: boolean }
+      funds_commitment: { type: string }
+  receipt:
+    type: object
+    required: ["consent","timestamp"]
+    properties:
+      consent: { type: string, enum: ["mutual"] }
+      timestamp: { type: string, format: date-time }
+  post_state:
+    type: object
+    properties:
+      owner: { type: string, description: "anonymized id OK" }

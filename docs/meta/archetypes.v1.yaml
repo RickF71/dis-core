@@ -1,0 +1,14 @@
+version: v1
+meta: archetypes
+summary: >
+  The original archetypal names and meanings that evolved into the DIS
+  metaphysical architecture.
+archetypes:
+  lumen: "Light of awareness; the witnessing principle."
+  lima: "Early term for Limen; the civic-moral threshold between Terra and Nima."
+  numen: "Early term for Nima; the abstract creative realm of form and code."
+  terra: "The living substrate; physical matter and life."
+notes: |
+  These archetypes represent the symbolic ancestry of DIS.
+  Lumen corresponds to consciousness, Lima to moral agency, Numen to
+  structural inevitability, and Terra to embodied existence.

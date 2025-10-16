@@ -1,0 +1,22 @@
+$schema: "https://dis.core/schemas/discredit.decay.tiered.v1"
+title: "Dis-Credit Decay Policy (Tiered)"
+type: object
+required: ["rules","audit_interval"]
+properties:
+  rules:
+    type: array
+    items:
+      type: object
+      required: ["holder_type","decay_rate"]
+      properties:
+        holder_type:
+          type: string
+          enum: ["person","stewardship_trust","domain_treasury","unowned"]
+        decay_rate:
+          type: number
+          description: "Per month (e.g., 0.001 = 0.1%)"
+        activity_refresh_days:
+          type: integer
+          description: "If active within window, pause/refresh decay."
+  audit_interval: { type: string, default: "30d" }
+  notes: { type: string }

@@ -1,0 +1,37 @@
+schema: console.auth.v0
+version: 0.9.2
+description: >
+  Authentication schema for the DIS Console and related API front-ends.
+  Uses the same DIS-Auth handshake mechanism, enforcing user sovereignty.
+
+fields:
+  - name: session_id
+    type: uuid
+  - name: console_ref
+    type: uri
+    description: The Console instance (personal or domain-linked).
+  - name: initiator_dis
+    type: dis_uid
+  - name: auth_handshake
+    type: ref
+    ref: schemas/dis-auth-handshake.v0.yaml
+  - name: privileges
+    type: list
+    items: string
+    enum: [view, edit, apply, freeze, breakglass, delegate]
+  - name: consent_proof
+    type: hash
+  - name: active
+    type: boolean
+    default: true
+  - name: issued_at
+    type: timestamp
+  - name: expires_at
+    type: timestamp
+
+logic:
+  - rule: >
+      Console session requires a verified DIS-Auth handshake 
+      bound to initiator_dis with explicit consent.
+  - auto_revoke_on_expiry: true
+  - use_revocation_registry: schemas/revocation_registry.v0.yaml

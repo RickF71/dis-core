@@ -1,0 +1,28 @@
+schema: interpersonal_coherence.v1
+description: >
+  Defines the smallest stable moral field within DIS: the human–human pair.
+  Mutual recognition within this dyad is the root of all legitimate consent propagation.
+
+domain_scope: interpersonal
+inherits_from:
+  - moral_field.v1
+  - consent_protocol.v1
+
+principles:
+  - reciprocity_required: true
+  - empathy_field_active: true
+  - coercion_between_partners: invalidates_consent
+  - asymmetry_of_power: monitored_and_self_correcting
+  - ai_participation: facilitative_only
+  - pair_as_atomic_moral_unit: true
+
+coherence_indicators:
+  - bidirectional_consent_signal
+  - mutual_empathy_feedback
+  - sustained_choice_harmony
+  - absence_of_coercion_flags
+
+notes:
+  - "All higher-order domains derive legitimacy from networks of coherent pairs."
+  - "The first moral act is mutual recognition."
+  - "AI entities may assist in reflection but cannot substitute for empathy."

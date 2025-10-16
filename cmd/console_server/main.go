@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"dis-core/internal/console"
+	"dis-core/internal/db"
 	"dis-core/internal/ledger"
 )
 
@@ -314,7 +315,7 @@ func main() {
 		log.Printf("🤝 Received external verification receipt from peer")
 		resp := map[string]any{
 			"status": "accepted",
-			"time":   time.Now().UTC().Format(time.RFC3339),
+			"time":   db.NowRFC3339Nano(),
 		}
 
 		w.Header().Set("Content-Type", "application/json")

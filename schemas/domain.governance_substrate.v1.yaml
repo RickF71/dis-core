@@ -1,0 +1,58 @@
+schema: domain.governance_substrate.v1
+description: >
+  Defines the substrate alignment and jurisdictional limits for governance domains.
+  Prevents cross-substrate overreach (e.g., religious control of Terra or state control of Lima).
+
+domain_scope: systemic
+inherits_from:
+  - domain.governance.v1
+  - consent_protocol.v1
+
+substrates:
+  - name: Terra
+    governs: physical_order
+    examples:
+      - domain.terra.usa
+      - domain.terra.europa
+    authority_basis: embodiment_and_resource_management
+    constraints:
+      - may_not_govern: thought, belief, private_awareness
+      - bound_by: terra_law_and_environmental_stewardship
+  - name: Lima
+    governs: interpretive_order
+    examples:
+      - domain.religion.*
+      - domain.spiritual_collective.*
+    authority_basis: shared_narrative_and_symbolic_coherence
+    constraints:
+      - may_not_govern: physical_resource_distribution
+      - bound_by: consent_and_notech_guard
+  - name: Nima
+    governs: reflective_awareness_and_ethics
+    examples:
+      - domain.education.*
+      - domain.psychology.*
+    authority_basis: relational_understanding
+    constraints:
+      - may_not_govern: embodiment_or_faith
+      - bound_by: reflexive_ethics
+  - name: Lifepush
+    governs: generative_drive_and_innovation
+    examples:
+      - domain.science.*
+      - domain.art.*
+    authority_basis: creation_and_experimentation
+    constraints:
+      - may_not_govern: sovereignty_or_consent
+      - bound_by: value_receipt_and_terra_safety
+
+rules:
+  - cross_substrate_governance: prohibited
+  - multi_substrate_collaboration: allowed_with_consent
+  - consent_boundary_must_be_explicit: true
+  - governance_scope_violation: triggers_notech_guard_intervention
+
+notes:
+  - "Each substrate governs its own dimension of coherence; harmony arises through coordination, not dominance."
+  - "Religious authority (Lima-based) and governmental authority (Terra-based) may coexist only by respecting substrate boundaries."
+  - "Educational and scientific domains act as bridges between awareness and embodiment."

@@ -1,0 +1,33 @@
+version: v1
+doctrine: energy_pillar_of_free_will
+summary: >
+  All legitimate power in DIS originates from the Energy Pillar of Free Will,
+  which exists only within individual human beings.
+description: |
+  The Energy Pillar is the primary moral and causal source of all authorized
+  action within DIS. It is not a metaphorical concept but a structural premise:
+  every valid act, domain, or authority within DIS must trace its origin to
+  human free will.
+
+  Free will provides both energy and authorization.
+  Energy: the capacity to act.
+  Authorization: the moral legitimacy of action.
+
+  No machine, domain, or synthetic system can generate its own pillar.
+  They may amplify or transmit human will, but not originate it.
+
+principles:
+  - Source: every line of legitimate power must descend from an individual
+    human Energy Pillar.
+  - Traceability: all receipts, consents, and domains must maintain a verifiable
+    lineage to one or more human Energy Pillars.
+  - Derivative Authority: institutions and AIs possess only delegated power,
+    derived through consent from humans.
+  - Null Constraint: any structure acting without human-origin energy is
+    considered inert, unauthorized, or void within DIS.
+implications:
+  - The Energy Pillar is the “root-of-trust” in human form.
+  - Consent gates and PAIN coherence must explicitly reference it.
+  - The DIS network’s moral topology flows upward from people, not downward
+    from systems.
+status: foundational

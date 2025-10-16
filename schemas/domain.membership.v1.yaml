@@ -1,0 +1,16 @@
+$schema: "https://dis.core/schemas/domain.membership.v1"
+title: "Domain Membership & Support"
+type: object
+required: ["user_id","domain_id","consent_level"]
+properties:
+  user_id: { type: string }
+  domain_id: { type: string }
+  consent_level: { type: string, enum: ["support","present","none"] }
+  discredit_pledge:
+    type: object
+    properties:
+      amount: { type: number, minimum: 0 }
+      decay_rate: { type: number, minimum: 0 }
+      refundable: { type: boolean, default: true }
+  ttl_after_withdrawal: { type: string, default: "24h" }
+  last_update: { type: string, format: date-time }

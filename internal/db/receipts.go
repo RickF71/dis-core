@@ -3,58 +3,55 @@ package db
 import (
 	"context"
 	"database/sql"
-	"time"
+	"fmt"
 )
 
+// Receipt matches the current receipts table schema.
 type Receipt struct {
-	ID     int64  `json:"id"`
-	Ref    string `json:"ref"`
-	By     string `json:"by"`
-	Scope  string `json:"scope"`
-	Result string `json:"result"`
-	Sig    string `json:"sig"`
-	Nonce  string `json:"nonce"`
-	TS     string `json:"timestamp"` // RFC3339
+	ID        int64  `json:"id"`
+	ReceiptID string `json:"receipt_id"`
+	SchemaRef string `json:"schema_ref"`
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"`
 }
 
-// EnsureReceiptsSchema creates the receipts table if missing.
+// EnsureReceiptsSchema creates the receipts table if missing (for safety).
 func EnsureReceiptsSchema(db *sql.DB) error {
 	schema := `
 CREATE TABLE IF NOT EXISTS receipts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ref TEXT,
-  by TEXT NOT NULL,
-  scope TEXT NOT NULL,
-  result TEXT NOT NULL,
-  sig TEXT NOT NULL,
-  nonce TEXT NOT NULL,
-  ts TEXT NOT NULL
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	receipt_id TEXT UNIQUE NOT NULL,
+	schema_ref TEXT,
+	content TEXT,
+	timestamp TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_receipts_ts ON receipts(ts);
-CREATE INDEX IF NOT EXISTS idx_receipts_scope ON receipts(scope);
+CREATE INDEX IF NOT EXISTS idx_receipts_ts ON receipts(timestamp);
 `
 	_, err := db.Exec(schema)
 	return err
 }
 
+// InsertReceipt adds a new receipt entry into the receipts table.
 func InsertReceipt(db *sql.DB, r *Receipt) (int64, error) {
-	if r.TS == "" {
-		r.TS = time.Now().UTC().Format(time.RFC3339Nano)
+	if r.Timestamp == "" {
+		r.Timestamp = NowRFC3339Nano()
 	}
-	q := `INSERT INTO receipts(ref,by,scope,result,sig,nonce,ts) VALUES(?,?,?,?,?,?,?)`
-	res, err := db.Exec(q, r.Ref, r.By, r.Scope, r.Result, r.Sig, r.Nonce, r.TS)
+	q := `INSERT INTO receipts(receipt_id, schema_ref, content, timestamp)
+	      VALUES(?, ?, ?, ?)`
+	res, err := db.Exec(q, r.ReceiptID, r.SchemaRef, r.Content, r.Timestamp)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
+// ListOpts provides filtering/pagination parameters.
 type ListOpts struct {
 	Limit  int
 	Offset int
-	Scope  string // optional filter
 }
 
+// ListReceipts fetches recent receipts with optional limit/offset.
 func ListReceipts(db *sql.DB, opts ListOpts) ([]Receipt, error) {
 	if opts.Limit <= 0 || opts.Limit > 500 {
 		opts.Limit = 100
@@ -63,24 +60,11 @@ func ListReceipts(db *sql.DB, opts ListOpts) ([]Receipt, error) {
 		opts.Offset = 0
 	}
 
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if opts.Scope != "" {
-		rows, err = db.QueryContext(context.Background(),
-			`SELECT id,ref,by,scope,result,sig,nonce,ts
-			 FROM receipts
-			 WHERE scope = ?
-			 ORDER BY id DESC
-			 LIMIT ? OFFSET ?`, opts.Scope, opts.Limit, opts.Offset)
-	} else {
-		rows, err = db.QueryContext(context.Background(),
-			`SELECT id,ref,by,scope,result,sig,nonce,ts
-			 FROM receipts
-			 ORDER BY id DESC
-			 LIMIT ? OFFSET ?`, opts.Limit, opts.Offset)
-	}
+	rows, err := db.QueryContext(context.Background(),
+		`SELECT id, receipt_id, schema_ref, content, timestamp
+		 FROM receipts
+		 ORDER BY id DESC
+		 LIMIT ? OFFSET ?`, opts.Limit, opts.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -89,10 +73,39 @@ func ListReceipts(db *sql.DB, opts ListOpts) ([]Receipt, error) {
 	var out []Receipt
 	for rows.Next() {
 		var r Receipt
-		if err := rows.Scan(&r.ID, &r.Ref, &r.By, &r.Scope, &r.Result, &r.Sig, &r.Nonce, &r.TS); err != nil {
+		if err := rows.Scan(&r.ID, &r.ReceiptID, &r.SchemaRef, &r.Content, &r.Timestamp); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+//
+// === v0.9.3 Additions for AutoRevocation + /api/status ===
+//
+
+// SaveReceipt inserts a receipt directly using the default DB handle.
+func SaveReceipt(r Receipt) error {
+	if DefaultDB == nil {
+		return fmt.Errorf("db not initialized")
+	}
+	if r.Timestamp == "" {
+		r.Timestamp = NowRFC3339Nano()
+	}
+	_, err := DefaultDB.Exec(`
+		INSERT INTO receipts (receipt_id, schema_ref, content, timestamp)
+		VALUES (?, ?, ?, ?);
+	`, r.ReceiptID, r.SchemaRef, r.Content, r.Timestamp)
+	return err
+}
+
+// CountReceipts returns total count of receipts in the database.
+func CountReceipts() (int64, error) {
+	if DefaultDB == nil {
+		return 0, fmt.Errorf("db not initialized")
+	}
+	var n int64
+	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM receipts;`).Scan(&n)
+	return n, err
 }
