@@ -10,6 +10,8 @@ import (
 	"dis-core/internal/config"
 	"dis-core/internal/db"
 	"dis-core/internal/policy"
+
+	"github.com/rs/cors" // ✅ Added
 )
 
 // Server represents the DIS-PERSONAL REST node.
@@ -36,13 +38,24 @@ func NewServer(store *sql.DB, cfg *config.Config, pol *policy.Policy, sum string
 
 // Start launches the REST API server for DIS-PERSONAL.
 func (s *Server) Start(addr string) error {
-	http.HandleFunc("/ping", s.handlePing)
-	http.HandleFunc("/info", s.handleInfo)
-	http.HandleFunc("/verify", HandleExternalVerify) // now implemented as a stub below
-	http.HandleFunc("/receipts", s.handleReceipts)
+	mux := http.NewServeMux()
+
+	// --- Routes ---
+	mux.HandleFunc("/ping", s.handlePing)
+	mux.HandleFunc("/info", s.handleInfo)
+	mux.HandleFunc("/verify", HandleExternalVerify)
+	mux.HandleFunc("/receipts", s.handleReceipts)
+
+	// --- CORS wrapper ---
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173"}, // Finagler dev server
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+	})
 
 	log.Printf("🛰️  DIS-PERSONAL REST API listening on %s\n", addr)
-	return http.ListenAndServe(addr, nil)
+	return http.ListenAndServe(addr, c.Handler(mux))
 }
 
 // --- Handlers ---
