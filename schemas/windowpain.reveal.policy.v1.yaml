@@ -1,0 +1,15 @@
+$schema: "https://dis.core/schemas/windowpain.reveal.policy.v1"
+title: "Policy — Window PAIN Reveal"
+type: object
+required: ["rules"]
+properties:
+  rules:
+    type: array
+    items:
+      type: object
+      properties:
+        confirm_gesture: { type: boolean, default: true }
+        biometric_local_only: { type: boolean, default: false }
+        disclose_identity: { type: string, enum: ["optional","forbidden","required"], default: "optional" }
+        log_local_only: { type: boolean, default: true }
+        rate_limit_daily: { type: integer, default: 10 }

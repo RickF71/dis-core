@@ -57,6 +57,9 @@ func (s *Server) Start(addr string) error {
 
 // --- Route registration ---
 func (s *Server) registerRoutes() {
+	// === Health ===
+	s.mux.HandleFunc("/healthz", s.handleHealth)
+
 	// === Core info ===
 	s.mux.HandleFunc("/ping", s.handlePing)
 	s.mux.HandleFunc("/info", s.handleInfo)
@@ -69,6 +72,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/auth/virtual_usgov", HandleVirtualUSGovCredential)
 	s.mux.HandleFunc("/api/identity/register", HandleIdentityRegister(s.store))
 	s.mux.HandleFunc("/api/identity/list", HandleIdentityList(s.store))
+	s.mux.HandleFunc("/api/overlay/", GetOverlayHandler) // mounts /api/overlay/:domain/:scope
 
 	// === v0.9.3 self-maintenance ===
 	RegisterConsoleAuthRoutes(s.mux)
@@ -84,6 +88,14 @@ func (s *Server) registerRoutes() {
 }
 
 // --- Core Handlers ---
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Keep it simple and fast—used by load balancers & UIs
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"time":   db.NowRFC3339Nano(),
+	})
+}
 
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

@@ -19,6 +19,7 @@ func RegisterTerraRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/terra/map", handleTerraMap)
 	mux.HandleFunc("/api/terra/version", handleTerraVersion)
 	mux.HandleFunc("/api/terra/head", handleTerraHead)
+	http.HandleFunc("/api/overlay/", GetOverlayHandler)
 }
 
 // --- Handlers ---

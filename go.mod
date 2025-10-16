@@ -3,12 +3,12 @@ module dis-core
 go 1.23.0
 
 require (
-	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/jonas-p/go-shp v0.1.1
 	github.com/paulmach/orb v0.12.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.39.0
+	github.com/joho/godotenv v1.5.1
 )
 
 require (

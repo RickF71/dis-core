@@ -1,0 +1,32 @@
+$schema: "https://dis.core/schemas/pledge.zk.policy.v1"
+title: "Policy — ZK Pledging"
+type: object
+required: ["rules"]
+properties:
+  rules:
+    type: array
+    items:
+      type: object
+      required: ["require"]
+      properties:
+        require:
+          type: string
+          enum:
+            - "proof_verified"
+            - "audited_circuit"
+            - "human_set_root_in_registry"
+        forbid: { type: string, enum: ["store_fingerprints","store_ip"] }
+        allow_reveal:
+          type: object
+          properties:
+            via: { type: string, enum: ["pain.window"] }
+            conditions:
+              type: array
+              items:
+                type: string
+                enum: ["requires_human_gesture","single_use_reveal"]
+  retention:
+    type: object
+    properties:
+      pledges_raw_days: { type: integer, default: 0 }
+      pledges_aggregate_days: { type: integer, default: 365 }
