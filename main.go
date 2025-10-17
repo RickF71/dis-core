@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dis-core/internal/api"
+	"dis-core/internal/api/atlas"
 	"dis-core/internal/config"
 	"dis-core/internal/core"
 	"dis-core/internal/daemon" // [v0.9.3+]
@@ -68,19 +69,21 @@ func main() {
 		log.Fatal("Policy error:", err)
 	}
 
-	// --- Init / Auto-Create DB ---
-	store, err := db.SetupDatabase(cfg.DatabasePath)
+	// --- Init / Auto-Create PostgreSQL DB (unified DIS-Core + Atlas) ---
+	store, err := db.ConnectPostgres(cfg.DatabaseDSN)
 	if err != nil {
-		log.Fatal("DB setup failed:", err)
+		log.Fatalf("❌ failed to connect to PostgreSQL: %v", err)
 	}
 	defer store.Close()
 
-	// [v0.9.3+] Ensure identities table exists
-	if err := db.EnsureIdentitiesSchema(store); err != nil {
-		log.Fatalf("failed to ensure identities table: %v", err)
+	if err := db.Setup(store); err != nil {
+		log.Fatalf("❌ failed to initialize PostgreSQL schema: %v", err)
 	}
 
-	// [v0.9.3+] Seed a local system identity if missing
+	// Initialize Atlas store wrapper (uses same Postgres connection)
+	atlasStore := atlas.NewAtlasStore(store)
+
+	// [v0.9.3+] Seed baseline identities (system + personal)
 	_, _ = db.UpsertIdentity(store, "dis_uid:terra:system", "system", true)
 	_, _ = db.UpsertIdentity(store, "dis_uid:terra:rick:bf72a8c19f", "rick", true)
 
@@ -97,8 +100,9 @@ func main() {
 		log.Printf("🌐 DIS-PERSONAL %s — Network Sovereignty (bound to DIS-CORE %s) serving on %s\n",
 			vInfo.DISPersonal, vInfo.DISCore, addr)
 
-		// [v0.9.3+] Enhanced server — includes new routes
 		server := api.NewServer(store, cfg, pol, sum, coreHash)
+		server.AttachAtlas(atlasStore)
+
 		go func() {
 			if err := server.Start(addr); err != nil {
 				log.Fatal(err)
@@ -131,6 +135,6 @@ func main() {
 	}
 
 	// --- Default Path ---
-	log.Println("✅ DIS-PERSONAL started successfully (no interactive console).")
+	log.Println("✅ DIS-PERSONAL started successfully (PostgreSQL mode).")
 	log.Println("Use --serve for API mode or --by/--scope for headless mode.")
 }

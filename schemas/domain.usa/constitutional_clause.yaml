@@ -1,0 +1,27 @@
+id: domain.usa.constitutional_clause.v1
+title: Foundational Equivalents Clause
+status: inherited
+parent: domain.terra.ethics.core
+
+description: |
+  Establishes the correspondence between the United States' founding ideals
+  and the DIS universal model of Terra, Lima, and Numen.
+
+text: |
+  We hold these truths to be self-evident: that all persons possess the right
+  to Life, Liberty, and the Pursuit of Happiness, understood within DIS as the
+  right to physical integrity (Terra), moral agency (Lima), and the free
+  expression of will (Numen → Terra through Lima).
+
+  These rights are not conferred by any authority, but recognized as inherent
+  properties of consciousness. The role of `domain.usa` is to preserve and
+  harmonize these properties within its civic field, ensuring that Life is
+  protected, Liberty is cultivated, and the Pursuit of Happiness remains
+  unobstructed.
+
+inherits:
+  - domain.terra.ethics.core
+applies_to:
+  - domain.usa
+tags: [foundational, equivalence, civic, ethics]
+version: 1.0

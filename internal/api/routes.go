@@ -1,40 +1,35 @@
 package api
 
 import (
-	"dis-core/internal/db"
 	"net/http"
+
+	"dis-core/internal/api/atlas"
+	"dis-core/internal/api/auth"
+	"dis-core/internal/api/identities"
+	"dis-core/internal/api/receipts"
+	"dis-core/internal/api/terra"
 )
 
-// Route describes a single HTTP endpoint.
-type Route struct {
-	Method      string
-	Path        string
-	Handler     http.HandlerFunc
-	Description string
-}
-
-// RegisterAllRoutes binds every API endpoint to the server’s mux.
+// RegisterAllRoutes wires all endpoint groups into the server mux.
 func (s *Server) RegisterAllRoutes() {
-	routes := []Route{
-		// 🟢 Core information
-		{"GET", "/ping", s.handlePing, "Simple health check"},
-		{"GET", "/info", s.handleInfo, "DIS node configuration summary"},
-		{"GET", "/verify", HandleExternalVerify, "Verify external receipt"},
-		{"GET", "/receipts", s.handleReceipts, "List stored receipts"},
+	mux := s.mux
 
-		// 🔐 Authentication and identity
-		{"POST", "/api/auth/revoke", s.HandleAuthRevoke, "Revoke handshake / session"},
-		{"POST", "/api/auth/handshake", s.HandleDISAuthHandshake, "Create handshake token"},
-		{"POST", "/api/auth/virtual_usgov", HandleVirtualUSGovCredential, "Simulated USGOV credential issuer"},
-		{"POST", "/api/auth/console", HandleConsoleAuth, "Console login using handshake token"},
-		{"POST", "/api/identity/register", HandleIdentityRegister(db.DefaultDB), "Register a new identity"},
-		{"GET", "/api/identity/list", HandleIdentityList(db.DefaultDB), "List identities"},
+	// Core system routes
+	mux.HandleFunc("/verify", HandleVerify) // or s.handleVerify if you make it a method
+	mux.HandleFunc("/ping", s.handlePing)
+	mux.HandleFunc("/info", s.handleInfo)
+	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.HandleFunc("/identities", s.handleIdentities)
 
-		// 🧩 Self-maintenance
-		{"GET", "/api/status", HandleStatus, "Diagnostic counts: receipts, handshakes, revocations, identities"},
-	}
+	// Modular packages
+	auth.Register(mux, s.store)
+	identities.Register(mux, s.store)
+	atlas.Register(mux, s.store)
+	receipts.Register(mux, s.store)
+	terra.Register(mux, s.store)
 
-	for _, r := range routes {
-		s.mux.HandleFunc(r.Path, r.Handler)
-	}
+	// Root fallback
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("🌐 DIS-CORE v0.9.3 — Self-Maintenance and Reflexive Identity\n"))
+	})
 }

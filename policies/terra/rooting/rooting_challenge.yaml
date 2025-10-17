@@ -1,0 +1,21 @@
+policy:
+  id: terra.rooting.challenge.v1
+  title: Challenge/Remediation of Rooting
+  description: >
+    Rare remediation path for clear fraud. Requires multi-witness quorum review.
+  trigger:
+    - complaint.received
+    - evidence.attached (hash refs)
+  quorum:
+    reviewers_required: 3
+    eligible: [terra.steward, community.witness, ombuds]
+  rule:
+    if: quorum.approves == true
+    then:
+      - mark receipt: disputed
+      - emit: terra.rooting.remedy
+      - set applicant.IsRooted: (no change unless remedy == revoke)
+    else:
+      - deny
+  notes: >
+    Revocation is exceptional; sovereignty bias is to maintain IsRooted.

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
 	"time"
@@ -11,20 +11,23 @@ import (
 	"dis-core/internal/db"
 )
 
-// buildServer assembles all active routes.
+type Server struct {
+	store *sql.DB
+	mux   *http.ServeMux
+	// maybe cfg *config.Config
+}
+
 func buildServer() *http.ServeMux {
-	mux := http.NewServeMux()
+	store := db.DefaultDB
+	if store == nil {
+		log.Fatal("database not initialized")
+	}
 
-	// === DIS-CORE v0.9.3 Routes ===
-	api.RegisterConsoleAuthRoutes(mux)
-	api.RegisterStatusRoutes(mux)
+	// If you don't yet load a real config or policy, just pass nil and empty strings
+	s := api.NewServer(store, nil, nil, "", "")
 
-	// === Root route ===
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "🌐 DIS-CORE v0.9.3 — Self-Maintenance and Reflexive Identity\nTime: %s\n", db.NowRFC3339Nano())
-	})
-
-	return mux
+	// The NewServer call already registers all routes and sets up the mux
+	return s.Mux() // We'll add this accessor next if it's missing
 }
 
 // RunServer starts the HTTP server and listens until context cancel.

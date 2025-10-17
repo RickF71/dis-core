@@ -1,4 +1,4 @@
-package api
+package terra
 
 import (
 	"crypto/sha1"
@@ -14,14 +14,6 @@ import (
 
 const baseTerraPath = "data/terra/earth"
 
-// RegisterTerraRoutes attaches Terra sync endpoints to the mux.
-func RegisterTerraRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/terra/map", handleTerraMap)
-	mux.HandleFunc("/api/terra/version", handleTerraVersion)
-	mux.HandleFunc("/api/terra/head", handleTerraHead)
-	http.HandleFunc("/api/overlay/", GetOverlayHandler)
-}
-
 // --- Handlers ---
 
 func handleTerraMap(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +22,6 @@ func handleTerraMap(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Expires", "0")
 	w.Header().Set("Content-Type", "application/json")
 
-	// Optional ?region= parameter, defaults to "world"
 	region := r.URL.Query().Get("region")
 	if region == "" {
 		region = "world"
@@ -47,9 +38,8 @@ func handleTerraMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(baseTerraPath, filename)
-
-	file, err := os.Open(filePath)
+	path := filepath.Join(baseTerraPath, filename)
+	file, err := os.Open(path)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("open %s: %v", filename, err), http.StatusInternalServerError)
 		return
@@ -59,31 +49,33 @@ func handleTerraMap(w http.ResponseWriter, r *http.Request) {
 	if fi, err := file.Stat(); err == nil {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", fi.Size()))
 	}
-
 	if _, err := io.Copy(w, file); err != nil {
-		http.Error(w, fmt.Sprintf("File stream error: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("stream error: %v", err), http.StatusInternalServerError)
 	}
 }
 
-func handleTerraVersion(w http.ResponseWriter, r *http.Request) {
-	hash, mod, err := terraMeta(filepath.Join(baseTerraPath, "terra_world_clean.geojson"))
+func handleTerraVersion(w http.ResponseWriter, _ *http.Request) {
+	file := filepath.Join(baseTerraPath, "terra_world_clean.geojson")
+	hash, mod, err := terraMeta(file)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	resp := map[string]interface{}{
 		"hash":      hash,
 		"modified":  mod.UTC(),
-		"sizeBytes": fileSize(filepath.Join(baseTerraPath, "terra_world_clean.geojson")),
+		"sizeBytes": fileSize(file),
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func handleTerraHead(w http.ResponseWriter, r *http.Request) {
-	hash, mod, err := terraMeta(filepath.Join(baseTerraPath, "terra_world_clean.geojson"))
+func handleTerraHead(w http.ResponseWriter, _ *http.Request) {
+	file := filepath.Join(baseTerraPath, "terra_world_clean.geojson")
+	hash, mod, err := terraMeta(file)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("ETag", fmt.Sprintf(`"%s"`, hash))
@@ -93,7 +85,7 @@ func handleTerraHead(w http.ResponseWriter, r *http.Request) {
 
 // --- Helpers ---
 
-func terraMeta(path string) (hash string, modTime time.Time, err error) {
+func terraMeta(path string) (string, time.Time, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", time.Time{}, err

@@ -4,45 +4,54 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 // Receipt matches the current receipts table schema.
 type Receipt struct {
-	ID        int64  `json:"id"`
-	ReceiptID string `json:"receipt_id"`
-	SchemaRef string `json:"schema_ref"`
-	Content   string `json:"content"`
-	Timestamp string `json:"timestamp"`
+	ID        int64     `json:"id"`
+	ReceiptID string    `json:"receipt_id"`
+	SchemaRef string    `json:"schema_ref"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // EnsureReceiptsSchema creates the receipts table if missing (for safety).
 func EnsureReceiptsSchema(db *sql.DB) error {
 	schema := `
 CREATE TABLE IF NOT EXISTS receipts (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	id SERIAL PRIMARY KEY,
 	receipt_id TEXT UNIQUE NOT NULL,
 	schema_ref TEXT,
 	content TEXT,
-	timestamp TEXT
+	timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_receipts_ts ON receipts(timestamp);
 `
 	_, err := db.Exec(schema)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to ensure receipts table: %w", err)
+	}
+	fmt.Println("✅ receipts table verified or created (Postgres).")
+	return nil
 }
 
 // InsertReceipt adds a new receipt entry into the receipts table.
 func InsertReceipt(db *sql.DB, r *Receipt) (int64, error) {
-	if r.Timestamp == "" {
-		r.Timestamp = NowRFC3339Nano()
+	if r.Timestamp.IsZero() {
+		r.Timestamp = time.Now().UTC()
 	}
-	q := `INSERT INTO receipts(receipt_id, schema_ref, content, timestamp)
-	      VALUES(?, ?, ?, ?)`
-	res, err := db.Exec(q, r.ReceiptID, r.SchemaRef, r.Content, r.Timestamp)
+	q := `
+	INSERT INTO receipts (receipt_id, schema_ref, content, timestamp)
+	VALUES ($1, $2, $3, $4)
+	RETURNING id;
+	`
+	var id int64
+	err := db.QueryRow(q, r.ReceiptID, r.SchemaRef, r.Content, r.Timestamp).Scan(&id)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to insert receipt: %w", err)
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 // ListOpts provides filtering/pagination parameters.
@@ -60,13 +69,14 @@ func ListReceipts(db *sql.DB, opts ListOpts) ([]Receipt, error) {
 		opts.Offset = 0
 	}
 
-	rows, err := db.QueryContext(context.Background(),
-		`SELECT id, receipt_id, schema_ref, content, timestamp
-		 FROM receipts
-		 ORDER BY id DESC
-		 LIMIT ? OFFSET ?`, opts.Limit, opts.Offset)
+	rows, err := db.QueryContext(context.Background(), `
+		SELECT id, receipt_id, schema_ref, content, timestamp
+		FROM receipts
+		ORDER BY id DESC
+		LIMIT $1 OFFSET $2;
+	`, opts.Limit, opts.Offset)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list receipts: %w", err)
 	}
 	defer rows.Close()
 
@@ -90,12 +100,12 @@ func SaveReceipt(r Receipt) error {
 	if DefaultDB == nil {
 		return fmt.Errorf("db not initialized")
 	}
-	if r.Timestamp == "" {
-		r.Timestamp = NowRFC3339Nano()
+	if r.Timestamp.IsZero() {
+		r.Timestamp = time.Now().UTC()
 	}
 	_, err := DefaultDB.Exec(`
 		INSERT INTO receipts (receipt_id, schema_ref, content, timestamp)
-		VALUES (?, ?, ?, ?);
+		VALUES ($1, $2, $3, $4);
 	`, r.ReceiptID, r.SchemaRef, r.Content, r.Timestamp)
 	return err
 }

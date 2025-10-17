@@ -20,12 +20,12 @@ type Identity struct {
 func EnsureIdentitiesSchema(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS identities (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		dis_uid TEXT UNIQUE NOT NULL,
 		namespace TEXT,
-		created_at TEXT NOT NULL,
-		updated_at TEXT,
-		active INTEGER DEFAULT 1 CHECK(active IN (0,1))
+		created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+		updated_at TIMESTAMPTZ,
+		active BOOLEAN DEFAULT TRUE
 	);
 	CREATE INDEX IF NOT EXISTS idx_identities_disuid ON identities(dis_uid);
 	CREATE INDEX IF NOT EXISTS idx_identities_namespace ON identities(namespace);
@@ -34,22 +34,22 @@ func EnsureIdentitiesSchema(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to ensure identities table: %w", err)
 	}
-	fmt.Println("✅ identities table verified or created.")
+	fmt.Println("✅ identities table verified or created (Postgres).")
 	return nil
 }
 
 // InsertIdentity creates a new identity record.
 func InsertIdentity(db *sql.DB, uid string, namespace string) (int64, error) {
-	ts := NowRFC3339Nano()
 	q := `
 	INSERT INTO identities (dis_uid, namespace, created_at, active)
-	VALUES (?, ?, ?, 1);
+	VALUES ($1, $2, NOW(), TRUE)
+	RETURNING id;
 	`
-	res, err := db.Exec(q, uid, namespace, ts)
+	var id int64
+	err := db.QueryRow(q, uid, namespace).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert identity: %w", err)
 	}
-	id, _ := res.LastInsertId()
 	fmt.Printf("🆔 new identity created: %s\n", uid)
 	return id, nil
 }
@@ -57,22 +57,23 @@ func InsertIdentity(db *sql.DB, uid string, namespace string) (int64, error) {
 // UpsertIdentity inserts or updates an identity based on dis_uid.
 // If the identity exists, updates namespace or reactivates it.
 func UpsertIdentity(db *sql.DB, uid, namespace string, active bool) (int64, error) {
-	existing, _ := GetIdentity(db, uid)
-	ts := NowRFC3339Nano()
-
-	if existing != nil {
-		_, err := db.Exec(`
-			UPDATE identities
-			SET namespace = ?, active = ?, updated_at = ?
-			WHERE dis_uid = ?;
-		`, namespace, boolToInt(active), ts, uid)
-		if err != nil {
-			return existing.ID, fmt.Errorf("failed to update identity: %w", err)
-		}
-		fmt.Printf("♻️  identity updated: %s\n", uid)
-		return existing.ID, nil
+	q := `
+	INSERT INTO identities (dis_uid, namespace, created_at, active)
+	VALUES ($1, $2, NOW(), $3)
+	ON CONFLICT (dis_uid)
+	DO UPDATE SET
+		namespace = EXCLUDED.namespace,
+		active = EXCLUDED.active,
+		updated_at = NOW()
+	RETURNING id;
+	`
+	var id int64
+	err := db.QueryRow(q, uid, namespace, active).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to upsert identity: %w", err)
 	}
-	return InsertIdentity(db, uid, namespace)
+	fmt.Printf("♻️  identity upserted: %s\n", uid)
+	return id, nil
 }
 
 // GetIdentity retrieves a specific identity by DISUID.
@@ -80,19 +81,18 @@ func GetIdentity(db *sql.DB, uid string) (*Identity, error) {
 	row := db.QueryRow(`
 		SELECT id, dis_uid, namespace, created_at, updated_at, active
 		FROM identities
-		WHERE dis_uid = ?;
+		WHERE dis_uid = $1;
 	`, uid)
 
 	var ident Identity
-	var created, updated sql.NullString
-	var activeInt int
+	var updated sql.NullTime
 	err := row.Scan(
 		&ident.ID,
 		&ident.DISUID,
 		&ident.Namespace,
-		&created,
+		&ident.CreatedAt,
 		&updated,
-		&activeInt,
+		&ident.Active,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -100,18 +100,9 @@ func GetIdentity(db *sql.DB, uid string) (*Identity, error) {
 		}
 		return nil, fmt.Errorf("failed to get identity: %w", err)
 	}
-
-	if created.Valid {
-		if t, e := time.Parse(time.RFC3339Nano, created.String); e == nil {
-			ident.CreatedAt = t
-		}
-	}
 	if updated.Valid {
-		if t, e := time.Parse(time.RFC3339Nano, updated.String); e == nil {
-			ident.UpdatedAt = &t
-		}
+		ident.UpdatedAt = &updated.Time
 	}
-	ident.Active = activeInt == 1
 	return &ident, nil
 }
 
@@ -120,7 +111,7 @@ func FindByNamespace(db *sql.DB, ns string) ([]Identity, error) {
 	rows, err := db.Query(`
 		SELECT id, dis_uid, namespace, created_at, updated_at, active
 		FROM identities
-		WHERE namespace LIKE ?;
+		WHERE namespace ILIKE $1;
 	`, "%"+ns+"%")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find by namespace: %w", err)
@@ -130,27 +121,20 @@ func FindByNamespace(db *sql.DB, ns string) ([]Identity, error) {
 	var results []Identity
 	for rows.Next() {
 		var ident Identity
-		var created, updated sql.NullString
-		var activeInt int
+		var updated sql.NullTime
 		if err := rows.Scan(
 			&ident.ID,
 			&ident.DISUID,
 			&ident.Namespace,
-			&created,
+			&ident.CreatedAt,
 			&updated,
-			&activeInt,
+			&ident.Active,
 		); err != nil {
 			return nil, err
 		}
-		if created.Valid {
-			t, _ := time.Parse(time.RFC3339Nano, created.String)
-			ident.CreatedAt = t
-		}
 		if updated.Valid {
-			t, _ := time.Parse(time.RFC3339Nano, updated.String)
-			ident.UpdatedAt = &t
+			ident.UpdatedAt = &updated.Time
 		}
-		ident.Active = activeInt == 1
 		results = append(results, ident)
 	}
 	return results, rows.Err()
@@ -164,9 +148,9 @@ func ListIdentities(db *sql.DB, limit, offset int) ([]Identity, error) {
 	rows, err := db.Query(`
 		SELECT id, dis_uid, namespace, created_at, updated_at, active
 		FROM identities
-		WHERE active = 1
+		WHERE active = TRUE
 		ORDER BY id DESC
-		LIMIT ? OFFSET ?;
+		LIMIT $1 OFFSET $2;
 	`, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list identities: %w", err)
@@ -176,27 +160,20 @@ func ListIdentities(db *sql.DB, limit, offset int) ([]Identity, error) {
 	var list []Identity
 	for rows.Next() {
 		var ident Identity
-		var created, updated sql.NullString
-		var activeInt int
+		var updated sql.NullTime
 		if err := rows.Scan(
 			&ident.ID,
 			&ident.DISUID,
 			&ident.Namespace,
-			&created,
+			&ident.CreatedAt,
 			&updated,
-			&activeInt,
+			&ident.Active,
 		); err != nil {
 			return nil, err
 		}
-		if created.Valid {
-			t, _ := time.Parse(time.RFC3339Nano, created.String)
-			ident.CreatedAt = t
-		}
 		if updated.Valid {
-			t, _ := time.Parse(time.RFC3339Nano, updated.String)
-			ident.UpdatedAt = &t
+			ident.UpdatedAt = &updated.Time
 		}
-		ident.Active = activeInt == 1
 		list = append(list, ident)
 	}
 	return list, rows.Err()
@@ -204,12 +181,11 @@ func ListIdentities(db *sql.DB, limit, offset int) ([]Identity, error) {
 
 // DeactivateIdentity marks an identity as inactive.
 func DeactivateIdentity(db *sql.DB, uid string) error {
-	ts := NowRFC3339Nano()
 	_, err := db.Exec(`
 		UPDATE identities
-		SET active = 0, updated_at = ?
-		WHERE dis_uid = ?;
-	`, ts, uid)
+		SET active = FALSE, updated_at = NOW()
+		WHERE dis_uid = $1;
+	`, uid)
 	if err == nil {
 		fmt.Printf("⚠️  identity deactivated: %s\n", uid)
 	}
@@ -218,12 +194,11 @@ func DeactivateIdentity(db *sql.DB, uid string) error {
 
 // ReactivateIdentity re-enables a previously inactive identity.
 func ReactivateIdentity(db *sql.DB, uid string) error {
-	ts := NowRFC3339Nano()
 	_, err := db.Exec(`
 		UPDATE identities
-		SET active = 1, updated_at = ?
-		WHERE dis_uid = ?;
-	`, ts, uid)
+		SET active = TRUE, updated_at = NOW()
+		WHERE dis_uid = $1;
+	`, uid)
 	if err == nil {
 		fmt.Printf("✅ identity reactivated: %s\n", uid)
 	}
@@ -235,19 +210,10 @@ func CountIdentities() (int64, error) {
 	if DefaultDB == nil {
 		return 0, fmt.Errorf("db not initialized")
 	}
-
 	var n int64
 	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM identities;`).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count identities: %w", err)
 	}
 	return n, nil
-}
-
-// Helper
-func boolToInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }

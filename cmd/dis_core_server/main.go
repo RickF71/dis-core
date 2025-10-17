@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Open database
-	store, err := sql.Open("sqlite", cfg.DatabasePath)
+	store, err := sql.Open("sqlite", cfg.DatabaseDSN)
 	if err != nil {
 		log.Fatalf("❌ Failed to open database: %v", err)
 	}

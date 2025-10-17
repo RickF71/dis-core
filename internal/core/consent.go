@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
+	"dis-core/internal/bridge"
 	"dis-core/internal/config"
-	"dis-core/internal/db"
 	dbpkg "dis-core/internal/db"
 	"dis-core/internal/policy"
 	"dis-core/internal/util"
@@ -38,10 +39,11 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 			return 0, "", "", "", genErr
 		}
 	}
-	ts := db.NowRFC3339Nano()
+
+	ts := time.Now().UTC()
 
 	// Signature includes policy checksum
-	sig := util.Sign(action, id, by, scope, nonce, ts, polSum)
+	sig := util.Sign(action, id, by, scope, nonce, bridge.CanonicalTime(ts), polSum)
 
 	// 1️⃣ Construct new-style receipt record
 	r := &dbpkg.Receipt{
@@ -57,5 +59,5 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 	}
 
 	log.Printf("✅ Consent action recorded: by=%s scope=%s receipt_id=%d", by, scope, recID)
-	return recID, nonce, ts, sig, nil
+	return recID, nonce, bridge.CanonicalTime(ts), sig, nil
 }

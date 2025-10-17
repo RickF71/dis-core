@@ -1,0 +1,19 @@
+protocol:
+  id: terra-commit.v1
+  title: Atomic Terra Event Commit
+  phases:
+    - prepare:
+        checks:
+          - actor.IsRooted == true
+          - both_signatures_present == true
+    - commit:
+        writes:
+          - terra.person.giveroot (single batch write)
+        precondition: all checks pass
+    - abort:
+        on: any check failure or write error
+  guarantees:
+    - all-or-nothing
+    - idempotent on retry (receipt_hash stable)
+  notes: >
+    Used by any Terra-scoped atomic event; default for giveroot.
