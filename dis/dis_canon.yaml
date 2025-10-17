@@ -1,0 +1,20 @@
+version: v1
+kind: dis.canon
+metadata:
+  description: >
+    Foundational statement defining the relationship between DIS
+    (the fabric of sovereignty) and the domains that participate within it.
+
+axioms:
+  - id: AXIOM_DOMAIN_OBLIGATION
+    name: Domain Obligation to DIS
+    text: >
+      DIS may not govern individuals, but it governs domains.
+      Every domain that wishes to participate within DIS must
+      accept its foundational axioms and remain accountable to
+      the network fabric that safeguards individual sovereignty.
+      Specific obligations and enforcement mechanisms shall be
+      defined by policy at a later stage.
+
+notes:
+  - "Power must have mirrors; domains are the mirrors through which DIS ensures human sovereignty."
