@@ -17,7 +17,7 @@ type Config struct {
 	APIPort            int    `yaml:"api_port"`
 	// RepoRoot allows the server to locate the repository root when resolving
 	// domain files. Defaults to "." (current working directory).
-	RepoRoot           string `yaml:"repo_root"`
+	RepoRoot string `yaml:"repo_root"`
 
 	// PostgreSQL connection string, e.g.:
 	// postgres://user:pass@localhost:5432/dis_core?sslmode=disable
