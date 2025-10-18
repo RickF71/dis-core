@@ -16,5 +16,14 @@ axioms:
       Specific obligations and enforcement mechanisms shall be
       defined by policy at a later stage.
 
+  - id: AXIOM_LIFE_MAXIMAL
+    name: Life as Maximal
+    text: >
+      Terra holds that all life is maximal.
+      This axiom establishes the upper bound of moral worth:
+      no life may be valued less than life itself.
+      Interpretation and application remain open to future understanding.
+
+
 notes:
   - "Power must have mirrors; domains are the mirrors through which DIS ensures human sovereignty."

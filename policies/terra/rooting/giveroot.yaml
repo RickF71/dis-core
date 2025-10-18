@@ -1,31 +1,24 @@
-event:
-  kind: terra.person.giveroot
-  id: terra.giveroot.<uuid>
+policy:
+  id: terra.giveroot.v1
+  title: Terra GiveRoot Policy (Canonical)
   description: >
-    Atomic person-to-person rooting event: living witness recognizes applicant,
-    applicant consents, both sign. Result: applicant.IsRooted = true.
-  actor:                       # the giver (must be rooted)
-    id: dis:person:<giver-id>
-    role_scope: terra
-  subject:                     # the recipient (to be rooted)
-    id: dis:person:<applicant-id> | temp:local:<shadow-id>
-  method:                      # how recognition occurred
-    kind: mutual_recognition    # e.g., eye, voice, touch, interpreter-assisted
-    detail: "handshake phrase"  # optional human-readable note (not structured proof)
-  checks:
+    Only a rooted human may, by mutual recognition, cause another human to become rooted.
+    This action is human↔human, Terra-scoped, atomic, and co-signed.
+  invariants:
+    - person-to-person only (no seat, domain, or AI actors)
+    - atomic transaction (no split verify/accept)
+    - dual-signature (giver + applicant)
+    - consent required; accessible methods allowed
+  requires:
     - actor.IsRooted == true
-    - applicant.consent (explicit or co-sign)
-    - time_window: verification + acceptance must be within X seconds (atomicity)
-  signatures:
-    - giver_signature: <sig>
-    - applicant_signature: <sig>   # applicant must co-sign to express consent
-  result:
-    person.IsRooted: true
-    rooted_at: RFC3339
-    witness_ref: terra.giveroot.<uuid>
-  provenance:
-    recorded_by: domain.terra.ledger
-    storage: immutable-pointer (hash)
-  privacy:
-    - do_not_store: biometrics, raw video, raw audio
-    - store_minimal: witness_id, applicant_id, method_label, timestamp, signatures
+    - applicant.consent == true
+    - method in [mutual_recognition, adapted_recognition]
+  effects:
+    - set applicant.IsRooted = true
+    - emit event: terra.person.giveroot
+  safeguards:
+    - rate_limit_per_actor: {count: 5, period: 30d}
+    - optional_multi_witness: false
+  audit:
+    record: [giver_id, applicant_id, method, timestamp, receipt_hash]
+    redact: [biometrics, raw_media]
