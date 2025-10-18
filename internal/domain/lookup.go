@@ -44,27 +44,12 @@ func LookupByCode(code string, repoRoot string) (*Domain, error) {
 		return nil, fmt.Errorf("400 Bad Request: invalid ISO code (expect 3 letters): %q", code)
 	}
 
-	// build candidate paths
-	// 1) /domains/countries/{iso}/{iso}.yaml
-	p1 := filepath.Join(repoRoot, "domains", "countries", iso, fmt.Sprintf("%s.yaml", iso))
-	// also accept legacy filename domain.{iso}.yaml for robustness
-	p1alt := filepath.Join(repoRoot, "domains", "countries", iso, fmt.Sprintf("domain.%s.yaml", iso))
+	// canonical path: ./domains/countries/<iso>/domain.<iso>.yaml
+	fname := fmt.Sprintf("domain.%s.yaml", iso)
+	found := filepath.Join(repoRoot, "domains", "countries", iso, fname)
 
-	// 2) /domains/terra/{iso}.yaml
-	p2 := filepath.Join(repoRoot, "domains", "terra", fmt.Sprintf("%s.yaml", iso))
-	p2alt := filepath.Join(repoRoot, "domains", "terra", fmt.Sprintf("domain.%s.yaml", iso))
-
-	candidates := []string{p1, p1alt, p2, p2alt}
-	var found string
-	for _, p := range candidates {
-		if fileExists(p) {
-			found = p
-			break
-		}
-	}
-
-	if found == "" {
-		return nil, fmt.Errorf("404 Not Found: domain for code %q not found", code)
+	if !fileExists(found) {
+		return nil, fmt.Errorf("404 Not Found: domain for code %q not found at canonical path %s", code, found)
 	}
 
 	b, err := os.ReadFile(found)
@@ -74,7 +59,7 @@ func LookupByCode(code string, repoRoot string) (*Domain, error) {
 
 	var d Domain
 	if err := yaml.Unmarshal(b, &d); err != nil {
-		return nil, fmt.Errorf("400 Bad Request: failed to parse domain file %s: %v", found, err)
+		return nil, fmt.Errorf("400 Bad Request: failed to parse domain YAML %s: %v", found, err)
 	}
 
 	// Normalize code field to uppercase ISO
