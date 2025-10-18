@@ -20,8 +20,8 @@ func (s *Server) handleDomainInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// repo root: assume repo root (server runs in repo); change if you keep config field
-	repoRoot := "."
+	// repo root provided via server config
+	repoRoot := s.cfg.RepoRoot
 	d, err := domain.LookupByCode(code, repoRoot)
 	if err != nil {
 		// inspect error prefix to determine status

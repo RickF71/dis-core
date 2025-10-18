@@ -15,6 +15,9 @@ type Config struct {
 	PolicyPath         string `yaml:"policy_path"`
 	APIHost            string `yaml:"api_host"`
 	APIPort            int    `yaml:"api_port"`
+	// RepoRoot allows the server to locate the repository root when resolving
+	// domain files. Defaults to "." (current working directory).
+	RepoRoot           string `yaml:"repo_root"`
 
 	// PostgreSQL connection string, e.g.:
 	// postgres://user:pass@localhost:5432/dis_core?sslmode=disable
@@ -54,6 +57,10 @@ func Load(path string) (*Config, error) {
 	}
 	if c.APIPort == 0 {
 		c.APIPort = 8080
+	}
+
+	if c.RepoRoot == "" {
+		c.RepoRoot = "."
 	}
 
 	// Allow DSN from env var if not in YAML
