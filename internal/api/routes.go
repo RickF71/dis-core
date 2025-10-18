@@ -17,9 +17,13 @@ func (s *Server) RegisterAllRoutes() {
 	// Core system routes
 	mux.HandleFunc("/verify", HandleVerify) // or s.handleVerify if you make it a method
 	mux.HandleFunc("/ping", s.handlePing)
+	// Backwards-compatible API routes used by Finagler frontend
+	mux.HandleFunc("/api/status", s.handlePing)
+	mux.HandleFunc("/api/domain/info", s.handleDomainInfo)
 	mux.HandleFunc("/info", s.handleInfo)
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/identities", s.handleIdentities)
+	mux.HandleFunc("/api/identity/list", s.handleIdentities)
 
 	// Modular packages
 	auth.Register(mux, s.store)
