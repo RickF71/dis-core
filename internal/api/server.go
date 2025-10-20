@@ -2,99 +2,114 @@ package api
 
 import (
 	"database/sql"
-	"encoding/json"
+	"dis-core/internal/api/atlas"
+	"dis-core/internal/schema"
 	"log"
 	"net/http"
-	"time"
 
-	"dis-core/internal/api/atlas"
-	"dis-core/internal/config"
-	"dis-core/internal/db"
-	"dis-core/internal/policy"
+	disnet "dis-core/internal/net"
 )
 
-// Server represents the DIS-CORE REST node.
+// Server represents the running DIS-Core API node.
 type Server struct {
-	store    *sql.DB
-	cfg      *config.Config
-	policy   *policy.Policy
-	sum      string
-	coreHash string
-	mux      *http.ServeMux
-	atlas    *atlas.AtlasStore
+	store      *sql.DB
+	logger     *log.Logger
+	schemas    *schema.Registry
+	mux        *http.ServeMux
+	atlas      *atlas.AtlasStore
+	NetManager *disnet.Manager // 👈 restored network manager
+	Version    string
+	CoreHash   string
 }
 
-func (s *Server) AttachAtlas(a *atlas.AtlasStore) {
-	s.atlas = a
-}
-
-// NewServer constructs a new REST server instance.
-func NewServer(store *sql.DB, cfg *config.Config, pol *policy.Policy, sum string, coreHash string) *Server {
-	s := &Server{
-		store:    store,
-		cfg:      cfg,
-		policy:   pol,
-		sum:      sum,
-		coreHash: coreHash,
-		mux:      http.NewServeMux(),
-	}
-
-	atlasStore, err := atlas.InitAtlasStore(store)
-	if err != nil {
-		log.Fatalf("failed to init atlas store: %v", err)
-	}
-	s.atlas = atlasStore
-
-	// register modular routes
-	s.RegisterAllRoutes()
-
-	return s
-}
-
-// Start launches the REST API server for DIS-CORE.
-func (s *Server) Start(addr string) error {
-	log.Printf("🛰️  DIS-CORE REST API listening on %s\n", addr)
-
-	server := &http.Server{
-		Addr:         addr,
-		Handler:      WithCORS(s.mux),
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 20 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	return server.ListenAndServe()
-}
-
+// Mux returns the internal HTTP mux for this server.
 func (s *Server) Mux() *http.ServeMux {
 	return s.mux
 }
 
-// --- Core handlers ---
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status": "ok",
-		"time":   db.NowRFC3339Nano(),
-	})
-}
-
+// handlePing is a simple health endpoint for API status checks.
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
-		"core_hash": s.coreHash,
-		"policy":    s.sum,
-		"db_path":   s.cfg.DatabaseDSN,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"message": "DIS node alive",
 	})
 }
 
-// --- JSON utility ---
-func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("❌ JSON encode error: %v", err)
+// handleInfo reports basic build and version info.
+func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"version": "0.9.3",
+		"core":    "DIS-Core",
+	})
+}
+
+// handleHealth performs a simple self-check.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"health": "green",
+	})
+}
+
+// NewServer constructs and initializes a DIS-Core API server.
+func NewServer(store *sql.DB) *Server {
+	s := &Server{
+		store:      store,
+		mux:        http.NewServeMux(),
+		NetManager: disnet.NewManager(), // 👈 initialize manager
+		logger:     log.Default(),
 	}
+
+	s.RegisterAllRoutes()
+	s.registerMirrorSpinRoutes()
+	s.mux.HandleFunc("/api/schema/list", s.handleSchemaList)
+	return s
+}
+
+// WithLogger sets a custom logger and returns the server (chainable)
+func (s *Server) WithLogger(l *log.Logger) *Server {
+	s.logger = l
+	return s
+}
+
+// WithSchemas sets a schema registry and returns the server (chainable)
+func (s *Server) WithSchemas(reg *schema.Registry) *Server {
+	s.schemas = reg
+	return s
+}
+
+// handleSchemaList returns all registered schema IDs and versions as JSON.
+func (s *Server) handleSchemaList(w http.ResponseWriter, r *http.Request) {
+	if s.schemas == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "schema registry unavailable"})
+		return
+	}
+	type schemaInfo struct {
+		ID      string `json:"id"`
+		Version string `json:"version"`
+	}
+	var out []schemaInfo
+	for _, e := range s.schemasEntries() {
+		out = append(out, schemaInfo{ID: e.ID, Version: e.Version})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// schemasEntries returns all schema entries in the registry.
+func (s *Server) schemasEntries() []schema.Entry {
+	if s.schemas == nil {
+		return nil
+	}
+	entries := make([]schema.Entry, 0, len(s.schemasEntriesMap()))
+	for _, e := range s.schemasEntriesMap() {
+		entries = append(entries, e)
+	}
+	return entries
+}
+
+// schemasEntriesMap returns the byKey map from the registry (read-only).
+func (s *Server) schemasEntriesMap() map[string]schema.Entry {
+	if s.schemas == nil {
+		return nil
+	}
+	return s.schemas.ByKey()
 }

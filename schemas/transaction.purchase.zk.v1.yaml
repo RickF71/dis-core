@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/transaction.purchase.zk.v1"
+$schema: "https://dis.core/domains/dis/schemas/transaction.purchase.zk.v1"
 title: "ZK Ownership Purchase"
 type: object
 required: ["tx_id","good","price","unit","from","to","proof","receipt"]

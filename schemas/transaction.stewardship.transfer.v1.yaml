@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/transaction.stewardship.transfer.v1"
+$schema: "https://dis.core/domains/dis/schemas/transaction.stewardship.transfer.v1"
 title: "Stewardship Transfer (Chain of Custody)"
 type: object
 required: ["tx_id","asset_id","custodian_from","custodian_to","duties","owner_lineage","timestamp"]

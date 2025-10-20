@@ -1,4 +1,6 @@
 meta:
+  name: domain.government
+  uuid: "c9d8e7f6-5a4b-3c2d-1e0f-9a8b7c6d5e4f"
   schema_id: domain.government
   schema_version: v1.0
   domain_id: domain.government

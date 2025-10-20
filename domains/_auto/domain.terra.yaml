@@ -1,0 +1,6 @@
+id: domain.terra
+name: Terra
+parent_id: domain.null
+is_notech: false
+requires_inside_domain: true
+updated_at: "2025-10-19T14:20:56.670155-05:00"

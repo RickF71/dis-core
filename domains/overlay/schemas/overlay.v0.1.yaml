@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/overlay.v0.1"
+$schema: "https://dis.core/domains/dis/schemas/overlay.v0.1"
 title: "Overlay Envelope (v0.1)"
 type: object
 required: ["$schema","domain","scope","version","data"]

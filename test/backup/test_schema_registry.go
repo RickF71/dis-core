@@ -1,3 +1,5 @@
+//go:build ignore
+
 package main
 
 import (
@@ -21,7 +23,7 @@ func main() {
 
 	// Optional: manually register one more schema to verify runtime registration
 	data := []byte("version: v0.99\nid: test_dynamic\n")
-	rec, err := ld.RegisterSchema("test_dynamic", "v0.99", data, "test", filepath.Join(root, "schemas/test_dynamic.yaml"))
+	rec, err := ld.RegisterSchema("test_dynamic", "v0.99", data, "test", filepath.Join(root, "domains/dis/schemas/test_dynamic.yaml"))
 	if err != nil {
 		panic(err)
 	}

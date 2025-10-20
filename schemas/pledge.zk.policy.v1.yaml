@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/pledge.zk.policy.v1"
+$schema: "https://dis.core/domains/dis/schemas/pledge.zk.policy.v1"
 title: "Policy — ZK Pledging"
 type: object
 required: ["rules"]

@@ -14,7 +14,7 @@ fields:
     type: dis_uid
   - name: auth_handshake
     type: ref
-    ref: schemas/dis-auth-handshake.v0.yaml
+    ref: domains/dis/schemas/dis-auth-handshake.v0.yaml
   - name: privileges
     type: list
     items: string
@@ -34,4 +34,4 @@ logic:
       Console session requires a verified DIS-Auth handshake 
       bound to initiator_dis with explicit consent.
   - auto_revoke_on_expiry: true
-  - use_revocation_registry: schemas/revocation_registry.v0.yaml
+  - use_revocation_registry: domains/dis/schemas/revocation_registry.v0.yaml

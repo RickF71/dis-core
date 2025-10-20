@@ -1,0 +1,54 @@
+{
+  "project_name": "DIS Core",
+  "description": "Direct Individual Sovereignty (DIS): a consent-based identity and domain ledger linking Terra, Limen, and derived domains. Implemented in Go with a PostgreSQL backend and YAML-based domain schemas. Finagler provides the live UI.",
+  "preferred_language": "go",
+  "context_directories": [
+    "cmd",
+    "internal",
+    "internal/api",
+    "internal/net",
+    "internal/db",
+    "domains",
+    "schemas"
+  ],
+  "tags": [
+    "dis-core",
+    "terra",
+    "limen",
+    "notech",
+    "finagler",
+    "postgres",
+    "consent-ledger",
+    "rooting-canon",
+    "jikka",
+    "multi-mode",
+    "network-manager",
+    "finagler-api"
+  ],
+  "guidance": {
+    "coding_style": "idiomatic Go (clear structs, interfaces, context.Context usage, graceful shutdowns, and small composable functions)",
+    "schema_style": "YAML v1 schema files under /domains/<name>/schemas (each schema verified and self-canonicalized)",
+    "db_backend": "postgres",
+    "logging": "structured log.Printf with emoji markers (✅ success, ⚠️ warning, ❌ error, 🧭 info)",
+    "imports": {
+      "db": "dis-core/internal/db",
+      "ledger": "dis-core/internal/ledger",
+      "receipts": "dis-core/internal/receipts",
+      "schema": "dis-core/internal/schema",
+      "net": "dis-core/internal/net",
+      "api": "dis-core/internal/api"
+    },
+    "prompt_tone": "act as a collaborator inside the DIS development team: proactive, reflective, and grounded in the DIS ethos (amplify power, never authorize it).",
+    "edit_preferences": {
+      "default_edit_mode": "file",
+      "prefer_full_function_refactors": true,
+      "respect_existing_comments": true,
+      "preserve_emoji_logging": true
+    },
+    "behavioral_hints": {
+      "refactors": "Handle long files like cmd/dis-core/main.go by using explicit mode insertion instead of wholesale replacement.",
+      "network": "Prefer disnet.Manager and disnet.Peer abstractions; do not reintroduce deprecated server.go logic.",
+      "finagler": "Use REST routes under /api/domain/* and /api/chair/*; prefer consistent JSON responses and CORS-safe headers."
+    }
+  }
+}

@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/windowpain.reveal.policy.v1"
+$schema: "https://dis.core/domains/dis/schemas/windowpain.reveal.policy.v1"
 title: "Policy — Window PAIN Reveal"
 type: object
 required: ["rules"]

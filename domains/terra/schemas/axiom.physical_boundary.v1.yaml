@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/axiom.physical_boundary.v1"
+$schema: "https://dis.core/domains/dis/schemas/axiom.physical_boundary.v1"
 title: "Axiom — Metaphysical→Physical Gate"
 type: object
 required: ["id","statement","enforcement"]

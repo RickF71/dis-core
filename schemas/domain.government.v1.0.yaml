@@ -1,0 +1,22 @@
+# schemas/domain.government.v1.0.yaml
+---
+meta:
+  schema_id: domain.government
+  schema_version: v1.0
+description: Base schema defining government-type domains within DIS.
+fields:
+  - name: jurisdiction
+    type: string
+    description: Human-readable name for the governed territory.
+  - name: parent_domain
+    type: string
+    description: Higher-level domain this government belongs to (e.g. domain.usa)
+  - name: seat
+    type: string
+    description: Official seat of governance or capital.
+  - name: founded
+    type: string
+    description: Date of establishment or constitutional origin.
+  - name: sovereignty_level
+    type: string
+    description: Enum of 'federal', 'state', 'municipal', etc.

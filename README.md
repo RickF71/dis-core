@@ -27,7 +27,7 @@ This repository contains the **canonical DIS-CORE v1.0** schema and the **DIS-PE
 |------------|----------|-------------|
 | **DIS-CORE** | `v1.0` | Frozen schema (constitutional baseline) |
 | **DIS-PERSONAL** | `v0.5.1-core` | First self-verifying node bound to DIS-CORE v1.0 |
-| **Hash Verification** | Enabled | Startup integrity check of `schemas/dis-core.v1.yaml` |
+| **Hash Verification** | Enabled | Startup integrity check of `domains/dis/schemas/dis-core.v1.yaml` |
 
 ---
 

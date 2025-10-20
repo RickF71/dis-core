@@ -60,8 +60,8 @@ func (sr *SchemaRegistry) RegisterSchema(id, version string, data []byte, regist
 }
 
 func (sr *SchemaRegistry) RegisterCoreSchemas() error {
-	_, err1 := sr.RegisterSchema("value_receipt", "v1", nil, "system", "/schemas/value_receipt.v1.yaml")
-	_, err2 := sr.RegisterSchema("lifepush_substrate_structure", "v1", nil, "system", "/schemas/lifepush_substrate_structure.v1.yaml")
+	_, err1 := sr.RegisterSchema("value_receipt", "v1", nil, "system", "/domains/dis/schemas/core/value_receipt.v1.yaml")
+	_, err2 := sr.RegisterSchema("lifepush_substrate_structure", "v1", nil, "system", "/domains/terra/schemas/lifepush_substrate_structure.v1.yaml")
 	if err1 != nil {
 		return err1
 	}

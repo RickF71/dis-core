@@ -33,7 +33,7 @@ func CreateSchema(db *sql.DB) error {
 
 		`CREATE TABLE IF NOT EXISTS domains (
 			id SERIAL PRIMARY KEY,
-			domain_name TEXT UNIQUE NOT NULL,
+			name TEXT UNIQUE NOT NULL,
 			schema_ref TEXT,
 			metadata JSONB DEFAULT '{}'::jsonb
 		);`,
@@ -72,12 +72,12 @@ func CreateSchema(db *sql.DB) error {
 // SeedDefaults inserts baseline domains for the DIS network.
 func SeedDefaults(db *sql.DB) error {
 	_, err := db.Exec(`
-	INSERT INTO domains (domain_name, schema_ref, metadata)
-	VALUES 
+	INSERT INTO domains (name, schema_ref, metadata)
+	VALUES
 		('domain.null', 'dis-core.v1', '{}'::jsonb),
 		('domain.terra', 'dis-core.v1', '{}'::jsonb),
 		('domain.virtual.usa', 'virtual_usa.credential.v0', '{}'::jsonb)
-	ON CONFLICT (domain_name) DO NOTHING;
+	ON CONFLICT (name) DO NOTHING;
 	`)
 	if err == nil {
 		fmt.Println("🌱 Seeded baseline domains: domain.null, domain.terra, domain.virtual.usa")

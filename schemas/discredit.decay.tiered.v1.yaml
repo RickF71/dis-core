@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/discredit.decay.tiered.v1"
+$schema: "https://dis.core/domains/dis/schemas/discredit.decay.tiered.v1"
 title: "Dis-Credit Decay Policy (Tiered)"
 type: object
 required: ["rules","audit_interval"]

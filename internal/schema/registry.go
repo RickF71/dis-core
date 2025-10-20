@@ -38,6 +38,7 @@ func (r *Registry) key(id, version string) string {
 // LoadDir walks a directory and registers any YAML matching a DIS schema header.
 func (r *Registry) LoadDir(dir string) error {
 	return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+
 		if err != nil {
 			return err
 		}
@@ -129,4 +130,13 @@ func (r *Registry) HashAll() string {
 		h.Write([]byte(e.Hash))
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// ByKey returns a copy of the byKey map (read-only).
+func (r *Registry) ByKey() map[string]Entry {
+	out := make(map[string]Entry, len(r.byKey))
+	for k, v := range r.byKey {
+		out[k] = v
+	}
+	return out
 }

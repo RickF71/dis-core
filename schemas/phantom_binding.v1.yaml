@@ -1,4 +1,4 @@
-# schemas/phantom_binding.v1.yaml
+# domains/dis/schemas/phantom_binding.v1.yaml
 phantom_binding:
   id: string
   version: v1

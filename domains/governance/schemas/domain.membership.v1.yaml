@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/domain.membership.v1"
+$schema: "https://dis.core/domains/dis/schemas/domain.membership.v1"
 title: "Domain Membership & Support"
 type: object
 required: ["user_id","domain_id","consent_level"]

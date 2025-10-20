@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/pledge.zk.v1"
+$schema: "https://dis.core/domains/dis/schemas/pledge.zk.v1"
 title: "Zero-Knowledge Pledge"
 type: object
 required: ["pledge_id","domain","amount","currency","verifier","commitment","proof","proof_public_inputs","reveal_policy","timestamps"]

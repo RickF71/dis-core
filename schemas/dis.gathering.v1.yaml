@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/dis.gathering.v1"
+$schema: "https://dis.core/domains/dis/schemas/dis.gathering.v1"
 title: "Ephemeral Private Gathering"
 type: object
 required: ["id","name","domain","participants","setting","visibility","transcript_policy","start_time"]

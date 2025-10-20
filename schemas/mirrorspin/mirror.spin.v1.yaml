@@ -1,0 +1,26 @@
+---
+id: mirror.spin.v1
+description: >
+  Reflective event emitted when a database object is mirrored into its YAML analogue.
+fields:
+  - name: source
+    type: string
+    description: Source system or module that initiated the spin (e.g. 'db', 'finagler')
+  - name: target
+    type: string
+    description: Target of the reflection (e.g. 'yaml', 'overlay')
+  - name: entity_type
+    type: string
+    description: Type of entity being mirrored (identity, domain, schema, etc.)
+  - name: entity_id
+    type: string
+    description: Unique identifier for the entity
+  - name: timestamp
+    type: string
+    description: RFC3339Nano timestamp of spin initiation
+  - name: hash
+    type: string
+    description: Hash of the reflected data for integrity verification
+  - name: diff_summary
+    type: string
+    description: Short summary of what changed during reflection

@@ -8,15 +8,13 @@ import (
 
 // HandleVerify processes verification requests from external or internal domains.
 // Future versions will validate receipt signatures, trust proofs, or cross-domain attestations.
-func HandleVerify(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodPost:
-		handleVerifyPost(w, r)
-	default:
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{
-			"error": "method not allowed",
-		})
+func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
 	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "verified"})
 }
 
 func handleVerifyPost(w http.ResponseWriter, r *http.Request) {

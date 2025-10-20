@@ -108,7 +108,7 @@ scope:
       - "dis scaffold jikka.boundary"
       - "dis scaffold spotlight"
     output: >
-      Generates YAML templates under /schemas/ and Go struct stubs under /internal/scaffold/.
+      Generates YAML templates under /domains/dis/schemas/ and Go struct stubs under /internal/scaffold/.
       Templates will include metadata header, version, and linkage hints.
 
 integration_notes: |

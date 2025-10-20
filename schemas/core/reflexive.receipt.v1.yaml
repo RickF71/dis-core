@@ -1,4 +1,4 @@
-$schema: "https://dis.core/schemas/reflexive.receipt.v1"
+$schema: "https://dis.core/domains/dis/schemas/reflexive.receipt.v1"
 title: "Reflexive Binding Receipt (PAIN-private)"
 type: object
 required: ["receipt_id","pledge_id","subject_uid","binding_proof","anti_export","timestamps"]
