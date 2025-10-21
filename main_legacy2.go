@@ -21,9 +21,7 @@ To start a secondary node:
 	go run ./cmd/dis-core --dis_port=6969
 
 To use maintenance tools (receipts, freeze, etc.):
-	go run ./cmd/main_legacy.go
-
-`)
+	go run ./cmd/main_legacy.go`)
 
 	// Always start the server
 	disPort := 8080
@@ -40,5 +38,5 @@ To use maintenance tools (receipts, freeze, etc.):
 	// Print suggested commands for users
 	fmt.Println("\nTo start the DIS node server:")
 	fmt.Println("  go run ./cmd/dis-core --dis_port=8080")
-	fmt.Println("  curl http://localhost:8080/api/status\n")
+	fmt.Println("  curl http://localhost:8080/api/status")
 }

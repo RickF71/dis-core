@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"dis-core/internal/schema"
 	"fmt"
 	"io/fs"
 	"os"
@@ -20,7 +21,7 @@ func NowUTC() time.Time {
 
 // LoadDomainsFromFS scans a folder for domain YAML files,
 // parses them, validates each schema reference, and records provenance.
-func (l *Ledger) LoadDomainsFromFS(path string) ([]*DomainRecord, error) {
+func (l *Ledger) LoadDomainsFromFS(path string, reg *schema.Registry) ([]*DomainRecord, error) {
 	var domains []*DomainRecord
 
 	err := filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
@@ -65,7 +66,7 @@ func (l *Ledger) LoadDomainsFromFS(path string) ([]*DomainRecord, error) {
 		dom.SourcePath = p
 
 		// Verify that the referenced schema exists in the registry
-		if entry, ok := l.schemas.GetSchema(schemaID, schemaVer); ok {
+		if entry, ok := reg.Get(schemaID, schemaVer); ok {
 			dom.Validated = true
 			dom.IsBound = true
 			dom.CheckedAt = NowUTC()

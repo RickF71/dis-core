@@ -17,7 +17,7 @@ func SetupDatabase() (*sql.DB, error) {
 	dsn := os.Getenv("DIS_DB_DSN")
 	if dsn == "" {
 		// Default local fallback
-		dsn = "postgres://postgres:postgres@localhost:5432/dis_dev?sslmode=disable"
+		dsn = "postgres://dis_user:card567@localhost:5432/dis_core?sslmode=disable"
 		fmt.Println("⚠️  Using default Postgres DSN:", dsn)
 	}
 
@@ -43,6 +43,17 @@ func SetupDatabase() (*sql.DB, error) {
 	}
 	if err := EnsureHandshakesSchema(db); err != nil {
 		fmt.Println("⚠️  Handshakes schema not created:", err)
+	}
+
+	if err := EnsurePeersSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ensure peers schema: %w", err)
+	}
+
+	// --- Ensure peers table ---
+	if err := EnsurePeersSchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("ensure peers schema: %w", err)
 	}
 
 	// --- Self-bootstrapping Domain schema ---
@@ -88,6 +99,22 @@ func CloseDatabase() {
 //   Self-Bootstrapping Domain Schema + Seed
 // ──────────────────────────────────────────────
 //
+
+// EnsurePeersSchema creates the peers table if it does not exist.
+func EnsurePeersSchema(db *sql.DB) error {
+	stmt := `
+	CREATE TABLE IF NOT EXISTS peers (
+		address TEXT PRIMARY KEY,
+		last_seen TIMESTAMPTZ DEFAULT NOW(),
+		healthy BOOLEAN DEFAULT FALSE
+	);
+	`
+	if _, err := db.Exec(stmt); err != nil {
+		return fmt.Errorf("create peers table: %w", err)
+	}
+	fmt.Println("✅ peers table ready.")
+	return nil
+}
 
 // EnsureDomainSchema creates the domains table if it does not exist.
 func EnsureDomainSchema(db *sql.DB) error {

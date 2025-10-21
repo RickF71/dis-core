@@ -6,9 +6,5 @@ database_path: data/dis.db
 nonce_bytes: 16
 policy_path: policy.yaml
 
-# Network (v0.5)
-api_host: 0.0.0.0   # 0.0.0.0 to accept LAN connections; 127.0.0.1 for local-only
-api_port: 8080
-
 
 verifyCore: true

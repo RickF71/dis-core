@@ -5,7 +5,7 @@ import (
 	"os"
 	"sort"
 
-	"dis-core/internal/util"
+	"dis-core/internal/util/crypto"
 
 	"gopkg.in/yaml.v3"
 )
@@ -31,7 +31,7 @@ func Load(path string) (*Policy, string, error) {
 		p.Allowed[k] = s
 	}
 	sort.Strings(p.Deny)
-	sum := util.ChecksumHex(b)
+	sum := crypto.ChecksumHex(b)
 	return &p, sum, nil
 }
 

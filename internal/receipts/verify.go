@@ -2,7 +2,7 @@ package receipts
 
 import (
 	"crypto/ed25519"
-	"dis-core/internal/crypto"
+	"dis-core/internal/util/crypto"
 	"encoding/base64"
 	"encoding/json"
 	"errors"

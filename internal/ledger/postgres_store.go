@@ -12,10 +12,6 @@ type Store struct {
 	db *sql.DB
 }
 
-func Open(db *sql.DB) *Store {
-	return &Store{db: db}
-}
-
 func (s *Store) InsertReceipt(r *receipts.Receipt) error {
 	meta, _ := json.Marshal(r.Metadata)
 	_, err := s.db.Exec(`
@@ -57,4 +53,8 @@ func (s *Store) VerifyReceipt(id string) error {
 	}
 	fmt.Printf("✅ verified receipt: %s\n", id)
 	return nil
+}
+
+func NewStore(db *sql.DB) *Store {
+	return &Store{db: db}
 }

@@ -21,7 +21,7 @@ func main() {
 	log.Printf("🌐 Starting DIS-Network node on %s", addr)
 
 	// Create a new network manager
-	manager := disnet.NewManager()
+	manager := disnet.NewManager(nil)
 
 	// Start listening for peers
 	go func() {

@@ -17,14 +17,17 @@ type Manager struct {
 	stop    chan struct{}
 	ln      net.Listener
 	running bool
+	db      *sql.DB
 }
 
 // NewManager constructs a new network manager with periodic health checks.
-func NewManager() *Manager {
+// Optionally accepts a *sql.DB for persistence; pass nil to disable DB ops.
+func NewManager(db *sql.DB) *Manager {
 	return &Manager{
 		peers:  make(map[string]*Peer),
 		ticker: time.NewTicker(30 * time.Second),
 		stop:   make(chan struct{}),
+		db:     db,
 	}
 }
 
@@ -84,6 +87,10 @@ func (m *Manager) AddPeer(addr string) {
 	if _, ok := m.peers[addr]; !ok {
 		m.peers[addr] = &Peer{Address: addr, Healthy: false}
 		log.Printf("➕ Added peer: %s", addr)
+		// Save to DB if available
+		if m.db != nil {
+			_ = m.SavePeerToDB(m.db, addr)
+		}
 	}
 }
 
@@ -144,6 +151,9 @@ func (m *Manager) Stop() {
 }
 
 func (m *Manager) LoadPeersFromDB(db *sql.DB) error {
+	if db == nil {
+		return nil
+	}
 	rows, err := db.Query(`SELECT address FROM peers`)
 	if err != nil {
 		return err
@@ -160,7 +170,10 @@ func (m *Manager) LoadPeersFromDB(db *sql.DB) error {
 }
 
 func (m *Manager) SavePeerToDB(db *sql.DB, addr string) error {
+	if db == nil {
+		return nil
+	}
 	_, err := db.Exec(`INSERT INTO peers(address) VALUES($1)
-		ON CONFLICT (address) DO NOTHING`, addr)
+	       ON CONFLICT (address) DO NOTHING`, addr)
 	return err
 }

@@ -55,7 +55,7 @@ func NewServer(store *sql.DB) *Server {
 	s := &Server{
 		store:      store,
 		mux:        http.NewServeMux(),
-		NetManager: disnet.NewManager(), // 👈 initialize manager
+		NetManager: disnet.NewManager(store), // 👈 initialize manager
 		logger:     log.Default(),
 	}
 

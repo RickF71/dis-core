@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dis-core/internal/ledger"
+	"dis-core/internal/receipts"
 )
 
 // ---- Public Types ----
@@ -68,31 +69,16 @@ type Decision struct {
 	LegitimacyRule string     `json:"legitimacy_rule"` // the decisive rule id
 }
 
-// Receipt is a minimal shape the Gate can emit.
-// You’ll likely replace this with your internal/ledger type.
-type Receipt struct {
-	ID             string            `json:"id"`
-	Time           time.Time         `json:"time"`
-	Action         string            `json:"action"`
-	SchemaRef      string            `json:"schema_ref"`
-	InitiatorID    string            `json:"initiator_id"`
-	AffectedIDs    []string          `json:"affected_ids"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
-	Decision       string            `json:"decision"` // "allowed"|"blocked"|"throttled"
-	TrustChange    float64           `json:"trust_change"`
-	EthicsChange   float64           `json:"ethics_change"`
-	LegitimacyRef  string            `json:"legitimacy_ref"` // rule id/source
-	ConsentVersion string            `json:"consent_version"`
-}
+// Use canonical receipts.Receipt type
 
 // FeedbackSink receives receipts to drive moral feedback loops.
 type FeedbackSink interface {
-	Apply(ctx context.Context, rcpt Receipt) error
+	Apply(ctx context.Context, rcpt receipts.Receipt) error
 }
 
 // ReceiptPoster lets you plug your ledger post operation.
 type ReceiptPoster interface {
-	Post(ctx context.Context, rcpt Receipt) (string, error) // returns receipt ID
+	Post(ctx context.Context, rcpt receipts.Receipt) (string, error) // returns receipt ID
 }
 
 // ---- Config (loaded from YAML) ----
@@ -273,34 +259,32 @@ func (g *Gate) VerifyConsent(ctx context.Context, req ConsentRequest) (Decision,
 }
 
 // AuthorizeAction runs VerifyConsent, emits a receipt, and forwards to feedback sink.
-func (g *Gate) AuthorizeAction(ctx context.Context, req ConsentRequest) (Decision, *Receipt, error) {
+func (g *Gate) AuthorizeAction(ctx context.Context, req ConsentRequest) (Decision, *receipts.Receipt, error) {
 	dec, err := g.VerifyConsent(ctx, req)
 	if err != nil {
 		return Decision{}, nil, err
 	}
 
-	rcpt := &Receipt{
-		ID:             "", // filled by poster if available
-		Time:           g.timeNow(),
-		Action:         req.Action,
-		SchemaRef:      req.SchemaRef,
-		InitiatorID:    req.Initiator.ID,
-		AffectedIDs:    collectIDs(req.Affected),
-		Metadata:       req.Metadata,
-		Decision:       decisionWord(dec),
-		TrustChange:    dec.TrustDelta,
-		EthicsChange:   dec.EthicsDelta,
-		LegitimacyRef:  dec.LegitimacyRule,
-		ConsentVersion: g.version,
+	rcpt := &receipts.Receipt{
+		By:        req.Initiator.ID,
+		Action:    req.Action,
+		Timestamp: g.timeNow().Format(time.RFC3339Nano),
+		// Optionally fill Provenance, Metadata, etc. if available
+		Metadata: receipts.Metadata{
+			IssuedFromConsole:  "consent-gate",
+			IssuerSeat:         "gate",
+			VerifiedAt:         g.timeNow().Format(time.RFC3339Nano),
+			VerificationMethod: "consent-gate",
+		},
 	}
 
 	// Persist receipt if a poster is configured.
 	if g.poster != nil {
-		id, perr := g.poster.Post(ctx, *rcpt)
+		_, perr := g.poster.Post(ctx, *rcpt)
 		if perr != nil {
 			return dec, rcpt, perr
 		}
-		rcpt.ID = id
+		// Optionally set ReceiptID if your poster returns it
 	}
 
 	// Feed moral dynamics.

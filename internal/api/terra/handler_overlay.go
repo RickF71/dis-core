@@ -1,7 +1,7 @@
 package terra
 
 import (
-	"dis-core/internal/iso"
+	"dis-core/internal/util/iso"
 	"encoding/json"
 	"fmt"
 	"net/http"

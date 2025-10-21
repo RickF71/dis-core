@@ -11,7 +11,7 @@ import (
 	"dis-core/internal/config"
 	dbpkg "dis-core/internal/db"
 	"dis-core/internal/policy"
-	"dis-core/internal/util"
+	"dis-core/internal/util/crypto"
 )
 
 // PerformConsentAction validates policy and inserts a receipt.
@@ -34,7 +34,7 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 	nonce := providedNonce
 	if nonce == "" {
 		var genErr error
-		nonce, genErr = util.RandomNonce(cfg.NonceBytes)
+		nonce, genErr = crypto.RandomNonce(cfg.NonceBytes)
 		if genErr != nil {
 			return 0, "", "", "", genErr
 		}
@@ -43,7 +43,7 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 	ts := time.Now().UTC()
 
 	// Signature includes policy checksum
-	sig := util.Sign(action, id, by, scope, nonce, bridge.CanonicalTime(ts), polSum)
+	sig := crypto.Sign(action, id, by, scope, nonce, bridge.CanonicalTime(ts), polSum)
 
 	// 1️⃣ Construct new-style receipt record
 	r := &dbpkg.Receipt{

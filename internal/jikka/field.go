@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dis-core/internal/ledger"
+	"dis-core/internal/receipts"
 )
 
 // JikkaField represents an emergent moral field between two domains.
@@ -98,12 +99,11 @@ func CreateJikka(domainA, domainB string, freeWillA, freeWillB, recognition, con
 	log.Printf("🌌 Jikka Field created between %s ↔ %s:\n%s", domainA, domainB, string(data))
 
 	// Save receipt for provenance
-	ledger.SaveReceipt(&ledger.Receipt{
-		Action:     "jikka.create",
-		By:         domainA,
-		ConsentRef: "",
-		Status:     field.Integrity,
-		Comments:   "Jikka field evaluation between domains",
+	// Use canonical Receipt struct fields only
+	receipts.SaveReceipt(&receipts.Receipt{
+		By:     domainA,
+		Action: "jikka.create",
+		// Fill other canonical fields as needed, e.g. Provenance, Metadata, etc.
 	})
 
 	return field, nil
@@ -123,10 +123,10 @@ func (j *JikkaField) Dissolve(reason string) {
 	}
 
 	// Record dissolution as a receipt
-	ledger.SaveReceipt(&ledger.Receipt{
-		Action:   "jikka.dissolve",
-		By:       j.DomainA,
-		Status:   "ended",
-		Comments: reason,
+	// Use canonical Receipt struct fields only
+	receipts.SaveReceipt(&receipts.Receipt{
+		By:     j.DomainA,
+		Action: "jikka.dissolve",
+		// Fill other canonical fields as needed, e.g. Provenance, Metadata, etc.
 	})
 }

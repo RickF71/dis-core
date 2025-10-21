@@ -99,14 +99,14 @@ func main() {
 	log.Println("✅ Connected to PostgreSQL ledger")
 
 	// Initialize ledger using shared connection
-	led := ledger.Open(db)
+	store := ledger.NewStore(db)
 
 	// --------------------------------------------------------------------
 	// Handle CLI flags
 	// --------------------------------------------------------------------
 
 	if *listReceipts {
-		list, err := led.ListReceipts()
+		list, err := store.ListReceipts()
 		if err != nil {
 			log.Fatalf("list receipts: %v", err)
 		}
@@ -118,7 +118,7 @@ func main() {
 	}
 
 	if *verifyReceipt != "" {
-		if err := led.VerifyReceipt(*verifyReceipt); err != nil {
+		if err := store.VerifyReceipt(*verifyReceipt); err != nil {
 			log.Fatalf("verify: %v", err)
 		}
 		return
@@ -208,6 +208,7 @@ func main() {
 			log.Printf("❌ %s: %v", f, err)
 			continue
 		}
+
 		fmt.Printf("✅ loaded domain: %s (%s)\n", d.Meta.Name, d.Meta.UUID)
 	}
 }
@@ -229,10 +230,11 @@ func doFreeze(reg *schema.Registry, db *sql.DB, version string) {
 		log.Fatalf("save receipt: %v", err)
 	}
 
-	led := ledger.Open(db)
-	if err := led.InsertReceipt(r); err != nil {
+	store := ledger.NewStore(db)
+	if err := store.InsertReceipt(r); err != nil {
 		log.Printf("⚠️ failed to insert freeze receipt: %v", err)
 	}
 
+	fmt.Printf("🔏 DIS-CORE %s frozen — hash=%s\n", version, hash[:12])
 	fmt.Printf("🔏 DIS-CORE %s frozen — hash=%s\n", version, hash[:12])
 }

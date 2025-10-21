@@ -3,14 +3,14 @@ package receipts
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"dis-core/internal/crypto"
-	"dis-core/internal/db"
+	"dis-core/internal/util/crypto"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Receipt defines the DIS ci.call.v1 structure
@@ -43,7 +43,7 @@ type Metadata struct {
 
 // NewReceipt creates a signed ci.call.v1 receipt for an action.
 func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Receipt {
-	timestamp := db.NowRFC3339Nano()
+	timestamp := time.Now().Format(time.RFC3339Nano)
 
 	// Payload to hash/sign (stable ordering!)
 	payload := fmt.Sprintf("%s|%s|%s|%s|%s|%s",

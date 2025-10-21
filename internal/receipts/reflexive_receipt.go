@@ -1,4 +1,4 @@
-package ledger
+package receipts
 
 import (
 	"encoding/json"
@@ -41,13 +41,11 @@ func EmitReflexiveReceipt(domainID string, e events.Event, a rules.Action) error
 	log.Printf("🪞 ReflexiveReceipt [%s] — %s", domainID, string(data))
 
 	// Build the new authoritative ledger receipt
+	// Use canonical Receipt struct fields only
 	receipt := &Receipt{
-		Action:          e.Type + ":" + a.Type,
-		By:              domainID,
-		ConsentRef:      e.ConsentRef,  // optional if your Event struct has it
-		FeedbackRef:     a.FeedbackRef, // optional if your Action struct has it
-		TrustScoreAfter: a.TrustDelta,
-		Comments:        "Reflexive domain cognition event",
+		By:     domainID,
+		Action: e.Type + ":" + a.Type,
+		// Fill other canonical fields as needed, e.g. Provenance, Metadata, etc.
 	}
 
 	// Store with full integrity (UUID, hash, timestamp)
