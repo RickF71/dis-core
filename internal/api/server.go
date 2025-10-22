@@ -2,30 +2,41 @@ package api
 
 import (
 	"database/sql"
-	"dis-core/internal/api/atlas"
-	"dis-core/internal/schema"
 	"log"
 	"net/http"
 
-	disnet "dis-core/internal/net"
+	"dis-core/internal/domain"
+	"dis-core/internal/ledger"
+	"dis-core/internal/overlay"
+	"dis-core/internal/policy"
+	"dis-core/internal/schema"
 )
 
-// Server represents the running DIS-Core API node.
 type Server struct {
-	store      *sql.DB
-	logger     *log.Logger
-	schemas    *schema.Registry
-	mux        *http.ServeMux
-	atlas      *atlas.AtlasStore
-	NetManager *disnet.Manager // 👈 restored network manager
-	Version    string
-	CoreHash   string
+	mux *http.ServeMux
+	db  *sql.DB
+
+	// Core components
+	Ledger *ledger.Ledger
+
+	// Managers (YAML import & domain logic)
+	DomainManager  *domain.Manager
+	SchemaManager  *schema.Manager
+	PolicyManager  *policy.Manager
+	OverlayManager *overlay.Manager // safe to keep even if stub
+
+	// Optional legacy store field (some older routes expect it)
+	Store *ledger.Store
+
+	// Optional logger
+	logger *log.Logger
+
+	// Optional schema registry (for validation)
+	schemas *schema.Registry
 }
 
 // Mux returns the internal HTTP mux for this server.
-func (s *Server) Mux() *http.ServeMux {
-	return s.mux
-}
+func (s *Server) Mux() *http.ServeMux { return s.mux }
 
 // handlePing is a simple health endpoint for API status checks.
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
@@ -51,17 +62,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewServer constructs and initializes a DIS-Core API server.
-func NewServer(store *sql.DB) *Server {
+func NewServer(db *sql.DB) *Server {
 	s := &Server{
-		store:      store,
-		mux:        http.NewServeMux(),
-		NetManager: disnet.NewManager(store), // 👈 initialize manager
-		logger:     log.Default(),
+		mux: http.NewServeMux(),
+		db:  db,
 	}
-
-	s.RegisterAllRoutes()
-	s.registerMirrorSpinRoutes()
-	s.mux.HandleFunc("/api/schema/list", s.handleSchemaList)
+	s.Store = ledger.NewStore(db)
 	return s
 }
 
