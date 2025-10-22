@@ -18,9 +18,12 @@ import (
 
 	"dis-core/internal/api"
 	"dis-core/internal/canon"
-	"dis-core/internal/ledger"
 	"dis-core/internal/mirrorspin"
 	"dis-core/internal/schema"
+
+	//"dis-core/internal/overlay"
+
+	"dis-core/internal/ledger"
 )
 
 var (
@@ -256,7 +259,25 @@ func runAllServers(db *sql.DB, reg *schema.Registry, finPort, netPort int) {
 		mirrorspin.SpinLoop(db)
 	}()
 
-	srv := api.NewServer(db).WithLogger(log.Default()).WithSchemas(reg)
+	// --------------------------------------------------------------------
+	// Initialize managers (needed for YAML import API)
+	// --------------------------------------------------------------------
+	domainMgr := domain.NewManager(db)
+	schemaMgr := schema.NewManager(db)
+	// policyMgr := policy.NewManager(db)  // TODO: implement policy.NewManager
+	// overlay optional; uncomment later
+	// overlayMgr := overlay.NewManager(db)
+
+	// Create the API server and inject managers
+	srv := api.NewServer(db).
+		WithLogger(log.Default()).
+		WithSchemas(reg)
+
+	srv.DomainManager = domainMgr
+	srv.SchemaManager = schemaMgr
+	// srv.PolicyManager = policyMgr  // TODO: uncomment when policy.NewManager is implemented
+	// srv.OverlayManager = overlayMgr
+
 	corsWrapper := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")

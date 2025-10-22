@@ -21,7 +21,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 	// ------------------------------------------------------------------------
 	case http.MethodGet:
 		dataDir := resolveDataDir() // environment-driven path
-		idents, err := db.ListIdentities(s.store, 100, 0)
+		idents, err := db.ListIdentities(s.db, 100, 0)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{
 				"error":   "failed to list identities",
@@ -55,7 +55,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 		}
 
 		uid := uuid.NewString()
-		if _, err := db.InsertIdentity(s.store, uid, input.Namespace); err != nil {
+		if _, err := db.InsertIdentity(s.db, uid, input.Namespace); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{
 				"error":   "failed to insert identity",
 				"details": err.Error(),

@@ -68,6 +68,7 @@ func NewServer(db *sql.DB) *Server {
 		db:  db,
 	}
 	s.Store = ledger.NewStore(db)
+	s.RegisterAllRoutes() // reconnect routes from routes.go
 	return s
 }
 

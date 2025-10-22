@@ -34,7 +34,7 @@ func (s *Server) RegisterAllRoutes() {
 			return
 		}
 
-		if err := canon.ExportDomains(s.store, "domains/_auto"); err != nil {
+		if err := canon.ExportDomains(s.db, "domains/_auto"); err != nil {
 			log.Printf("⚠️ Canon export failed: %v", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -46,11 +46,11 @@ func (s *Server) RegisterAllRoutes() {
 	})
 
 	// Modular packages
-	auth.Register(mux, s.store)
-	identities.Register(mux, s.store)
-	atlas.Register(mux, s.store)
-	receipts.Register(mux, s.store)
-	terra.Register(mux, s.store)
+	auth.Register(mux, s.db)
+	identities.Register(mux, s.db)
+	atlas.Register(mux, s.db)
+	receipts.Register(mux, s.db)
+	terra.Register(mux, s.db)
 
 	// Register network API routes
 	s.registerNetworkRoutes()
