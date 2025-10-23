@@ -15,22 +15,22 @@ type Store struct {
 func (s *Store) InsertReceipt(r *receipts.Receipt) error {
 	meta, _ := json.Marshal(r.Metadata)
 	_, err := s.db.Exec(`
-		INSERT INTO receipts (id, actor, action, timestamp, hash, signature, frozen_core_hash, metadata)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (id) DO UPDATE SET
-			actor = EXCLUDED.actor,
-			action = EXCLUDED.action,
-			timestamp = EXCLUDED.timestamp,
-			hash = EXCLUDED.hash,
-			signature = EXCLUDED.signature,
-			frozen_core_hash = EXCLUDED.frozen_core_hash,
-			metadata = EXCLUDED.metadata;
-	`, r.ReceiptID, r.By, r.Action, r.Timestamp, r.Hash, r.Signature, r.FrozenCoreHash, string(meta))
+	       INSERT INTO receipts (id, actor, action, created_at, hash, signature, frozen_core_hash, metadata)
+	       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	       ON CONFLICT (id) DO UPDATE SET
+		       actor = EXCLUDED.actor,
+		       action = EXCLUDED.action,
+		       created_at = EXCLUDED.created_at,
+		       hash = EXCLUDED.hash,
+		       signature = EXCLUDED.signature,
+		       frozen_core_hash = EXCLUDED.frozen_core_hash,
+		       metadata = EXCLUDED.metadata;
+       `, r.ReceiptID, r.By, r.Action, r.CreatedAt, r.Hash, r.Signature, r.FrozenCoreHash, string(meta))
 	return err
 }
 
 func (s *Store) ListReceipts() ([]receipts.Receipt, error) {
-	rows, err := s.db.Query(`SELECT id, actor, action, timestamp, hash, frozen_core_hash FROM receipts ORDER BY timestamp DESC`)
+	rows, err := s.db.Query(`SELECT id, actor, action, created_at, hash, frozen_core_hash FROM receipts ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *Store) ListReceipts() ([]receipts.Receipt, error) {
 	var list []receipts.Receipt
 	for rows.Next() {
 		var r receipts.Receipt
-		rows.Scan(&r.ReceiptID, &r.By, &r.Action, &r.Timestamp, &r.Hash, &r.FrozenCoreHash)
+		rows.Scan(&r.ReceiptID, &r.By, &r.Action, &r.CreatedAt, &r.Hash, &r.FrozenCoreHash)
 		list = append(list, r)
 	}
 	return list, nil

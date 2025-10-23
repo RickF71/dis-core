@@ -7,21 +7,34 @@ import (
 	"time"
 )
 
-// SpinLoop runs the MirrorSpin engine on an interval, watching for DB deltas.
+// SpinLoop periodically checks for new mirror events and logs a summary.
+// This loop self-heals schema drift (via EnsureMirrorEventsTable) and runs continuously.
 func SpinLoop(db *sql.DB) {
-	tick := time.NewTicker(15 * time.Second)
-	defer tick.Stop()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 
-	for range tick.C {
-		changed, details := detectDBChanges(db)
-		if changed {
-			if err := emitMirrorEvent(db, details); err != nil {
-				log.Printf("❌ MirrorSpin event failed: %v", err)
-			} else {
-				log.Printf("🪞 MirrorSpin: %s", details)
-			}
+	for range ticker.C {
+		var count int
+		// Query the mirror_events table using created_at for time window
+		err := db.QueryRow(`SELECT COUNT(*) FROM mirror_events WHERE created_at > NOW() - INTERVAL '15 seconds'`).Scan(&count)
+		if err != nil {
+			log.Printf("MirrorSpin detect error: %v", err)
+			continue
+		}
+
+		if count > 0 {
+			log.Printf("🪞 MirrorSpin detected %d recent mirror events", count)
 		} else {
-			log.Println("🪞 MirrorSpin: no changes detected")
+			log.Printf("🪞 MirrorSpin idle — no new events in last 15s")
+		}
+
+		// Optionally: insert a heartbeat or perform a lightweight reflection event
+		_, insertErr := db.Exec(`
+			INSERT INTO mirror_events (event_type, message)
+			VALUES ('mirror.heartbeat', 'MirrorSpin loop ticked OK')
+		`)
+		if insertErr != nil {
+			log.Printf("MirrorSpin heartbeat insert failed: %v", insertErr)
 		}
 	}
 }
@@ -31,7 +44,7 @@ func SpinLoop(db *sql.DB) {
 func detectDBChanges(db *sql.DB) (bool, string) {
 	// Example: check if any receipts or identities changed recently
 	var count int
-	err := db.QueryRow(`SELECT COUNT(*) FROM receipts WHERE timestamp > NOW() - INTERVAL '15 seconds'`).Scan(&count)
+	err := db.QueryRow(`SELECT COUNT(*) FROM receipts WHERE created_at > NOW() - INTERVAL '15 seconds'`).Scan(&count)
 	if err != nil {
 		log.Printf("MirrorSpin detect error: %v", err)
 		return false, ""

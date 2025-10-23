@@ -12,6 +12,12 @@ import (
 	"dis-core/internal/schema"
 )
 
+// WithLedger sets the Ledger pointer and returns the server (chainable)
+func (s *Server) WithLedger(led *ledger.Ledger) *Server {
+	s.Ledger = led
+	return s
+}
+
 type Server struct {
 	mux *http.ServeMux
 	db  *sql.DB

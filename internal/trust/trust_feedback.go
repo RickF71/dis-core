@@ -17,7 +17,7 @@ type TrustFeedback struct {
 	MoralDelta    float64   `json:"moral_delta"` // -1.0 → +1.0
 	Confidence    float64   `json:"confidence"`  // 0.0–1.0
 	TrustScore    float64   `json:"trust_score"` // evolving trust
-	Timestamp     time.Time `json:"timestamp"`
+	CreatedAt     time.Time `json:"created_at"`
 	SourceReceipt string    `json:"source_receipt"`
 }
 
@@ -33,7 +33,7 @@ func ApplyFeedback(fb *TrustFeedback) {
 	fb.TrustScore = math.Round(newScore*100) / 100
 
 	TrustMap[fb.TargetDomain] = fb.TrustScore
-	fb.Timestamp = time.Now().UTC()
+	fb.CreatedAt = time.Now().UTC()
 	fb.FeedbackID = ledger.GenerateUUID()
 
 	data, _ := json.MarshalIndent(fb, "", "  ")

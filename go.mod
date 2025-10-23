@@ -10,4 +10,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require go.mongodb.org/mongo-driver v1.11.4 // indirect
+require (
+	github.com/joho/godotenv v1.5.1 // indirect
+	go.mongodb.org/mongo-driver v1.11.4 // indirect
+)

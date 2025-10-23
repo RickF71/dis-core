@@ -52,6 +52,12 @@ func (s *Server) RegisterAllRoutes() {
 	receipts.Register(mux, s.db)
 	terra.Register(mux, s.db)
 
+	// Register import receipts list route
+	s.registerImportListRoute()
+
+	// Register import (POST) route
+	s.registerImportRoutes()
+
 	// Register network API routes
 	s.registerNetworkRoutes()
 	log.Printf("✅ Registered route: /api/net/peers")

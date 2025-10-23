@@ -20,12 +20,14 @@ type Handshake struct {
 func EnsureHandshakesSchema(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS handshakes (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		id SERIAL PRIMARY KEY,
 		token TEXT UNIQUE NOT NULL,
 		subject TEXT NOT NULL,
 		initiator TEXT,
-		expires_at TEXT,
-		revoked_at TEXT
+		expires_at TIMESTAMPTZ,
+		revoked_at TIMESTAMPTZ,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		status TEXT DEFAULT 'pending'
 	);
 	CREATE INDEX IF NOT EXISTS idx_handshakes_token ON handshakes(token);
 	`

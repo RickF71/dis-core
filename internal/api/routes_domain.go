@@ -54,9 +54,9 @@ func RegisterDomainRoutes(mux *http.ServeMux, db *sql.DB) {
 			return
 		}
 		_, err := db.Exec(`
-			INSERT INTO domains (id, parent_id, name, is_notech, requires_inside_domain)
-			VALUES (?, ?, ?, ?, ?)`,
-			d.ID, d.ParentID, d.Name, d.IsNotech, d.RequiresInsideDomain)
+			INSERT INTO domains (name, is_notech, requires_inside_domain)
+			VALUES (?, ?, ?)`,
+			d.Name, d.IsNotech, d.RequiresInsideDomain)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return

@@ -102,7 +102,7 @@ type CanonicalReceipt struct {
 	Scope     string `json:"scope"`
 	Action    string `json:"action"`
 	Nonce     string `json:"nonce"`
-	Timestamp string `json:"timestamp"`
+	CreatedAt string `json:"created_at"`
 	Signature string `json:"signature"`
 }
 
@@ -114,7 +114,7 @@ func (r *CanonicalReceipt) Hash() (string, error) {
 		"scope":      r.Scope,
 		"action":     r.Action,
 		"nonce":      r.Nonce,
-		"timestamp":  r.Timestamp,
+		"created_at": r.CreatedAt,
 	})
 	if err != nil {
 		return "", err

@@ -24,7 +24,7 @@ type ConsoleAction struct {
 	ID        string
 	Type      string
 	PolicyRef string
-	Timestamp string
+	CreatedAt string
 	Initiator string
 	Status    string
 	Reason    string
@@ -61,7 +61,7 @@ func (c *Console) LogAction(actionType, policyRef, initiator string) (*ConsoleAc
 		return nil, fmt.Errorf("unauthorized initiator: %s", initiator)
 	}
 
-	timestamp := db.NowRFC3339Nano()
+	createdAt := db.NowRFC3339Nano()
 	actionID := generateActionID()
 
 	// Generate the receipt via receipts.NewReceipt
@@ -77,7 +77,7 @@ func (c *Console) LogAction(actionType, policyRef, initiator string) (*ConsoleAc
 		ID:        actionID,
 		Type:      actionType,
 		PolicyRef: policyRef,
-		Timestamp: timestamp,
+		CreatedAt: createdAt,
 		Initiator: initiator,
 		Status:    "executed",
 		Receipt:   r,

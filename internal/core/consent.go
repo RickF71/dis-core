@@ -15,7 +15,7 @@ import (
 )
 
 // PerformConsentAction validates policy and inserts a receipt.
-// Returns: receiptID, nonce, timestamp, signature, error
+// Returns: receiptID, nonce, createdAt, signature, error
 func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce string, cfg *config.Config, pol *policy.Policy, polSum string) (int64, string, string, string, error) {
 	var id string
 	if err := sqlDB.QueryRow("SELECT id FROM identities ORDER BY created_at DESC LIMIT 1").Scan(&id); err != nil {
@@ -50,7 +50,7 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 		ReceiptID: fmt.Sprintf("rcpt-%s", nonce[:8]),
 		SchemaRef: "bridge-receipt-template.v0",
 		Content:   fmt.Sprintf("Consent granted by %s for scope '%s'. Sig=%s", by, scope, sig[:16]),
-		Timestamp: ts,
+		CreatedAt: ts,
 	}
 
 	recID, err := dbpkg.InsertReceipt(sqlDB, r)

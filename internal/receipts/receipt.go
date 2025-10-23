@@ -18,7 +18,7 @@ type Receipt struct {
 	ReceiptID      string       `json:"receipt_id"`
 	By             string       `json:"by"`
 	Action         string       `json:"action"`
-	Timestamp      string       `json:"timestamp"`
+	CreatedAt      string       `json:"created_at"`
 	Hash           string       `json:"hash"`
 	Provenance     []Provenance `json:"provenance"`
 	Signature      string       `json:"signature"`
@@ -43,11 +43,11 @@ type Metadata struct {
 
 // NewReceipt creates a signed ci.call.v1 receipt for an action.
 func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Receipt {
-	timestamp := time.Now().Format(time.RFC3339Nano)
+	createdAt := time.Now().Format(time.RFC3339Nano)
 
 	// Payload to hash/sign (stable ordering!)
 	payload := fmt.Sprintf("%s|%s|%s|%s|%s|%s",
-		by, action, timestamp, frozenCoreHash, consoleID, issuerSeat)
+		by, action, createdAt, frozenCoreHash, consoleID, issuerSeat)
 
 	// Hash payload
 	hash := sha256.Sum256([]byte(payload))
@@ -61,7 +61,7 @@ func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Recei
 		ReceiptID:      generateReceiptID(),
 		By:             by,
 		Action:         action,
-		Timestamp:      timestamp,
+		CreatedAt:      createdAt,
 		Hash:           hashHex,
 		Signature:      sigB64,
 		FrozenCoreHash: frozenCoreHash,
@@ -73,7 +73,7 @@ func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Recei
 		Metadata: Metadata{
 			IssuedFromConsole:  consoleID,
 			IssuerSeat:         issuerSeat,
-			VerifiedAt:         timestamp,
+			VerifiedAt:         createdAt,
 			VerificationMethod: "SAT-check",
 			SignerPublicKeyB64: base64.StdEncoding.EncodeToString(signer.Pub),
 		},

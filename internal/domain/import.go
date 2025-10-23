@@ -1,18 +1,12 @@
 package domain
 
+import (
+	"dis-core/internal/util"
+
+	"gopkg.in/yaml.v3"
+)
+
 func (m *Manager) ImportFromYAML(data map[string]any) error {
-	// validate structure, canonicalize, and insert into DB
-	tx, err := m.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// Example: store into domains table
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO domains (name, data) VALUES (?, ?)`,
-		data["name"], data); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	yamlBytes, _ := yaml.Marshal(data)
+	return util.ImportYAMLToDB(m.db, "domains", "domain.yaml", string(yamlBytes))
 }

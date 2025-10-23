@@ -268,7 +268,7 @@ func (g *Gate) AuthorizeAction(ctx context.Context, req ConsentRequest) (Decisio
 	rcpt := &receipts.Receipt{
 		By:        req.Initiator.ID,
 		Action:    req.Action,
-		Timestamp: g.timeNow().Format(time.RFC3339Nano),
+		CreatedAt: g.timeNow().Format(time.RFC3339Nano),
 		// Optionally fill Provenance, Metadata, etc. if available
 		Metadata: receipts.Metadata{
 			IssuedFromConsole:  "consent-gate",

@@ -10,7 +10,7 @@ type Event struct {
 	Type        string                 `json:"type"`
 	Source      string                 `json:"source"`
 	Target      string                 `json:"target,omitempty"` // <— new
-	Timestamp   time.Time              `json:"timestamp"`
+	CreatedAt   time.Time              `json:"created_at"`
 	Context     map[string]interface{} `json:"context,omitempty"`
 	ConsentRef  string                 `json:"consent_ref,omitempty"`
 	FeedbackRef string                 `json:"feedback_ref,omitempty"`

@@ -16,13 +16,13 @@ func EnsureValueReceiptsSchema(db *sql.DB) error {
 		value_vector TEXT,
 		observer_field TEXT,
 		notes TEXT,
-		timestamp TIMESTAMPTZ DEFAULT NOW()
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_value_by_time 
-		ON value_receipts(by, timestamp);
+	CREATE INDEX IF NOT EXISTS idx_value_by_time
+		ON value_receipts(by, created_at);
 
-	CREATE INDEX IF NOT EXISTS idx_value_observer 
+	CREATE INDEX IF NOT EXISTS idx_value_observer
 		ON value_receipts(observer_field);
 	`
 	_, err := db.Exec(schema)

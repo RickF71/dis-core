@@ -1,12 +1,17 @@
 package schema
 
-import "database/sql"
+import (
+	"database/sql"
+	"dis-core/internal/util"
+
+	"gopkg.in/yaml.v3"
+)
 
 type Manager struct{ db *sql.DB }
 
 func NewManager(db *sql.DB) *Manager { return &Manager{db: db} }
 
 func (m *Manager) ImportFromYAML(node map[string]any) error {
-	// TODO: parse & insert schema YAML into DB
-	return nil
+	yamlBytes, _ := yaml.Marshal(node)
+	return util.ImportYAMLToDB(m.db, "schemas", "schema.yaml", string(yamlBytes))
 }

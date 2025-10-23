@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -94,12 +93,9 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a placeholder receipt ID for now
-	receiptID := fmt.Sprintf("rcpt-%d", time.Now().Unix())
+	rcpt, _ := s.Ledger.RecordImport(filename, "YAML imported successfully")
 	json.NewEncoder(w).Encode(map[string]any{
-		"status":   "ok",
-		"category": category,
-		"imported": filename,
-		"receipt":  receiptID,
+		"status":  "ok",
+		"receipt": rcpt,
 	})
 }

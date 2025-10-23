@@ -49,7 +49,7 @@ func StartAutoRevocationDaemon(ctx context.Context, interval time.Duration) {
 				ReceiptID: generateReceiptID("rcpt-revoke"),
 				SchemaRef: "revocation.v0",
 				Content:   "Revocation: handshake " + hs.Token + " for " + hs.Subject + " (reason: expired)",
-				Timestamp: now, // now is time.Time
+				CreatedAt: now, // now is time.Time
 			}
 
 			if err := safeSaveReceipt(rc); err != nil {

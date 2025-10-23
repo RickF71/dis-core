@@ -112,7 +112,7 @@ func main() {
 		}
 		fmt.Println("📜 Receipts:")
 		for _, r := range list {
-			fmt.Printf(" - %s | %s | %s | %s\n", r.ReceiptID, r.Action, r.Timestamp, r.By)
+			fmt.Printf(" - %s | %s | %s | %s\n", r.ReceiptID, r.Action, r.CreatedAt, r.By)
 		}
 		return
 	}

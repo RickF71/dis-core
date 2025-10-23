@@ -12,5 +12,5 @@ type ValueReceipt struct {
 	ValueVector    map[string]float64 `json:"value_vector" db:"value_vector"` // JSON column
 	ObserverField  string             `json:"observer_field,omitempty" db:"observer_field"`
 	Notes          string             `json:"notes,omitempty" db:"notes"`
-	Timestamp      time.Time          `json:"timestamp" db:"timestamp"`
+	CreatedAt      time.Time          `json:"created_at" db:"created_at"`
 }

@@ -14,7 +14,7 @@ type GiveRootEvent struct {
 	ApplicantID  string
 	MethodKind   string // "mutual_recognition" | "adapted_recognition"
 	MethodNote   string
-	Timestamp    time.Time
+	CreatedAt    time.Time
 	GiverSig     Signature
 	ApplicantSig Signature
 }

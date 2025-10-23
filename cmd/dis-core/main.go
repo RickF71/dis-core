@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"dis-core/internal/bootstrap"
 	"dis-core/internal/db"
 	"dis-core/internal/domain"
 	"dis-core/internal/receipts"
@@ -14,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
 	"dis-core/internal/api"
@@ -40,11 +42,40 @@ var (
 
 	canonImport = flag.String("canon-import", "", "Import YAMLs into DB from directory (e.g., ./bootstrap)")
 	canonFreeze = flag.Bool("canon-freeze", false, "Freeze canon import (DB is authoritative)")
+	recreateDB  = flag.Bool("recreate-db", false, "drop and recreate the database before starting")
 )
 
 func main() {
+	// Load .env file automatically
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("⚠️  No .env file found, using system environment instead.")
+	}
 	flag.Parse()
+	if *recreateDB {
+		adminDSN := os.Getenv("DISCORE_ADMIN_DSN") // e.g. postgres://postgres:admin@localhost/postgres?sslmode=disable
+		log.Printf("DISCORE_ADMIN_DSN is %v", os.Getenv("DISCORE_ADMIN_DSN"))
+		if adminDSN == "" {
+			log.Fatal("DISCORE_ADMIN_DSN is required for --recreate-db")
+		}
+		dbName := os.Getenv("DISCORE_DB_NAME")
+		if dbName == "" {
+			dbName = "dis_core"
+		}
+		appUser := os.Getenv("DISCORE_APP_USER")
+		if appUser == "" {
+			appUser = "dis_user"
+		}
+		appPass := os.Getenv("DISCORE_APP_PASS")
+		if appPass == "" {
+			log.Fatal("DISCORE_APP_PASS is required for --recreate-db")
+		}
 
+		fmt.Println("⚙️  Recreating database...")
+		if err := ledger.RecreateDatabase(adminDSN, dbName, appUser, appPass); err != nil {
+			log.Fatalf("recreate failed: %v", err)
+		}
+		fmt.Println("🔁 Database recreated. Proceeding with normal startup…")
+	}
 	// --------------------------------------------------------------------
 	// Connect to PostgreSQL
 	// --------------------------------------------------------------------
@@ -55,14 +86,17 @@ func main() {
 	defer database.Close()
 	fmt.Println("✅ Database initialized via SetupDatabase")
 
+	// flag:
+
+	// after flag.Parse(), before normal ledger open:
+
 	led, err := ledger.Open(os.Getenv("DIS_DB_DSN"), database)
 	if err != nil {
 		log.Fatalf("open ledger: %v", err)
 	}
 
-	// Ensure MirrorSpin table exists
-	if err := mirrorspin.EnsureMirrorEventsTable(database); err != nil {
-		log.Fatalf("mirror_events table init failed: %v", err)
+	if err := bootstrap.BootstrapAllTables(database); err != nil {
+		log.Fatalf("table bootstrap failed: %v", err)
 	}
 
 	// --------------------------------------------------------------------
@@ -122,7 +156,7 @@ func main() {
 		}
 		fmt.Println("📜 Receipts:")
 		for _, r := range list {
-			fmt.Printf(" - %s | %s | %s | %s\n", r.ReceiptID, r.Action, r.Timestamp, r.By)
+			fmt.Printf(" - %s | %s | %s | %s\n", r.ReceiptID, r.Action, r.CreatedAt, r.By)
 		}
 		return
 	}
@@ -147,7 +181,7 @@ func main() {
 	// Main serve mode
 	// --------------------------------------------------------------------
 	if *serveFlag {
-		runAllServers(database, reg, *finPort, *netPort)
+		runAllServers(database, reg, led, *finPort, *netPort)
 		return
 	}
 
@@ -242,7 +276,7 @@ func startNetServer(port int) {
 	}
 }
 
-func runAllServers(db *sql.DB, reg *schema.Registry, finPort, netPort int) {
+func runAllServers(db *sql.DB, reg *schema.Registry, led *ledger.Ledger, finPort, netPort int) {
 	// disPort logic removed; ports are explicit
 
 	stop := make(chan os.Signal, 1)
@@ -269,9 +303,11 @@ func runAllServers(db *sql.DB, reg *schema.Registry, finPort, netPort int) {
 	// overlayMgr := overlay.NewManager(db)
 
 	// Create the API server and inject managers
+
 	srv := api.NewServer(db).
 		WithLogger(log.Default()).
-		WithSchemas(reg)
+		WithSchemas(reg).
+		WithLedger(led)
 
 	srv.DomainManager = domainMgr
 	srv.SchemaManager = schemaMgr

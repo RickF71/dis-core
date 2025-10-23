@@ -1,6 +1,11 @@
 package overlay
 
-import "database/sql"
+import (
+	"database/sql"
+	"dis-core/internal/util"
+
+	"gopkg.in/yaml.v3"
+)
 
 type Manager struct {
 	db *sql.DB
@@ -11,6 +16,6 @@ func NewManager(db *sql.DB) *Manager {
 }
 
 func (m *Manager) ImportFromYAML(node map[string]any) error {
-	// TODO: parse overlay YAMLs when ready
-	return nil
+	yamlBytes, _ := yaml.Marshal(node)
+	return util.ImportYAMLToDB(m.db, "overlays", "overlay.yaml", string(yamlBytes))
 }
