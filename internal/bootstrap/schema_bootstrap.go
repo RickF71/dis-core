@@ -24,14 +24,14 @@ func BootstrapAllTables(dbConn *sql.DB) error {
 		fn   func(*sql.DB) error
 	}{
 		{"domains", domain.EnsureDomainsTable},
+		{"schemas", schema.EnsureSchemasTable},
+		{"overlays", overlay.EnsureOverlaysTable},
+		{"policies", policy.EnsurePoliciesTable},
+		{"mirror_events", mirrorspin.EnsureMirrorEventsTable},
 		{"peers", net.EnsurePeersTable},
 		{"identities", db.EnsureIdentitiesSchema},
 		{"handshakes", db.EnsureHandshakesSchema},
-		{"schemas", schema.EnsureSchemasTable},
-		{"policies", policy.EnsurePoliciesTable},
-		{"overlays", overlay.EnsureOverlaysTable},
 		{"import_receipts", ledger.EnsureImportReceiptsSchema},
-		{"mirror_events", mirrorspin.EnsureMirrorEventsTable},
 		{"receipts", db.EnsureReceiptsSchema},
 	}
 
@@ -40,7 +40,7 @@ func BootstrapAllTables(dbConn *sql.DB) error {
 			log.Printf("⚠️  %s table setup failed: %v", step.name, err)
 			return fmt.Errorf("%s table: %w", step.name, err)
 		}
-		fmt.Printf("✅ %s table ready\n", step.name)
+		log.Printf("✅ %s table ready", step.name)
 	}
 
 	fmt.Println("✅ All tables ensured.")

@@ -24,7 +24,7 @@ func buildServer() *http.ServeMux {
 	}
 
 	// If you don't yet load a real config or policy, just pass nil and empty strings
-	s := api.NewServer(store)
+	s := api.NewServer(nil, nil, store)
 
 	// The NewServer call already registers all routes and sets up the mux
 	return s.Mux() // We'll add this accessor next if it's missing

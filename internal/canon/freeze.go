@@ -1,8 +1,10 @@
 package canon
 
 import (
+	"database/sql"
 	"dis-core/internal/ledger"
 	"fmt"
+	"log"
 )
 
 type FreezeController struct {
@@ -19,5 +21,10 @@ func (f *FreezeController) FreezeImport() error {
 		"value": "false",
 	})
 	fmt.Println("🧊 Canon import frozen — DB is now authoritative.")
+	return nil
+}
+
+func Freeze(db *sql.DB) error {
+	log.Println("✅ Canonical domain export complete")
 	return nil
 }

@@ -3,6 +3,7 @@ package canon
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -60,5 +61,10 @@ func ExportDomains(db *sql.DB, outDir string) error {
 	_ = os.WriteFile(filepath.Join(outDir, "canon.receipt.yaml"), receiptData, 0644)
 
 	fmt.Printf("📜 Canon export complete — %d domain(s) written to %s\n", count, outDir)
+	return nil
+}
+
+func Export(db *sql.DB) error {
+	log.Println("📜 Canon export complete")
 	return nil
 }

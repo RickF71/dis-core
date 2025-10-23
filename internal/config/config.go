@@ -15,13 +15,14 @@ type Config struct {
 	PolicyPath         string `yaml:"policy_path"`
 	APIHost            string `yaml:"api_host"`
 	APIPort            int    `yaml:"api_port"`
-	// RepoRoot allows the server to locate the repository root when resolving
-	// domain files. Defaults to "." (current working directory).
-	RepoRoot string `yaml:"repo_root"`
+	RepoRoot           string `yaml:"repo_root"`
 
 	// PostgreSQL connection string, e.g.:
 	// postgres://user:pass@localhost:5432/dis_core?sslmode=disable
 	DatabaseDSN string `yaml:"database_dsn"`
+
+	Version string // DIS-Core version for startup log
+	FinPort int    // API port for startup log
 }
 
 // Load reads and parses the YAML config file, applying safe defaults.
@@ -73,4 +74,9 @@ func Load(path string) (*Config, error) {
 	}
 
 	return &c, nil
+}
+
+func FromFlags() *Config {
+	// TODO: Parse flags and environment, return Config
+	return &Config{}
 }

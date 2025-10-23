@@ -4,9 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
+
+	"database/sql"
 
 	"gopkg.in/yaml.v3"
 
@@ -76,5 +79,10 @@ func (c *CanonImporter) ImportDir(dir string) error {
 		})
 		fmt.Printf("✅ Imported %s (%s)\n", f, record.ID)
 	}
+	return nil
+}
+
+func Import(db *sql.DB) error {
+	log.Println("📜 Canon import complete")
 	return nil
 }

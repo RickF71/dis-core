@@ -16,7 +16,7 @@ import (
 // appUser:  e.g. "dis_user"
 // appPass:  password for appUser
 func RecreateDatabase(adminDSN, dbName, appUser, appPass string) error {
-	// Ensure admin DSN points to a control DB (postgres), not the target DB.
+	// Always connect to the control DB
 	adminDSN = withDBName(adminDSN, "postgres")
 
 	admin, err := sql.Open("postgres", adminDSN)
@@ -25,58 +25,54 @@ func RecreateDatabase(adminDSN, dbName, appUser, appPass string) error {
 	}
 	defer admin.Close()
 
-	_, _ = admin.Exec(fmt.Sprintf(`
-  REVOKE CONNECT ON DATABASE %s FROM PUBLIC;
-  SELECT pg_terminate_backend(pid)
-  FROM pg_stat_activity
-  WHERE datname = '%s' AND pid <> pg_backend_pid();`, dbName, dbName))
-
-	// Terminate lingering connections and drop only if it still exists
+	// Terminate connections if they exist, ignore errors
 	_, _ = admin.Exec(fmt.Sprintf(`
 		REVOKE CONNECT ON DATABASE %s FROM PUBLIC;
 		SELECT pg_terminate_backend(pid)
 		FROM pg_stat_activity
 		WHERE datname = '%s' AND pid <> pg_backend_pid();
-		DROP DATABASE IF EXISTS %s;
-	`, pgIdent(dbName), dbName, pgIdent(dbName)))
+	`, dbName, dbName))
 
-	// Ensure app role exists and set password
-	// Use DO block to create-or-alter role safely.
+	// Drop if it exists (ignore errors if already gone)
+	_, _ = admin.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s;", pgIdent(dbName)))
+
+	// Ensure app role exists and set password safely
 	roleSQL := fmt.Sprintf(`
-DO $$
-BEGIN
-	IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN
-		CREATE ROLE %s WITH LOGIN PASSWORD '%s';
-	ELSE
-		ALTER ROLE %s WITH LOGIN PASSWORD '%s';
-	END IF;
-END$$;`,
-		appUser, pgIdent(appUser), appPass, pgIdent(appUser), appPass)
+	DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN
+			CREATE ROLE %s WITH LOGIN PASSWORD '%s';
+		ELSE
+			ALTER ROLE %s WITH LOGIN PASSWORD '%s';
+		END IF;
+	END$$;
+	`, appUser, pgIdent(appUser), appPass, pgIdent(appUser), appPass)
 
 	if _, err := admin.Exec(roleSQL); err != nil {
 		return fmt.Errorf("ensure role failed: %w", err)
 	}
 
-	// Create DB owned by appUser
-	createDB := fmt.Sprintf(`CREATE DATABASE %s
+	// Create the database owned by appUser
+	createDB := fmt.Sprintf(`
+		CREATE DATABASE %s
 		WITH OWNER %s
 		ENCODING 'UTF8'
 		LC_COLLATE='en_US.UTF-8'
 		LC_CTYPE='en_US.UTF-8'
-		TEMPLATE template0;`, pgIdent(dbName), pgIdent(appUser))
+		TEMPLATE template0;
+	`, pgIdent(dbName), pgIdent(appUser))
 	if _, err := admin.Exec(createDB); err != nil {
 		return fmt.Errorf("create database failed: %w", err)
 	}
 
-	// Connect to the new DB to set default privileges / schema ownership
-	appDBdsn := withDBName(adminDSN, dbName) // reuse admin network/host/params, DB = new db
+	// Connect to the newly created DB to apply ownership and privileges
+	appDBdsn := withDBName(adminDSN, dbName)
 	db, err := sql.Open("postgres", appDBdsn)
 	if err != nil {
 		return fmt.Errorf("post-create connect failed: %w", err)
 	}
 	defer db.Close()
 
-	// Ensure public schema owned by appUser; default privileges grant to appUser
 	alters := []string{
 		fmt.Sprintf("ALTER SCHEMA public OWNER TO %s;", pgIdent(appUser)),
 		fmt.Sprintf("GRANT ALL PRIVILEGES ON DATABASE %s TO %s;", pgIdent(dbName), pgIdent(appUser)),

@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
 
+	"dis-core/internal/config"
 	"dis-core/internal/domain"
 	"dis-core/internal/ledger"
 	"dis-core/internal/overlay"
@@ -68,13 +70,16 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewServer constructs and initializes a DIS-Core API server.
-func NewServer(db *sql.DB) *Server {
+func NewServer(cfg *config.Config, led *ledger.Ledger, db *sql.DB) *Server {
 	s := &Server{
 		mux: http.NewServeMux(),
 		db:  db,
 	}
 	s.Store = ledger.NewStore(db)
 	s.RegisterAllRoutes() // reconnect routes from routes.go
+
+	// Do NOT wrap s.mux with CORS here; wrap at ListenAndServe
+
 	return s
 }
 
@@ -126,3 +131,10 @@ func (s *Server) schemasEntriesMap() map[string]schema.Entry {
 	}
 	return s.schemas.ByKey()
 }
+
+func (s *Server) Run(ctx context.Context) error {
+	// TODO: Start HTTP server, handle graceful shutdown
+	return nil
+}
+
+// TODO: Keep RegisterAllRoutes() as canonical, and split per-route files as needed.

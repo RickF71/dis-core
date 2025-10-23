@@ -7,6 +7,7 @@ package main
 import (
 	"database/sql"
 	"dis-core/internal/api"
+	"dis-core/internal/config"
 	"flag"
 	"fmt"
 	"log"
@@ -153,21 +154,20 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	// // Load config and policy
-	// cfg, err := config.Load("config.yaml")
-	// if err != nil {
-	// 	log.Fatalf("config load error: %v", err)
-	// }
+	// Load config
+	cfg, err := config.Load("config.yaml") // or config.FromFlags()
+	if err != nil {
+		log.Fatalf("config load error: %v", err)
+	}
 
-	// pol, sum, err := policy.Load(cfg.PolicyPath)
-	// if err != nil {
-	// 	log.Fatalf("policy load error: %v", err)
-	// }
-
-	// coreHash := "dev"
+	// Open ledger
+	led, err := ledger.Open(cfg.DatabaseDSN, db)
+	if err != nil {
+		log.Fatalf("open ledger: %v", err)
+	}
 
 	// Create the API server
-	apiServer := api.NewServer(db)
+	apiServer := api.NewServer(cfg, led, db)
 
 	finMux := apiServer.Mux()
 
@@ -235,6 +235,5 @@ func doFreeze(reg *schema.Registry, db *sql.DB, version string) {
 		log.Printf("⚠️ failed to insert freeze receipt: %v", err)
 	}
 
-	fmt.Printf("🔏 DIS-CORE %s frozen — hash=%s\n", version, hash[:12])
 	fmt.Printf("🔏 DIS-CORE %s frozen — hash=%s\n", version, hash[:12])
 }

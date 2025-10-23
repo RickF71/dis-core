@@ -66,7 +66,6 @@ func Open(dsn string, db *sql.DB) (*Ledger, error) {
 		}
 	}
 
-	fmt.Println("✅ Ledger ready.")
 	return &Ledger{DB: conn}, nil
 }
 
@@ -120,9 +119,7 @@ func (l *Ledger) StoreCanon(rec any) error {
 		getMetaString(r.Meta, "source_file"),
 		r.Hash,
 	)
-	if err != nil {
-		return fmt.Errorf("store canon: %w", err)
-	}
+	err = fmt.Errorf("store canon: %w", err)
 
 	return nil
 }

@@ -60,15 +60,14 @@ func (s *Server) RegisterAllRoutes() {
 
 	// Register network API routes
 	s.registerNetworkRoutes()
-	log.Printf("✅ Registered route: /api/net/peers")
+	//log.Printf("✅ Registered route: /api/net/peers")
+
+	s.registerDBRoutes() //
 
 	s.registerVersionRoutes()
+	s.registerMirrorSpinRoutes() //
 	//s.registerStatusRoutes()
 
-	// Root fallback
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("🌐 DIS-CORE v0.9.3 — Self-Maintenance and Reflexive Identity\n"))
-	})
 }
 
 // Register network API routes
