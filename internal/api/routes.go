@@ -15,6 +15,10 @@ import (
 
 // RegisterAllRoutes wires all endpoint groups into the server mux.
 func (s *Server) RegisterAllRoutes() {
+	// Register /api/eval if PolicyEngine is set
+	if s.PolicyEngine != nil {
+		s.RegisterEvalRoute(*s.PolicyEngine)
+	}
 	mux := s.mux
 
 	// Core system routes

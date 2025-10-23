@@ -22,6 +22,7 @@ import (
 
 	"dis-core/internal/domain"
 	"dis-core/internal/ledger"
+	"dis-core/internal/policy"
 	"dis-core/internal/receipts"
 	"dis-core/internal/schema"
 )
@@ -166,8 +167,30 @@ func main() {
 		log.Fatalf("open ledger: %v", err)
 	}
 
+	// --------------------------------------------------------------------
+	// Initialize Policy Engine
+	// --------------------------------------------------------------------
+
+	base := "./policies"
+	eng, err := policy.NewEngine(policy.EngineConfig{
+		PathFreezeRego:     filepath.Join(base, "freeze.rego"),
+		PathGatesRego:      filepath.Join(base, "gates.rego"),
+		PathRiskRego:       filepath.Join(base, "risk.rego"),
+		PathThresholdsJSON: filepath.Join(base, "thresholds.json"),
+		PathCIRulesJSON:    filepath.Join(base, "ci_rules.json"),
+		PathRedactionYAML:  filepath.Join(base, "redaction.yaml"),
+		PathCedarSchema:    filepath.Join(base, "auth_schema.cedar"),
+		StateProvider:      nil, // you can replace later with real domain state provider
+		AuthZ:              nil, // or a cedar.NewAuthorizer("./policies/auth_schema.cedar")
+	})
+	if err != nil {
+		log.Fatalf("failed to start policy engine: %v", err)
+	}
+	log.Printf("✅ Policy engine initialized (using %s)", base)
+
 	// Create the API server
 	apiServer := api.NewServer(cfg, led, db)
+	apiServer.PolicyEngine = eng
 
 	finMux := apiServer.Mux()
 

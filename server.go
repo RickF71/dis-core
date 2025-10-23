@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"time"
@@ -10,12 +9,6 @@ import (
 	"dis-core/internal/api"
 	"dis-core/internal/db"
 )
-
-type Server struct {
-	store *sql.DB
-	mux   *http.ServeMux
-	// maybe cfg *config.Config
-}
 
 func buildServer() *http.ServeMux {
 	store := db.DefaultDB

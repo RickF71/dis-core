@@ -7,9 +7,11 @@ import (
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
 	"dis-core/internal/mirrorspin"
+	"dis-core/internal/policy"
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 )
 
 func Run() error {
@@ -63,8 +65,30 @@ func Run() error {
 		return err
 	}
 
+	// Start policy engine
+	// Copilot: after creating the OPAEngine, wrap it with policy.NewPolicyEngine and use that variable instead
+
+	base := "./policies"
+	opaEngine, err := policy.NewEngine(policy.EngineConfig{
+		PathFreezeRego:     filepath.Join(base, "freeze.rego"),
+		PathGatesRego:      filepath.Join(base, "gates.rego"),
+		PathRiskRego:       filepath.Join(base, "risk.rego"),
+		PathThresholdsJSON: filepath.Join(base, "thresholds.json"),
+		PathCIRulesJSON:    filepath.Join(base, "ci_rules.json"),
+		PathRedactionYAML:  filepath.Join(base, "redaction.yaml"),
+		PathCedarSchema:    filepath.Join(base, "auth_schema.cedar"),
+		StateProvider:      nil,
+		AuthZ:              nil,
+	})
+	engine := policy.NewPolicyEngine(opaEngine)
+	if err != nil {
+		return fmt.Errorf("failed to start policy engine: %w", err)
+	}
+	log.Printf("✅ Policy engine initialized (using %s)", base) // wire policy engine
+
 	// Start API server
 	server := api.NewServer(cfg, led, database)
+	server.RegisterEvalRoute(policy.PolicyEngine(*engine)) // wire policy engine
 	log.Println("✅ Registered route(s)")
 
 	if err := mirrorspin.Start(database); err != nil {

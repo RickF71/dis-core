@@ -21,8 +21,9 @@ func (s *Server) WithLedger(led *ledger.Ledger) *Server {
 }
 
 type Server struct {
-	mux *http.ServeMux
-	db  *sql.DB
+	PolicyEngine *policy.PolicyEngine
+	mux          *http.ServeMux
+	db           *sql.DB
 
 	// Core components
 	Ledger *ledger.Ledger
