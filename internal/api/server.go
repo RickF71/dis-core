@@ -21,7 +21,7 @@ func (s *Server) WithLedger(led *ledger.Ledger) *Server {
 }
 
 type Server struct {
-	PolicyEngine *policy.PolicyEngine
+	PolicyEngine policy.PolicyEngine
 	mux          *http.ServeMux
 	db           *sql.DB
 
@@ -77,7 +77,7 @@ func NewServer(cfg *config.Config, led *ledger.Ledger, db *sql.DB) *Server {
 		db:  db,
 	}
 	s.Store = ledger.NewStore(db)
-	s.RegisterAllRoutes() // reconnect routes from routes.go
+	s.RegisterAPIs() // reconnect routes from routes.go
 
 	// Do NOT wrap s.mux with CORS here; wrap at ListenAndServe
 
@@ -138,4 +138,4 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-// TODO: Keep RegisterAllRoutes() as canonical, and split per-route files as needed.
+// TODO: Keep RegisterAPIs() as canonical, and split per-route files as needed.

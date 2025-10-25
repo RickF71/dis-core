@@ -1,4 +1,4 @@
-package receipts
+package ledger
 
 import (
 	"time"

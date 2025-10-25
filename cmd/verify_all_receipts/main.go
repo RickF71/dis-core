@@ -2,7 +2,7 @@ package main
 
 import (
 	"dis-core/internal/db"
-	"dis-core/internal/receipts"
+	"dis-core/internal/ledger"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -47,7 +47,7 @@ func main() {
 			continue
 		}
 
-		ok, err := receipts.VerifyWithEmbeddedPub(data)
+		ok, err := ledger.VerifyWithEmbeddedPub(data)
 		if err != nil {
 			// Determine if legacy (no signature) or corrupted
 			if strings.Contains(err.Error(), "insufficient data") {

@@ -1,13 +1,12 @@
 package console
 
 import (
+	"dis-core/internal/ledger"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
-
-	"dis-core/internal/receipts"
 )
 
 type VerifyReport struct {
@@ -19,7 +18,7 @@ type VerifyReport struct {
 }
 
 // CommitVerification creates a signed receipt for an audit run
-func (c *Console) CommitVerification(report VerifyReport) (*receipts.Receipt, error) {
+func (c *Console) CommitVerification(report VerifyReport) (*ledger.Receipt, error) {
 	payloadBytes, err := json.Marshal(report)
 	if err != nil {
 		return nil, err
@@ -36,8 +35,8 @@ func (c *Console) CommitVerification(report VerifyReport) (*receipts.Receipt, er
 	os.WriteFile(filename, payloadBytes, 0644)
 
 	// Generate the signed receipt
-	r := receipts.NewReceipt(c.BoundDomain, "domain.verify.v1", c.BoundCore, c.ID, c.SeatHolders[0])
-	if err := r.Save("versions/v0.6/receipts/generated"); err != nil {
+	r := ledger.NewReceipt(c.BoundDomain, "domain.verify.v1", c.BoundCore, c.ID, c.SeatHolders[0])
+	if err := ledger.SaveReceipt(r); err != nil {
 		return nil, err
 	}
 

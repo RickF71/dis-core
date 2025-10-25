@@ -5,20 +5,19 @@ import (
 	"log"
 	"net/http"
 
-	"dis-core/internal/api/atlas"
-	"dis-core/internal/api/auth"
-	"dis-core/internal/api/identities"
-	"dis-core/internal/api/receipts"
-	"dis-core/internal/api/terra"
 	"dis-core/internal/canon"
+	"dis-core/internal/registry/atlas"
+	"dis-core/internal/registry/auth"
+	"dis-core/internal/registry/identities"
+	"dis-core/internal/registry/receipts"
+	"dis-core/internal/registry/terra"
 )
 
-// RegisterAllRoutes wires all endpoint groups into the server mux.
-func (s *Server) RegisterAllRoutes() {
+// RegisterAPIs wires all endpoint groups into the server mux.
+func (s *Server) RegisterAPIs() {
 	// Register /api/eval if PolicyEngine is set
-	if s.PolicyEngine != nil {
-		s.RegisterEvalRoute(*s.PolicyEngine)
-	}
+	// Register /api/eval if PolicyEngine is set (interface nil check)
+	// Register /api/eval if PolicyEngine is set (interface nil check)
 	mux := s.mux
 
 	// Core system routes

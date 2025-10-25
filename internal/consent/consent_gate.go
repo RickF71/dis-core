@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"dis-core/internal/ledger"
-	"dis-core/internal/receipts"
 )
 
 // ---- Public Types ----
@@ -73,12 +72,12 @@ type Decision struct {
 
 // FeedbackSink receives receipts to drive moral feedback loops.
 type FeedbackSink interface {
-	Apply(ctx context.Context, rcpt receipts.Receipt) error
+	Apply(ctx context.Context, rcpt ledger.Receipt) error
 }
 
 // ReceiptPoster lets you plug your ledger post operation.
 type ReceiptPoster interface {
-	Post(ctx context.Context, rcpt receipts.Receipt) (string, error) // returns receipt ID
+	Post(ctx context.Context, rcpt ledger.Receipt) (string, error) // returns receipt ID
 }
 
 // ---- Config (loaded from YAML) ----
@@ -259,18 +258,18 @@ func (g *Gate) VerifyConsent(ctx context.Context, req ConsentRequest) (Decision,
 }
 
 // AuthorizeAction runs VerifyConsent, emits a receipt, and forwards to feedback sink.
-func (g *Gate) AuthorizeAction(ctx context.Context, req ConsentRequest) (Decision, *receipts.Receipt, error) {
+func (g *Gate) AuthorizeAction(ctx context.Context, req ConsentRequest) (Decision, *ledger.Receipt, error) {
 	dec, err := g.VerifyConsent(ctx, req)
 	if err != nil {
 		return Decision{}, nil, err
 	}
 
-	rcpt := &receipts.Receipt{
+	rcpt := &ledger.Receipt{
 		By:        req.Initiator.ID,
 		Action:    req.Action,
 		CreatedAt: g.timeNow().Format(time.RFC3339Nano),
 		// Optionally fill Provenance, Metadata, etc. if available
-		Metadata: receipts.Metadata{
+		Metadata: ledger.Metadata{
 			IssuedFromConsole:  "consent-gate",
 			IssuerSeat:         "gate",
 			VerifiedAt:         g.timeNow().Format(time.RFC3339Nano),

@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"dis-core/internal/db"
-	"dis-core/internal/receipts"
+	"dis-core/internal/ledger"
 )
 
 var lastVerificationTime time.Time
 var lastVerificationFile = "versions/v0.6/receipts/last_verification.txt"
 
-func (c *Console) RunVerification() (VerifyReport, *receipts.Receipt, error) {
+func (c *Console) RunVerification() (VerifyReport, *ledger.Receipt, error) {
 	dir := "versions/v0.6/receipts/generated"
 
 	// Gather receipt files
@@ -41,7 +41,7 @@ func (c *Console) RunVerification() (VerifyReport, *receipts.Receipt, error) {
 			status = "error"
 			reason = err.Error()
 		} else {
-			ok, verr := receipts.VerifyWithEmbeddedPub(data)
+			ok, verr := ledger.VerifyWithEmbeddedPub(data)
 			if verr != nil || !ok {
 				status = "invalid"
 				reason = "signature mismatch"
@@ -84,7 +84,7 @@ func (c *Console) RunVerification() (VerifyReport, *receipts.Receipt, error) {
 	return report, rcpt, nil
 }
 
-func (c *Console) RunVerificationIfNeeded() (bool, VerifyReport, *receipts.Receipt, error) {
+func (c *Console) RunVerificationIfNeeded() (bool, VerifyReport, *ledger.Receipt, error) {
 	dir := "versions/v0.6/receipts/generated"
 
 	// Get latest modification time among all receipts

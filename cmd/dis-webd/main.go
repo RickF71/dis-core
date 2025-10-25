@@ -23,7 +23,6 @@ import (
 	"dis-core/internal/domain"
 	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
-	"dis-core/internal/receipts"
 	"dis-core/internal/schema"
 )
 
@@ -240,7 +239,7 @@ func main() {
 
 func doFreeze(reg *schema.Registry, db *sql.DB, version string) {
 	hash := reg.HashAll()
-	r := receipts.NewReceipt(
+	r := ledger.NewReceipt(
 		"domain.terra",
 		fmt.Sprintf("freeze_core_%s", version),
 		hash,
@@ -248,10 +247,7 @@ func doFreeze(reg *schema.Registry, db *sql.DB, version string) {
 		"seat.core.architect",
 	)
 
-	dir := fmt.Sprintf("versions/%s/receipts", version)
-	if err := r.Save(dir); err != nil {
-		log.Fatalf("save receipt: %v", err)
-	}
+	ledger.SaveReceipt(r)
 
 	store := ledger.NewStore(db)
 	if err := store.InsertReceipt(r); err != nil {

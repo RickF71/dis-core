@@ -1,0 +1,14 @@
+id: domain.governments.jpn
+type: government
+derived_from: domain.lima.government
+overlay:
+  target: domain.terra
+  layer: civic
+  shape_ref: overlays/geo/countries/jpn.geojson
+metadata:
+  name: Japan
+  iso2: JP
+  iso3: JPN
+  region: Asia
+  subregion: Eastern Asia
+  flag: "\U0001F1EF\U0001F1F5"

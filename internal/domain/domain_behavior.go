@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"dis-core/internal/events"
-	"dis-core/internal/receipts"
+	"dis-core/internal/ledger"
 	"dis-core/internal/rules"
 )
 
@@ -66,7 +66,7 @@ func (b *DomainBrain) processCycle() {
 	for _, e := range evts {
 		action := b.Ruleset.Decide(e)
 		if action.Receipt {
-			receipts.EmitReflexiveReceipt(b.DomainID, e, action)
+			ledger.EmitReflexiveReceipt(b.DomainID, e, action)
 		}
 		b.updateState(action)
 	}

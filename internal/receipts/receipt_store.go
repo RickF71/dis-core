@@ -1,4 +1,4 @@
-package receipts
+package ledger
 
 import (
 	"encoding/json"
@@ -13,8 +13,6 @@ var ledgerLock sync.Mutex
 
 // Receipt represents an authoritative, signed event within DIS.
 // It records consent lineage, trust feedback, and final moral status.
-// Use canonical Receipt from receipt.go
-// import "dis-core/internal/receipts" in files that use Receipt
 
 // SaveReceipt marshals the receipt into JSON, writes an individual file,
 // and appends it to a rolling ledger.jsonl file.

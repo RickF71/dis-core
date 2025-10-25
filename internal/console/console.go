@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"dis-core/internal/db"
-	"dis-core/internal/receipts"
+	"dis-core/internal/ledger"
 )
 
 // Console represents an Authority Console instance bound to a domain & core.
@@ -28,7 +28,7 @@ type ConsoleAction struct {
 	Initiator string
 	Status    string
 	Reason    string
-	Receipt   *receipts.Receipt
+	Receipt   *ledger.Receipt
 }
 
 // NewConsole initializes a new Authority Console.
@@ -65,11 +65,10 @@ func (c *Console) LogAction(actionType, policyRef, initiator string) (*ConsoleAc
 	actionID := generateActionID()
 
 	// Generate the receipt via receipts.NewReceipt
-	r := receipts.NewReceipt(c.BoundDomain, actionType, c.BoundCore, c.ID, initiator)
+	r := ledger.NewReceipt(c.BoundDomain, actionType, c.BoundCore, c.ID, initiator)
 
 	// Save the receipt to disk under the current version’s receipt folder
-	saveDir := "versions/v0.6/receipts/generated"
-	if err := r.Save(saveDir); err != nil {
+	if err := ledger.SaveReceipt(r); err != nil {
 		return nil, fmt.Errorf("failed to save receipt: %v", err)
 	}
 

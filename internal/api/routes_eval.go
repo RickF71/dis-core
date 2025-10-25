@@ -1,8 +1,8 @@
 package api
 
 import (
+	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
-	"dis-core/internal/receipts"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -25,14 +25,14 @@ func (s *Server) RegisterEvalRoute(engine policy.PolicyEngine) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		receipt := receipts.NewReceipt(
+		receipt := ledger.NewReceipt(
 			input["by"].(string),
 			input["action"].(string),
 			"",          // TODO: frozenCoreHash
 			"console-1", // TODO: consoleID
 			"seat-1",    // TODO: issuerSeat
 		)
-		if err := receipt.Save("./receipts"); err != nil {
+		if err := ledger.SaveReceipt(receipt); err != nil {
 			log.Printf("receipt save error: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")

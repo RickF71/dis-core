@@ -4,15 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-
-	"dis-core/internal/receipts"
 )
 
 type Store struct {
 	db *sql.DB
 }
 
-func (s *Store) InsertReceipt(r *receipts.Receipt) error {
+func (s *Store) InsertReceipt(r *Receipt) error {
 	meta, _ := json.Marshal(r.Metadata)
 	_, err := s.db.Exec(`
 	       INSERT INTO receipts (id, actor, action, created_at, hash, signature, frozen_core_hash, metadata)
@@ -29,16 +27,16 @@ func (s *Store) InsertReceipt(r *receipts.Receipt) error {
 	return err
 }
 
-func (s *Store) ListReceipts() ([]receipts.Receipt, error) {
+func (s *Store) ListReceipts() ([]Receipt, error) {
 	rows, err := s.db.Query(`SELECT id, actor, action, created_at, hash, frozen_core_hash FROM receipts ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var list []receipts.Receipt
+	var list []Receipt
 	for rows.Next() {
-		var r receipts.Receipt
+		var r Receipt
 		rows.Scan(&r.ReceiptID, &r.By, &r.Action, &r.CreatedAt, &r.Hash, &r.FrozenCoreHash)
 		list = append(list, r)
 	}

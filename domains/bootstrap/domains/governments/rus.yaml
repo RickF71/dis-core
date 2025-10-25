@@ -1,0 +1,14 @@
+id: domain.governments.rus
+type: government
+derived_from: domain.lima.government
+overlay:
+  target: domain.terra
+  layer: civic
+  shape_ref: overlays/geo/countries/rus.geojson
+metadata:
+  name: Russia
+  iso2: RU
+  iso3: RUS
+  region: Europe
+  subregion: Eastern Europe
+  flag: "\U0001F1F7\U0001F1FA"
