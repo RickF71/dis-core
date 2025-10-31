@@ -1,0 +1,41 @@
+# DIS-PERSONAL / schemas/seat.registry.v1.yaml
+# Seat Registry — maintains verified seats and their lineage relations within a domain.
+version: 1
+kind: schema
+name: dis-personal.seat.registry.v1
+dis_core_binding: v1.0
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+required: [domain_ref, seats]
+additionalProperties: false
+
+properties:
+  domain_ref:
+    type: string
+    description: "Domain identifier this registry belongs to (e.g., terra, simula.terra)."
+
+  seats:
+    type: array
+    description: "Active seats within this domain."
+    items:
+      type: object
+      required: [seat_id, lineage_ref, verified, last_handshake]
+      properties:
+        seat_id: { type: string }
+        lineage_ref: { type: string, description: "Authority lineage anchor or parent seat." }
+        verified: { type: boolean, description: "True if lineage confirmed against authority.root." }
+        last_handshake: { type: string, format: date-time }
+        peer_links:
+          type: array
+          items: { type: string }
+          description: "IDs of peer seats recognized by this seat for mutual legitimacy checks."
+
+example:
+  domain_ref: "terra"
+  seats:
+    - seat_id: "seat_terra_core"
+      lineage_ref: "authority.root:terra"
+      verified: true
+      last_handshake: "2025-10-09T04:00:00Z"
+      peer_links: ["seat_simula_core"]

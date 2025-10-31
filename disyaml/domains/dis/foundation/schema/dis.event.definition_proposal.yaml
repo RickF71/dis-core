@@ -1,0 +1,19 @@
+version: v1
+kind: dis.event.definition_proposal
+spec:
+  description: >
+    Proposal to add, modify, or replace a core definition within DIS or Terra.
+  fields:
+    proposal_id: string
+    proposed_by: string
+    target_path: string          # e.g., "../dis_canon.yaml" or "../../terra/terra_canon.yaml"
+    proposal_type: enum(add|modify|replace)
+    diff_summary: string
+    rationale: string
+    timestamp: time
+    domain_acknowledgments:
+      - domain_id: string
+        signature: string
+  notes:
+    - "Used by scientific/governance foundations (e.g., SFFL)."
+    - "Consensus promotion escalates to dis.event.amendment."

@@ -1,0 +1,17 @@
+$schema: "https://dis.core/domains/dis/schemas/transaction.stewardship.transfer.v1"
+title: "Stewardship Transfer (Chain of Custody)"
+type: object
+required: ["tx_id","asset_id","custodian_from","custodian_to","duties","owner_lineage","timestamp"]
+properties:
+  tx_id: { type: string }
+  asset_id: { type: string }
+  custodian_from: { type: string }
+  custodian_to: { type: string }
+  owner_lineage: { type: string, description: "ultimate human/public endpoint if known" }
+  duties:
+    type: array
+    items:
+      type: string
+      enum: ["maintain_integrity","report_condition","handoff_consent_verified","insure","cold_chain"]
+  timestamp: { type: string, format: date-time }
+  notes: { type: string }

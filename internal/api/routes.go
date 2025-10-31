@@ -22,13 +22,13 @@ func (s *Server) RegisterAPIs() {
 
 	// Core system routes
 	//mux.HandleFunc("/verify", s.handleVerify)
-	mux.HandleFunc("/ping", s.handlePing)
+	mux.HandleFunc("/api/ping", s.handlePing)
 	// Backwards-compatible API routes used by Finagler frontend
-	mux.HandleFunc("/api/status", s.handlePing)
+	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/domain/info", s.handleDomainInfo)
-	mux.HandleFunc("/info", s.handleInfo)
-	mux.HandleFunc("/healthz", s.handleHealth)
-	mux.HandleFunc("/identities", s.handleIdentities)
+	mux.HandleFunc("/api/info", s.handleInfo)
+	mux.HandleFunc("/api/health", s.handleHealth)
+	mux.HandleFunc("/api/identities", s.handleIdentities)
 	mux.HandleFunc("/api/identity/list", s.handleIdentities)
 	// Canon export (manual trigger)
 	mux.HandleFunc("/api/canon/export", func(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +55,8 @@ func (s *Server) RegisterAPIs() {
 	receipts.Register(mux, s.db)
 	terra.Register(mux, s.db)
 
+	registerFlowAPI(s)
+
 	// Register import receipts list route
 	s.registerImportListRoute()
 
@@ -76,7 +78,7 @@ func (s *Server) RegisterAPIs() {
 // Register network API routes
 func BuildMux(db *sql.DB) *http.ServeMux {
 	mux := http.NewServeMux()
-	RegisterStatusRoutes(mux)
+	// RegisterStatusRoutes(mux) // TODO: implement if needed
 	//RegisterCanonRoutes(mux, db)
 	RegisterDomainRoutes(mux, db)
 	return mux

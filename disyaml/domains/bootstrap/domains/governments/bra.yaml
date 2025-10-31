@@ -1,0 +1,14 @@
+id: domain.governments.bra
+type: government
+derived_from: domain.lima.government
+overlay:
+  target: domain.terra
+  layer: civic
+  shape_ref: overlays/geo/countries/bra.geojson
+metadata:
+  name: Brazil
+  iso2: BR
+  iso3: BRA
+  region: South America
+  subregion: South America
+  flag: "\U0001F1E7\U0001F1F7"

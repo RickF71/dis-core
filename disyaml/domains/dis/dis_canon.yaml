@@ -1,0 +1,29 @@
+version: v1
+kind: dis.canon
+metadata:
+  description: >
+    Foundational statement defining the relationship between DIS
+    (the fabric of sovereignty) and the domains that participate within it.
+
+axioms:
+  - id: AXIOM_DOMAIN_OBLIGATION
+    name: Domain Obligation to DIS
+    text: >
+      DIS may not govern individuals, but it governs domains.
+      Every domain that wishes to participate within DIS must
+      accept its foundational axioms and remain accountable to
+      the network fabric that safeguards individual sovereignty.
+      Specific obligations and enforcement mechanisms shall be
+      defined by policy at a later stage.
+
+  - id: AXIOM_LIFE_MAXIMAL
+    name: Life as Maximal
+    text: >
+      Terra holds that all life is maximal.
+      This axiom establishes the upper bound of moral worth:
+      no life may be valued less than life itself.
+      Interpretation and application remain open to future understanding.
+
+
+notes:
+  - "Power must have mirrors; domains are the mirrors through which DIS ensures human sovereignty."

@@ -1,0 +1,16 @@
+extends: default
+
+rules:
+  colons:
+    max-spaces-after: 999     # don’t warn about extra spaces after :
+    level: warning
+  commas:
+    min-spaces-after: 0       # allow no or one space after ,
+    max-spaces-after: 999
+    level: warning
+  document-start:
+    present: false
+  line-length:
+    max: 160
+    level: warning
+  trailing-spaces: disable

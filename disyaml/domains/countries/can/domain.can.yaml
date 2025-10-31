@@ -1,0 +1,11 @@
+code: CAN
+name: "Canada"
+seat: "Ottawa"
+lineage:
+  - terra
+  - domain.can
+population: 38_246_108
+description: >
+  A federal parliamentary democracy and constitutional monarchy in North America;
+  vast northern territories, mixed urban and wilderness regions, and a strong
+  tradition of bilingual and multicultural civic identity.

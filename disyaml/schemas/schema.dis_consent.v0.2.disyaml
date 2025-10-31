@@ -1,0 +1,65 @@
+# ==========================================================
+#  schema.dis_consent.v0.2.disyaml
+#  Purpose: Defines how domains evaluate and enforce consent
+#            before executing any action.
+# ==========================================================
+
+type: schema.dis_consent.v0.2
+meta:
+  schema_id: dis_consent
+  schema_version: v0.2
+  description: >
+    Defines how domains evaluate and enforce consent before executing any action.
+    Integrates quorum thresholds, moral weighting, and legitimacy checks that
+    must pass before authority is exercised.
+  author: dis-core.committee
+  date_frozen: 2025-10-10
+  integrity_hash: "<auto-filled-by-registry>"
+
+fields:
+  - id: consent_id
+    type: string
+    description: Unique ID for this consent evaluation
+  - id: domain_ref
+    type: string
+    description: Domain requesting the action
+  - id: action_ref
+    type: string
+    description: Action or policy identifier under review
+  - id: threshold
+    type: number
+    range: [0.0, 1.0]
+    default: 0.66
+    description: Minimum approval ratio required
+  - id: quorum
+    type: integer
+    default: 3
+    description: Minimum number of valid participants required
+  - id: moral_weight
+    type: number
+    range: [0.0, 1.0]
+    default: 1.0
+    description: Multiplier reflecting moral or ethical salience
+  - id: legitimacy_ref
+    type: string
+    description: Optional reference to a governing legitimacy schema
+  - id: result
+    type: enum
+    values: [granted, denied, pending]
+    description: Outcome of the consent evaluation
+  - id: confidence
+    type: number
+    range: [0.0, 1.0]
+    description: Confidence in the consent outcome (aggregated trust)
+  - id: last_check
+    type: timestamp
+    description: Last evaluation time
+  - id: comments
+    type: text
+    description: Optional notes or rationale from participants
+
+bindings:
+  - schema: schema.dis_core_logic.v0.0
+    rule: consent_gate_required
+  - schema: schema.dis_trust.v0.1
+    rule: trust_feedback_linked

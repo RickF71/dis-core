@@ -1,0 +1,26 @@
+$schema: "https://dis.core/domains/dis/schemas/reflexive.receipt.v1"
+title: "Reflexive Binding Receipt (PAIN-private)"
+type: object
+required: ["receipt_id","pledge_id","subject_uid","binding_proof","anti_export","timestamps"]
+properties:
+  receipt_id: { type: string }
+  pledge_id: { type: string }
+  subject_uid: { type: string }
+  binding_proof:
+    type: object
+    properties:
+      key_handle: { type: string }
+      attestation_chain: { type: string }
+      csr_stub: { type: string }
+  anti_export:
+    type: object
+    properties:
+      sealed_to_device: { type: boolean, default: true }
+      exportable: { type: boolean, default: false }
+      reveal_method: { type: string, enum: ["challenge_response_only"] }
+  timestamps:
+    type: object
+    properties:
+      created: { type: string, format: date-time }
+      last_used: { type: string, format: date-time }
+  notes: { type: string }

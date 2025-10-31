@@ -27,6 +27,7 @@ type Config struct {
 
 // Load reads and parses the YAML config file, applying safe defaults.
 func Load(path string) (*Config, error) {
+	var BuildVersion = "dev"
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -59,7 +60,9 @@ func Load(path string) (*Config, error) {
 	if c.APIPort == 0 {
 		c.APIPort = 8080
 	}
-
+	if c.Version == "" {
+		c.Version = BuildVersion
+	}
 	if c.RepoRoot == "" {
 		c.RepoRoot = "."
 	}

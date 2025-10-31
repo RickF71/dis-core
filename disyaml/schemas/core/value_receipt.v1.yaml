@@ -1,0 +1,58 @@
+schema: value_receipt
+version: v1
+description: >
+  A reflexive record capturing the coherence delta produced by any action.
+  Value receipts quantify increases or decreases in moral, aesthetic, or functional coherence
+  within the shared moral field, recording the observed “Value Flow” between agents and domains.
+
+fields:
+  - name: id
+    type: string
+    description: Unique receipt identifier (e.g., rcpt-value-UUIDv7)
+  - name: by
+    type: string
+    description: DIS identity or domain responsible for the action
+  - name: action_ref
+    type: string
+    description: Reference to originating action or transaction
+  - name: substrate_ref
+    type: string
+    description: Optional pointer to a lifepush_substrate_structure defining threshold context
+  - name: coherence_delta
+    type: float
+    description: >
+      Numeric representation of net coherence change (positive = harmony / life-supportive,
+      negative = disharmony / entropy-producing)
+  - name: value_vector
+    type: map
+    description: Multidimensional breakdown of value contributions
+    example:
+      ethical: 0.8
+      aesthetic: 0.2
+      technical: -0.1
+  - name: observer_field
+    type: string
+    description: Source moral field or consciousness node observing the event
+  - name: notes
+    type: string
+    description: Optional human-readable context or interpretation
+  - name: timestamp
+    type: string
+    format: datetime
+    description: Time the coherence delta was recorded
+
+rules:
+  - name: must_have_coherence
+    condition: coherence_delta != null
+    severity: error
+  - name: within_expected_range
+    condition: coherence_delta >= -1.0 and coherence_delta <= 1.0
+    severity: warn
+  - name: require_action_link
+    condition: action_ref != ""
+    severity: error
+
+indexes:
+  - [id]
+  - [by, timestamp]
+  - [observer_field]

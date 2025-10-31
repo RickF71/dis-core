@@ -1,0 +1,103 @@
+# ==========================================================
+#  domain.food.route.coop/policies/route.yaml
+#  Canon: food.route.policy.v1
+#  Purpose:
+#     Coordinate long-distance food transport among multiple
+#     communities using consent-based funding and visible cost
+#     accounting.  No hidden subsidies or debt.
+# ==========================================================
+
+type: food.route.policy.v1
+domain: domain.food.route.coop
+terms:
+  - name: "Food Route Cooperative Policy"
+    version: 1.0
+    scope: "Defines cooperative food-transport routes between domains"
+    description: |
+      This policy coordinates long-distance food shipments
+      among remote communities using consent-based funding
+      and transparent cost accounting.
+
+governance:
+  overseer: domain.terra.root
+  operator_domains:
+    - domain.transport.north
+    - domain.transport.south
+  auditor: domain.terra.audit.logistics
+
+participants:
+  eligible_senders:
+    - domain.farm.*
+    - domain.food.market.*
+  eligible_receivers:
+    - domain.person.*
+    - domain.community.*
+  coop_membership: true
+  consent_required: 2           # sender + receiver
+
+route:
+  max_distance_km: 5000
+  checkpoint_interval_km: 200   # intermediate proof-of-delivery hops
+  data_captured:
+    - distance_km
+    - energy_used_kwh
+    - crew_hours
+    - goods_mass_kg
+    - perishables_index
+
+cost_formula: |
+  base_cost = (distance_km * 0.01) + (energy_used_kwh * 0.05) + (crew_hours * 0.5)
+  total_cost = base_cost * (1 + perishables_index * 0.1)
+  return round(total_cost, 2)
+
+funding:
+  model: "shared"
+  method: "pre-pledge"
+  contribution_split:
+    sender: 0.40
+    receiver: 0.40
+    coop_subsidy_pool: 0.20
+  subsidy_pool_source: domain.food.route.coop.treasury
+
+reward:
+  transporters:
+    earn_rate_cred_per_km: 0.01
+    bonus_for_reliability: 0.05   # for on-time + low spoilage
+  coordinators:
+    earn_flat_cred: 0.5 per trip
+  escrow:
+    release_on_final_proof: true
+    audit_anchor: domain.terra.root
+
+proof_chain:
+  - produce.ship.v1
+  - route.checkpoint.v1
+  - route.arrival.v1
+  - route.payment.v1
+  - route.audit.v1
+
+trust_adjustment:
+  if_on_time: +0.01
+  if_delay_over_24h: -0.02
+  if_spoilage_rate_gt_5: -0.05
+
+visibility:
+  public_metrics:
+    - total_distance_km
+    - total_energy_kwh
+    - crew_hours
+    - cooperative_subsidy_used
+  private_metrics:
+    - cargo_value
+    - individual_contributions
+
+reporting:
+  aggregate_interval_hours: 12
+  anchor_digest_interval_hours: 24
+  hash_anchor_domain: domain.terra.root
+
+notes:
+  - "Every route is a transparent joint contract between growers, transporters, and recipients."
+  - "Receipts show real physical effort required to feed distant regions."
+  - "Aid is voluntary and auditable, not a hidden tax or corporate subsidy."
+  - "Communities can pool credits ahead of time for seasonal shipments."

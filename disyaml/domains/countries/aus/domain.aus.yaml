@@ -1,0 +1,11 @@
+code: AUS
+name: "Commonwealth of Australia"
+seat: "Canberra"
+lineage:
+  - terra
+  - domain.aus
+population: 25_788_215
+description: >
+  Federal parliamentary constitutional monarchy comprising the Australian
+  continent and nearby islands; large interior deserts, populated coastal
+  regions, and multicultural civic identity.

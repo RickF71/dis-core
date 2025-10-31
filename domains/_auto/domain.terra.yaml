@@ -1,6 +1,0 @@
-id: domain.terra
-name: Terra
-parent_id: domain.null
-is_notech: false
-requires_inside_domain: true
-updated_at: "2025-10-22T09:46:57.090595-05:00"

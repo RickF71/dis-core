@@ -1,0 +1,67 @@
+# ==========================================================
+#  domain.government.disyaml
+#  Purpose:
+#    Archetypal governance domain defining the structural and ethical
+#    expectations for all civic authority domains under DIS.
+# ==========================================================
+
+type: domain.government
+meta:
+  name: domain.government
+  uuid: "c9d8e7f6-5a4b-3c2d-1e0f-9a8b7c6d5e4f"
+  schema_id: domain.government
+  schema_version: v1.1
+  domain_id: domain.government
+  description: >
+    Archetypal governance domain defining the structural and ethical
+    expectations for all civic authority domains under DIS. Provides
+    the base template for nation, state, and municipal domains.
+  author: dis-core.committee
+  date_frozen: 2025-10-10
+  integrity_hash: "<auto-filled-by-registry>"
+
+authority:
+  seats:
+    - id: s_gov_exec
+      title: Executive Steward
+      holder: "00000000-0000-4000-8000-000000000000"
+      term: P4Y
+      powers: [enact_policy, allocate_resources]
+      constraints: [consent_gate_required, ethics_review]
+    - id: s_gov_judicial
+      title: Judicial Arbiter
+      holder: "00000000-0000-4000-8000-000000000001"
+      term: P8Y
+      powers: [interpret_law, review_policy]
+      constraints: [independent_mandate]
+
+ethics:
+  framework: schema.dis_consent.v0.1
+  feedback_model: schema.moral_feedback.v0.1
+  consent_required_for: [policy_change, asset_allocation, executive_override]
+
+relations:
+  inherits_from: domain.terra
+  grants_templates_to: [domain.usa, domain.europa, domain.notech]
+
+boundaries:
+  no_automation: [policy_creation, lethal_force, consent_gate]
+  audit_interval: P1Y
+
+composition:
+  hierarchy:
+    parent: domain.terra
+  schema_refs:
+    - schema.domain.government.v1.1
+    - schema.domain.relations.v1
+    - schema.dis_consent.v0.2
+    - schema.dis_trust.v0.1
+
+tools:
+  - policy.freeze.v1
+  - policy.giveroot.v1
+  - policy.rooting_challenge.v1
+
+extends:
+  - domain.terra
+  - schema.domain.government.v1.1

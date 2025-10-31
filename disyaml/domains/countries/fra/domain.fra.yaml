@@ -1,0 +1,11 @@
+code: FRA
+name: "French Republic"
+seat: "Paris"
+lineage:
+  - terra
+  - domain.fra
+population: 67_422_000
+description: >
+  Unitary semi-presidential republic in Western Europe, known for centralized
+  institutions, cultural influence, and a mix of metropolitan and overseas
+  territories shaping national identity.

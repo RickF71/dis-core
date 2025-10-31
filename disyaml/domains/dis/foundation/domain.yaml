@@ -1,0 +1,26 @@
+version: v1
+kind: dis.domain.foundation
+metadata:
+  id: domain.dis.foundation
+  domain: dis
+  description: >
+    The constitutional domain of DIS, responsible for proposing, ratifying,
+    and recording changes to the core DIS/Terra canons and governance primitives.
+spec:
+  scope:
+    - "Affects only DIS and Terra canons, schemas, and policies."
+    - "Cannot govern individuals or operational domains."
+  authority:
+    proposal_event: dis.event.definition_proposal
+    amendment_event: dis.event.amendment
+  references:
+    # Canon files the Foundation is allowed to amend
+    canon_targets:
+      - ../dis_canon.yaml
+      - ../../terra/terra_canon.yaml
+  enforcement:
+    - "Changes require verified consensus receipts from rooted domains."
+    - "All accepted amendments generate a signed receipt and immutable hash record."
+  continuity:
+    - "This domain is guaranteed existence by DIS itself."
+    - "If corrupted or dissolved, DIS restores the last verified canonical state."

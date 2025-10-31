@@ -3,8 +3,6 @@ package policy
 import (
 	"database/sql"
 	"dis-core/internal/util"
-
-	"gopkg.in/yaml.v3"
 )
 
 type Manager struct {
@@ -16,6 +14,6 @@ func NewManager(db *sql.DB) *Manager {
 }
 
 func (m *Manager) ImportFromYAML(node map[string]any) error {
-	yamlBytes, _ := yaml.Marshal(node)
-	return util.ImportYAMLToDB(m.db, "policies", "policy.yaml", string(yamlBytes))
+	_, _, err := util.ImportYAML("policies", "policy.yaml")
+	return err
 }

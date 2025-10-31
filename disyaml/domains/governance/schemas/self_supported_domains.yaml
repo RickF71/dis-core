@@ -1,0 +1,34 @@
+id: governance.self_supported_domains.v1
+title: Self-Supported Domains
+status: proposed
+description: |
+  Defines the structure and purpose of self-supported or spiritual domains that
+  exist within larger civic domains. These subdomains maintain moral and
+  psychological equilibrium, reducing the need for external regulation.
+
+definition:
+  type: object
+  properties:
+    name: { type: string, description: "Domain identifier (e.g. domain.greenpeace)" }
+    parent_domain: { type: string, description: "Parent civic or governmental domain" }
+    focus: { type: string, description: "Primary moral or spiritual emphasis" }
+    governance_model: { type: string, description: "Internal rule system or consent model" }
+    safeguards:
+      type: array
+      items: { type: string, description: "Mechanisms preventing coercion or extremism" }
+
+principles:
+  - Autonomy under civic law.
+  - Transparency in governance and funding.
+  - Reciprocity between the spiritual and civic spheres.
+  - The healthier the self-supported domains, the lighter the outer government must be.
+
+examples:
+  - name: domain.greenpeace
+    parent_domain: domain.earth
+    focus: ecological ethics
+    governance_model: consensus
+    safeguards: [voluntary_membership, right_of_exit, transparency_report]
+
+tags: [governance, domain, self_support, ethics]
+version: 1.0

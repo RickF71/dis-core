@@ -1,0 +1,97 @@
+type: lovecoin.v0
+description: >
+  A decaying, consent-backed credit symbolizing mutual care or creative harmony between individuals or domains.
+  It is non-transferable, self-decaying, and represents measurable trust, empathy, or collaboration within the DIS moral economy.
+  Love Coin is not a currency of wealth, but a receipt of shared intention.
+
+version: 0.1
+domain: domain.terra
+category: consent-credit
+
+fields:
+  - name: issuer
+    type: dis_uid
+    required: true
+    description: >
+      The DIS-UID or domain issuing the Love Coin. 
+      Usually the originator of the consent act (e.g., domain.terra, domain.simula, personal.dis).
+
+  - name: participants
+    type: list(dis_uid)
+    required: true
+    description: >
+      The other participant(s) in the consent exchange. 
+      Each must verifiably acknowledge the event before minting.
+
+  - name: reason
+    type: string
+    required: true
+    description: >
+      A short contextual reason for the issuance (e.g. "collaboration", "mutual support", "repair", "creative spark").
+
+  - name: value
+    type: float
+    default: 1.0
+    min: 0.0
+    description: >
+      The initial intensity of the credit. 
+      Value is symbolic and normalized rather than economic.
+
+  - name: half_life
+    type: duration
+    default: 30d
+    description: >
+      The time it takes for the Love Coin's effective influence to halve. 
+      This models the natural entropy of human connection.
+
+  - name: decay_function
+    type: string
+    default: exp(-t/half_life)
+    description: >
+      Mathematical formula defining how the credit's influence decays over time.
+      Allows experimental or domain-specific adjustments (e.g., linear, sigmoid, renewal-based).
+
+  - name: issued_at
+    type: timestamp
+    required: true
+    description: >
+      ISO-8601 timestamp of issuance.
+
+  - name: expires_at
+    type: timestamp
+    computed: true
+    description: >
+      Automatically calculated based on half_life and issuance time.
+
+  - name: renewed_at
+    type: timestamp
+    optional: true
+    description: >
+      Optional timestamp if the Love Coin was renewed by continued cooperation or shared action.
+
+  - name: renewal_count
+    type: integer
+    default: 0
+    description: >
+      Number of times this Love Coin has been renewed through mutual reaffirmation.
+
+  - name: signature
+    type: string
+    required: true
+    description: >
+      Cryptographic signature proving both issuer and participants consented to the creation.
+
+metadata:
+  renewable: true
+  transferable: false
+  visible: true
+  indexed: ["issuer", "participants", "issued_at"]
+
+examples:
+  - issuer: "dis_uid:rick"
+    participants: ["dis_uid:maya"]
+    reason: "shared insight and empathy"
+    value: 1.0
+    half_life: 30d
+    issued_at: "2025-10-11T12:00:00Z"
+    signature: "sig_42a9d4fa..."

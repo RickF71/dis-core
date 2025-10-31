@@ -1,0 +1,126 @@
+# ============================================================
+# DOMAIN.SEAT v1.0 — Seat of Authority Schema
+# ------------------------------------------------------------
+# Defines the structural and ethical rules governing Seats within
+# any DIS domain. Seats are loci of sovereignty — the point where
+# individual or collective authority becomes operational.
+# ============================================================
+
+meta:
+  schema_id: domain.seat
+  schema_version: v1.0
+  status: active
+  dis_core_binding: v1.0
+  description: >
+    Canonical definition of a Seat of Authority within DIS.
+    A Seat represents the actionable node of consent, legitimacy,
+    and power within a domain. All domain actions must ultimately
+    be traceable through one or more Seats to a verified consent.
+  author: dis-core.committee
+  date_issued: 2025-10-10
+  integrity_hash: "<auto-filled-by-registry>"
+  lineage:
+    extends: [dis-core.domain, dis-core.identity, dis-core.policy]
+    relates: [phantom_binding.v1, dis_consent.v0.1]
+  notes:
+    - "This schema defines how legitimate authority is instantiated."
+    - "Every Seat action must produce a verifiable receipt."
+    - "Phantom and Shadow interactions require bindings through oversight."
+
+# ============================================================
+# 1. SEAT STRUCTURE
+# ============================================================
+
+seat:
+  id: string
+  version: v1
+  layer: DIS
+  title: "Seat of Authority Schema"
+  description: >
+    A Seat is a locus of legitimate authority within a domain. It represents
+    the structural capacity through which sovereignty becomes actionable.
+    Seats may also engage with shadow or phantom domains through verified
+    oversight bindings that preserve accountability and limit influence.
+
+  fields:
+    domain: string
+    purpose: string
+    occupant_id: string
+    consent_ref: string
+    delegation_ref: string
+    mode: [inactive, active, delegated]
+    status: [vacant, occupied, suspended, dissolved]
+    term_duration: string
+    lineage_ref: string
+    policy_scope: [string]
+    ethics_ref: string
+    audit_interval: string
+    legitimacy_status: [verified, shadow, phantom]     # harmonized term
+    phantom_binding_ref: string                        # replaces ghost_binding_ref
+
+# ============================================================
+# 2. ACCESSION RULES
+# ============================================================
+
+  accession:
+    method: [elected, appointed, assumed, procedural]
+    authority_ref: string
+    process_ref: string
+    eligibility_criteria:
+      - description: string
+        requirement_type: [qualification, lineage, consent]
+    commentary: >
+      Declares how the Seat’s authority is lawfully established. Each method
+      must produce verifiable receipts and be auditable through lineage.
+
+# ============================================================
+# 3. DELEGATION & BEHAVIOR
+# ============================================================
+
+  delegator_policy:
+    mode: [dormant, delegative, procedural]
+    delegate_ref: string
+    conditions:
+      - trigger: string
+        action: string
+        target: string
+    commentary: >
+      Defines behavior when unoccupied. Delegation never bypasses lineage
+      or consent verification.
+
+# ============================================================
+# 4. OPERATIONAL RULES
+# ============================================================
+
+  rules:
+    - must_belong_to_domain: true
+    - activation_requires: [consent_ref | delegation_ref]
+    - inherits_scope_from_domain: true
+    - vacancy_behavior: dormant_or_delegative
+    - emits_receipt_on_state_change: true
+    - term_duration_required_for_activation: true
+    - lineage_integrity_must_verify: true
+    - accession_must_produce_receipt: true
+    - if_legitimacy_phantom_requires_phantom_binding: true  # updated rule
+
+# ============================================================
+# 5. RECEIPT TYPES
+# ============================================================
+
+  receipts:
+    - seat.occupation.receipt.v1
+    - seat.appointment.receipt.v1
+    - seat.vacancy.receipt.v1
+    - seat.audit.receipt.v1
+    - seat.election.receipt.v1
+    - seat.assumption.receipt.v1
+    - phantom.boundary.receipt.v1
+    - phantom.scope.receipt.v1
+
+# ============================================================
+# 6. COMMENTARY
+# ============================================================
+
+  commentary: >
+    Seats define where and how authority is instantiated inside DIS.
+    They maintain continuity between individual consent and institutional action.

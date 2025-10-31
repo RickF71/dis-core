@@ -1,0 +1,31 @@
+schema: revocation_registry.v0
+version: 0.9.2
+description: >
+  Registry of revoked credentials, handshakes, and sessions.
+  Shared across DIS-Auth, Console, and Virtual USGOV domains.
+
+fields:
+  - name: revocation_id
+    type: uuid
+  - name: revoked_ref
+    type: ref
+    description: Reference to the object being revoked.
+  - name: revoked_type
+    type: string
+    enum: [credential, handshake, session]
+  - name: reason
+    type: string
+  - name: revoked_by
+    type: dis_uid
+  - name: revocation_time
+    type: timestamp
+  - name: valid_until
+    type: timestamp
+  - name: signature
+    type: signature
+
+rules:
+  - rule: revoked_refs_cannot_be_reissued
+    description: Once revoked, the same ref cannot be revalidated.
+  - rule: audit_log_required
+    description: All revocations must generate a receipt in the ledger.

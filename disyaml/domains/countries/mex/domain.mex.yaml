@@ -1,0 +1,11 @@
+code: MEX
+name: "United Mexican States"
+seat: "Mexico City"
+lineage:
+  - terra
+  - domain.mex
+population: 130_262_216
+description: >
+  A federal republic in North America with deep indigenous and colonial
+  heritage, varied geography from deserts to tropical coasts, and strong
+  regional cultural identities.

@@ -1,0 +1,15 @@
+version: v1
+kind: terra.policy.logged_transient
+spec:
+  description: >
+    Allows authorized domains to maintain transient conversation logs
+    with participant consent. Terra itself may not store or host logs.
+  preconditions:
+    - domain.authorized_for_logging == true
+    - all(participants[].consent_to_logging == true)
+  enforcement:
+    - emit domain.chat.logged_transient event
+  notes:
+    - "Terra maintains no logs of communication."
+    - "Logging is a domain-level privilege, never a Terra function."
+    - "Participants may request redaction or erasure according to domain policy."

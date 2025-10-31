@@ -2,37 +2,35 @@ package app
 
 import (
 	"dis-core/internal/api"
-	"dis-core/internal/canon"
+	"dis-core/internal/bootstrap"
 	"dis-core/internal/config"
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
 	"dis-core/internal/mirrorspin"
 	"dis-core/internal/policy"
+	"dis-core/internal/schema"
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 )
 
+// Run initializes and starts the DIS-Core service.
+// The bootstrap layer now handles all table creation and YAML imports.
+// No canon logic is used here — only editable bootstrap state.
 func Run() error {
-	// Load config from file, fallback to defaults if missing
+	// ------------------------------------------------------------
+	// 0. Load configuration
+	// ------------------------------------------------------------
 	cfg, err := config.Load("config.yaml")
 	if err != nil {
 		log.Printf("⚠️  No config.yaml found, using defaults: %v", err)
 		cfg = &config.Config{}
 	}
 
-	// // Setup context with graceful shutdown
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
-	// go func() {
-	// 	c := make(chan os.Signal, 1)
-	// 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	// 	<-c
-	// 	log.Println("shutting down...")
-	// 	cancel()
-	// }()
-
-	// Connect to DB and bootstrap schema
+	// ------------------------------------------------------------
+	// 1. Connect to database
+	// ------------------------------------------------------------
 	database, err := db.Connect(cfg)
 	if err != nil {
 		return err
@@ -40,31 +38,59 @@ func Run() error {
 	defer database.Close()
 	log.Println("✅ Connected to PostgreSQL ledger")
 
-	if err := db.EnsureTables(database, cfg); err != nil {
-		return err
-	}
-	log.Println("📜 Registered schema(s)")
+	// ------------------------------------------------------------
+	// 2. Initialize schema registry
+	// ------------------------------------------------------------
+	reg := schema.NewRegistry()
 
-	// Open ledger
-	led, err := ledger.Open(cfg.DatabaseDSN, database)
+	// Load schemas from disyaml tree
+	if err := reg.LoadDir("./disyaml/schemas"); err != nil {
+		log.Printf("⚠️  Core schema load failed: %v", err)
+	}
+	if err := reg.LoadDir("./disyaml/domains"); err != nil {
+		log.Printf("⚠️  Domain schema load failed: %v", err)
+	}
+	log.Printf("📘 Loaded %d schemas into registry", len(reg.ByKey()))
+
+	// ------------------------------------------------------------
+	// 3. Open ledger and load domain scaffolds
+	// ------------------------------------------------------------
+	led, err := ledger.Open(cfg.DatabaseDSN, database, reg)
 	if err != nil {
 		return err
 	}
 	defer led.Close()
-	log.Println("✅ Ledger ready.")
+	log.Println("✅ Ledger ready")
 
-	// Canon import/freeze/register logic
-	if err := canon.Import(database); err != nil {
-		return err
-	}
-	if err := canon.Export(database); err != nil {
-		return err
-	}
-	if err := canon.Freeze(database); err != nil {
-		return err
+	domainDir := filepath.Join(".", "disyaml/domains")
+	if err := led.BootstrapDomains(reg, domainDir); err != nil {
+		log.Printf("⚠️  Domain bootstrap failed: %v", err)
+	} else {
+		log.Println("✅ Domains loaded into ledger")
 	}
 
-	// Start policy engine
+	// ------------------------------------------------------------
+	// 4. Unified Bootstrap Phase
+	// ------------------------------------------------------------
+	log.Println("🚀 Starting bootstrap phase...")
+
+	// 4.1 Ensure all tables exist
+	if err := bootstrap.BootstrapAllTables(database); err != nil {
+		return fmt.Errorf("bootstrap tables: %w", err)
+	}
+
+	// 4.2 Import all YAML files into the bootstrap layer
+	if err := bootstrap.ImportYAML(".", database); err != nil {
+		log.Printf("⚠️  Bootstrap import failed: %v", err)
+	} else {
+		log.Println("✅ Bootstrap YAML import complete")
+	}
+
+	log.Println("🎯 Bootstrap phase complete.")
+
+	// ------------------------------------------------------------
+	// 5. Initialize policy engine
+	// ------------------------------------------------------------
 	base := "./policies"
 	opaEngine, err := policy.NewOPAEngine()
 	if err != nil {
@@ -73,9 +99,11 @@ func Run() error {
 	engine := policy.NewPolicyEngineImpl(opaEngine)
 	log.Printf("✅ Policy engine initialized (using %s)", base)
 
-	// Start API server
+	// ------------------------------------------------------------
+	// 6. Start API server
+	// ------------------------------------------------------------
 	server := api.NewServer(cfg, led, database)
-	server.RegisterEvalRoute(engine) // wire policy engine
+	server.RegisterEvalRoute(engine)
 	log.Println("✅ Registered route(s)")
 
 	if err := mirrorspin.Start(database); err != nil {

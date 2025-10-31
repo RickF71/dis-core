@@ -1,0 +1,117 @@
+# ==========================================================
+#  canon.dis_scaffold_plan.v0.9.5.disyaml
+#  Codename: Scaffold & Moral Field Integration
+#  Purpose:
+#    Establish formal schema and Go struct scaffolding linking
+#    Jikka, DomainType, and Spotlight concepts.
+# ==========================================================
+
+type: canon.dis_scaffold_plan.v0.9.5
+meta:
+  name: "DIS Scaffold Plan"
+  version: v0.9.5
+  codename: "Scaffold & Moral Field Integration"
+  resume_from: "v0.9.4 — Network Presence / Jikka Boundary Stable"
+  branch: "dev-0.9.5-scaffold-moral-field"
+  description: >
+    Establish formal schema and Go struct scaffolding linking Jikka, DomainType, and Spotlight concepts.
+    This version builds the moral field layer — the connective tissue between consent (Jikka),
+    structure (DomainType), and observation (Spotlight).
+  author: dis-core.committee
+  date_frozen: 2025-10-10
+  integrity_hash: "<auto-filled-by-registry>"
+
+scope:
+  schemas:
+    - name: schema.domain_type.v0.1
+      purpose: >
+        Defines classification and inheritance types for domains (e.g. terra, simula, virtual, corporate, personal).
+      links_to:
+        - schema.spotlight.domain.v0.1
+        - schema.jikka.boundary.v1
+      notes: >
+        DomainType becomes the type root used by both consent models and observational scaffolds.
+
+    - name: schema.jikka.boundary.v1
+      purpose: >
+        Specifies bi-directional moral/consent interfaces between two DIS entities.
+      links_to:
+        - schema.jikka.unilateral.v0.1
+        - schema.jikka.collective.v0.1
+      notes: >
+        The boundary schema formalizes shared moral fields (two-sided Jikka) vs unilateral trust edges.
+
+    - name: schema.jikka.unilateral.v0.1
+      purpose: >
+        Models one-way trust or moral projection — e.g. individual → organization, human → AI.
+      links_to:
+        - schema.jikka.boundary.v1
+      notes: >
+        Represents the moral asymmetry field — when one side consents without reciprocity.
+
+    - name: schema.jikka.collective.v0.1
+      purpose: >
+        Describes emergent moral fields formed by 3+ DIS domains (e.g. communal, civic, corporate groups).
+      links_to:
+        - schema.jikka.boundary.v1
+        - schema.spotlight.domain.v0.1
+      notes: >
+        Used to track “moral resonance” or shared ethical state within groups.
+
+    - name: schema.spotlight.domain.v0.1
+      purpose: >
+        Provides observational metadata (“Spotlight”) about a domain’s active moral or consent state.
+      links_to:
+        - schema.domain_type.v0.1
+        - schema.jikka.collective.v0.1
+      notes: >
+        Spotlights are not moral actors; they are observation nodes — a way to visualize moral/consent fields.
+
+go_scaffold:
+  base_dir: internal/scaffold
+  components:
+    - name: DomainType
+      struct: DomainType
+      fields:
+        - { name: Name,        type: string }
+        - { name: Class,       type: string }
+        - { name: Parent,      type: string }
+        - { name: Description, type: string }
+      purpose: >
+        Simple structural definition describing what kind of domain something is and where it fits hierarchically.
+
+    - name: JikkaBoundary
+      struct: JikkaBoundary
+      fields:
+        - { name: Source,    type: string }
+        - { name: Target,    type: string }
+        - { name: Mutual,    type: bool }
+        - { name: Strength,  type: float64 }
+        - { name: Timestamp, type: time.Time }
+      purpose: >
+        Defines consent/moral links between entities. Later versions will track resonance, drift, and history.
+
+    - name: Spotlight
+      struct: Spotlight
+      fields:
+        - { name: DomainID,     type: string }
+        - { name: ObservedState,type: string }
+        - { name: MoralSignal,  type: float64 }
+        - { name: UpdatedAt,    type: time.Time }
+      purpose: >
+        Observational node used to measure and display a domain’s active moral field presence.
+
+cli_stub:
+  command: "dis scaffold <type>"
+  examples:
+    - "dis scaffold domain_type"
+    - "dis scaffold jikka.boundary"
+    - "dis scaffold spotlight"
+  output: >
+    Generates YAML templates under /domains/dis/schemas/ and Go struct stubs under /internal/scaffold/.
+    Templates include metadata headers, version, and linkage hints.
+
+integration_notes: |
+  - This version creates no logic or runtime behavior — only shapes.
+  - Serves as the base for moral field propagation, visual consent graphs, and Jikka simulation layers.
+  - All schema hashes to be registered with DIS Schema Registry upon load.

@@ -3,6 +3,7 @@ package ledger
 import (
 	"crypto/sha256"
 	"database/sql"
+	"dis-core/internal/schema"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -14,13 +15,14 @@ import (
 // Ledger provides the core persistence layer for DIS-Core.
 // It manages schema creation, config, canon, and event logging.
 type Ledger struct {
-	DB *sql.DB
+	DB  *sql.DB
+	reg *schema.Registry
 }
 
 // Open initializes the ledger. It can accept either an existing DB handle
 // or a DSN string. If db is nil, it opens a new connection using the DSN.
-// This prevents multiple func Open() collisions across the package.
-func Open(dsn string, db *sql.DB) (*Ledger, error) {
+// Optionally, a schema registry can be attached for validation and linkage.
+func Open(dsn string, db *sql.DB, reg *schema.Registry) (*Ledger, error) {
 	var conn *sql.DB
 	var err error
 
@@ -33,8 +35,8 @@ func Open(dsn string, db *sql.DB) (*Ledger, error) {
 		}
 	}
 
-	// Ensure schema exists
-	schema := []string{
+	// Ensure schema tables exist
+	schemaStatements := []string{
 		`CREATE TABLE IF NOT EXISTS receipts (
 			id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
 			type TEXT NOT NULL,
@@ -60,13 +62,19 @@ func Open(dsn string, db *sql.DB) (*Ledger, error) {
 		);`,
 	}
 
-	for _, stmt := range schema {
+	for _, stmt := range schemaStatements {
 		if _, err := conn.Exec(stmt); err != nil {
 			return nil, fmt.Errorf("create tables: %w", err)
 		}
 	}
 
-	return &Ledger{DB: conn}, nil
+	// Build the ledger instance and attach registry
+	l := &Ledger{
+		DB:  conn,
+		reg: reg, // <— attach live schema registry
+	}
+
+	return l, nil
 }
 
 // Close cleanly shuts down the ledger database connection.
@@ -174,4 +182,12 @@ func getMetaString(m map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// Registry returns the schema registry associated with this ledger.
+func (l *Ledger) Registry() *schema.Registry {
+	if l == nil {
+		return nil
+	}
+	return l.reg
 }

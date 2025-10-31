@@ -1,12 +1,15 @@
 package policy
 
-import "database/sql"
+import (
+	"database/sql"
+	"dis-core/internal/util"
+)
 
 type Manager struct{ db *sql.DB }
 
 func NewManager(db *sql.DB) *Manager { return &Manager{db: db} }
 
 func (m *Manager) ImportFromYAML(node map[string]any) error {
-	// TODO: parse & insert policy YAML into DB
-	return nil
+	_, _, err := util.ImportYAML("policies", "policy.yaml")
+	return err
 }

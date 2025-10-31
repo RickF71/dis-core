@@ -1,0 +1,17 @@
+version: v1
+kind: dis.event.amendment
+spec:
+  description: >
+    Records a verified, ratified change to canonical DIS/Terra definitions.
+  fields:
+    amendment_id: string
+    target_path: string          # relative path to canon file being amended
+    new_definition_hash: string
+    ratified_by:
+      - domain_id: string
+        signature: string
+    consensus_level: float       # 0.0 - 1.0
+    effective_at: time
+  notes:
+    - "Amendments must trace to definition proposals."
+    - "Immutable; auditable via receipts."

@@ -1,0 +1,45 @@
+$schema: "https://dis.core/domains/dis/schemas/pledge.zk.v1"
+title: "Zero-Knowledge Pledge"
+type: object
+required: ["pledge_id","domain","amount","currency","verifier","commitment","proof","proof_public_inputs","reveal_policy","timestamps"]
+properties:
+  pledge_id: { type: string }
+  domain: { type: string }
+  amount: { type: number, minimum: 0 }
+  currency: { type: string, const: "dis-credit" }
+  verifier: { type: string, enum: ["zk-snark.v3","zk-stark.v1"] }
+  circuit_ref: { type: string }
+  commitment: { type: string }
+  proof: { type: string, description: "base64" }
+  proof_public_inputs:
+    type: object
+    required: ["domain_id"]
+    properties:
+      merkle_root: { type: string }
+      human_set_root: { type: string, description: "Root of human-eligible set" }
+      domain_id: { type: string }
+      amount_bucket: { type: string }
+  aggregate_set: { type: string }
+  reflexive_receipt_ref: { type: string, description: "Local PAIN-only handle" }
+  reveal_policy:
+    type: object
+    required: ["revealable","gate"]
+    properties:
+      revealable: { type: boolean, default: true }
+      gate:
+        type: object
+        required: ["via","conditions"]
+        properties:
+          via: { type: string, enum: ["pain.window"] }
+          conditions:
+            type: array
+            items:
+              type: string
+              enum: ["requires_human_gesture","biometric_local_only","single_use_reveal","rate_limit_daily"]
+  timestamps:
+    type: object
+    required: ["pledged"]
+    properties:
+      pledged: { type: string, format: date-time }
+      expires: { type: string, format: date-time }
+  meta: { type: object, additionalProperties: true }

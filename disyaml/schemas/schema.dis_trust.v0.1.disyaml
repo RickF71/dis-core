@@ -1,0 +1,67 @@
+# ==========================================================
+#  schema.dis_trust.v0.1.disyaml
+#  Purpose:
+#    Establishes a dynamic trust ledger reflecting feedback
+#    from moral or social actions within DIS.
+# ==========================================================
+
+type: schema.dis_trust.v0.1
+meta:
+  schema_id: dis_trust
+  schema_version: v0.1
+  description: >
+    Establishes a dynamic trust ledger reflecting feedback from moral or social actions.
+    Trust metrics evolve based on consent outcomes, confidence, and feedback signals.
+  author: dis-core.committee
+  date_frozen: 2025-10-10
+  integrity_hash: "<auto-filled-by-registry>"
+
+fields:
+  - id: feedback_id
+    type: string
+    required: true
+    description: Unique ID of this feedback record
+
+  - id: source_domain
+    type: string
+    required: true
+    description: Domain or individual giving feedback
+
+  - id: target_domain
+    type: string
+    required: true
+    description: Domain or entity receiving feedback
+
+  - id: action_ref
+    type: string
+    description: Action or event generating feedback
+
+  - id: moral_delta
+    type: number
+    range: [-1.0, 1.0]
+    description: >
+      Change in moral trust; positive = reinforcement, negative = erosion
+
+  - id: confidence
+    type: number
+    range: [0.0, 1.0]
+    description: Weight or certainty of feedback signal
+
+  - id: trust_score
+    type: number
+    range: [0.0, 1.0]
+    description: Current computed trust level for target_domain
+
+  - id: timestamp
+    type: timestamp
+    description: When feedback was recorded
+
+  - id: source_receipt
+    type: string
+    description: Reference to originating receipt for audit trace
+
+bindings:
+  - schema: schema.dis_consent.v0.2
+    rule: trust_updates_on_consent
+  - schema: schema.dis_core.v1
+    rule: feedback_receipt_required

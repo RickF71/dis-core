@@ -3,8 +3,6 @@ package overlay
 import (
 	"database/sql"
 	"dis-core/internal/util"
-
-	"gopkg.in/yaml.v3"
 )
 
 type Manager struct {
@@ -16,6 +14,6 @@ func NewManager(db *sql.DB) *Manager {
 }
 
 func (m *Manager) ImportFromYAML(node map[string]any) error {
-	yamlBytes, _ := yaml.Marshal(node)
-	return util.ImportYAMLToDB(m.db, "overlays", "overlay.yaml", string(yamlBytes))
+	_, _, err := util.ImportYAML("overlays", "overlay.yaml")
+	return err
 }

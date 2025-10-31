@@ -4,44 +4,40 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-
-	"dis-core/internal/db"
 )
 
-// statusPayload represents the JSON structure returned by /api/status.
-type statusPayload struct {
-	Time   string         `json:"time"`
-	Counts map[string]int `json:"counts"`
-	Notes  string         `json:"notes,omitempty"`
+// BuildVersion is injected at build time with:
+//
+//	go build -ldflags "-X github.com/rickf71/dis-core/internal/api.BuildVersion=v0.9.3"
+var BuildVersion = "dev"
+
+type StatusResponse struct {
+	Core      string `json:"core"`
+	Domains   int    `json:"domains"`
+	Receipts  int    `json:"receipts"`
+	Schemas   int    `json:"schemas"`
+	Status    string `json:"status"`
+	Timestamp string `json:"timestamp"`
+	Version   string `json:"version"`
 }
 
-// RegisterStatusRoutes binds /api/status to the global mux.
-func RegisterStatusRoutes(mux *http.ServeMux) {
-	mux.Handle("/api/status", WithCORS(http.HandlerFunc(HandleStatus)))
-}
+// handleStatus returns basic system health and counts.
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	// You can replace these with real DB lookups later
+	domainCount := 0
+	receiptCount := 0.5
+	schemaCount := 2
 
-// HandleStatus responds with a diagnostic summary.
-func HandleStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	rcpts, _ := db.CountReceipts()
-	hs, _ := db.CountHandshakes()
-	rev, _ := db.CountRevocations()
-	ids, _ := db.CountIdentities()
-
-	out := statusPayload{
-		Time: time.Now().UTC().Format(time.RFC3339),
-		Counts: map[string]int{
-			"receipts":    int(rcpts),
-			"handshakes":  int(hs),
-			"revocations": int(rev),
-			"identities":  int(ids),
-		},
+	resp := map[string]any{
+		"core":      "DIS-Core",
+		"domains":   domainCount,
+		"receipts":  receiptCount,
+		"schemas":   schemaCount,
+		"status":    "ok",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"version":   s.cfg.Version, // assuming s.Version is set at startup
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(out)
+	json.NewEncoder(w).Encode(resp)
 }

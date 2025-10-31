@@ -1,0 +1,39 @@
+meta:
+  name: domain.usa
+  uuid: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
+  schema_id: domain.government
+  schema_version: v1.1
+  domain_id: domain.usa
+  description: >
+    United States domain operating under the DIS governance archetype.
+    Provides national-level policy coordination and ethical enforcement
+    for all sub-domains within its jurisdiction.
+
+authority:
+  seats:
+    - id: s_president
+      title: President
+      holder: "11111111-1111-4111-8111-111111111111"
+      term: P4Y
+      powers: [appoint, veto, convene]
+      constraints: [consent_gate_required]
+    - id: s_congress
+      title: Legislative Council
+      holder: "22222222-2222-4222-8222-222222222222"
+      term: P2Y
+      powers: [enact, budget, oversight]
+      constraints: [ethics_gate_required]
+
+relations:
+  parent_domain: domain.government
+  child_domains: [domain.us.wisconsin]
+  peer_domains: [domain.europa, domain.asia]
+
+consent:
+  gate: dis_consent.v0.1
+  quorum: majority
+  feedback_loop: moral_feedback.v0.1
+
+boundaries:
+  no_automation: [war_declaration, judicial_override, final_vote]
+  audit_interval: P6M

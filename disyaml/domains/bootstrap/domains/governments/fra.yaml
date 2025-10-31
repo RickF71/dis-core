@@ -1,0 +1,14 @@
+id: domain.governments.fra
+type: government
+derived_from: domain.lima.government
+overlay:
+  target: domain.terra
+  layer: civic
+  shape_ref: overlays/geo/countries/fra.geojson
+metadata:
+  name: France
+  iso2: FR
+  iso3: FRA
+  region: Europe
+  subregion: Western Europe
+  flag: "\U0001F1EB\U0001F1F7"
