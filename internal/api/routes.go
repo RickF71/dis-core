@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 
@@ -15,22 +14,26 @@ import (
 
 // RegisterAPIs wires all endpoint groups into the server mux.
 func (s *Server) RegisterAPIs() {
-	// Register /api/eval if PolicyEngine is set
-	// Register /api/eval if PolicyEngine is set (interface nil check)
-	// Register /api/eval if PolicyEngine is set (interface nil check)
 	mux := s.mux
 
-	// Core system routes
-	//mux.HandleFunc("/verify", s.handleVerify)
+	// ============================================================
+	//  CORE / SYSTEM ROUTES
+	// ============================================================
 	mux.HandleFunc("/api/ping", s.handlePing)
-	// Backwards-compatible API routes used by Finagler frontend
-	mux.HandleFunc("/api/status", s.handleStatus)
-	mux.HandleFunc("/api/domain/info", s.handleDomainInfo)
 	mux.HandleFunc("/api/info", s.handleInfo)
 	mux.HandleFunc("/api/health", s.handleHealth)
+
+	// Status & domain metadata
+	mux.HandleFunc("/api/status", s.handleStatus)
+	mux.HandleFunc("/api/domain/info", s.handleDomainInfo)
+
+	// Identity management
 	mux.HandleFunc("/api/identities", s.handleIdentities)
 	mux.HandleFunc("/api/identity/list", s.handleIdentities)
-	// Canon export (manual trigger)
+
+	// ============================================================
+	//  CANON / EXPORT (manual trigger)
+	// ============================================================
 	mux.HandleFunc("/api/canon/export", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -48,38 +51,30 @@ func (s *Server) RegisterAPIs() {
 		log.Println("✅ Canon export triggered manually via /api/canon/export")
 	})
 
-	// Modular packages
+	// ============================================================
+	//  REGISTRY MODULES
+	// ============================================================
 	auth.Register(mux, s.db)
 	identities.Register(mux, s.db)
 	atlas.Register(mux, s.db)
 	receipts.Register(mux, s.db)
 	terra.Register(mux, s.db)
 
-	registerFlowAPI(s)
+	// ============================================================
+	//  BOOTSTRAP (Finagler ↔ DIS-Core integration)
+	// ============================================================
+	// All /api/bootstrap/* routes are defined inside internal/api/bootstrap.go
+	s.RegisterBootstrapRoutes(s.Ledger.DB)
 
-	// Register import receipts list route
-	s.registerImportListRoute()
-
-	// Register import (POST) route
-	s.registerImportRoutes()
-
-	// Register network API routes
-	s.registerNetworkRoutes()
-	//log.Printf("✅ Registered route: /api/net/peers")
-
-	s.registerDBRoutes() //
-
-	s.registerVersionRoutes()
-	s.registerMirrorSpinRoutes() //
-	//s.registerStatusRoutes()
-
-}
-
-// Register network API routes
-func BuildMux(db *sql.DB) *http.ServeMux {
-	mux := http.NewServeMux()
-	// RegisterStatusRoutes(mux) // TODO: implement if needed
-	//RegisterCanonRoutes(mux, db)
-	RegisterDomainRoutes(mux, db)
-	return mux
+	// ============================================================
+	//  ADDITIONAL ROUTE GROUPS
+	// ============================================================
+	registerFlowAPI(s)           // workflow orchestration
+	s.registerImportListRoute()  // import list
+	s.registerImportRoutes()     // import POST
+	s.registerNetworkRoutes()    // peer/network layer
+	s.registerDBRoutes()         // DB diagnostics
+	s.registerVersionRoutes()    // version info
+	s.registerMirrorSpinRoutes() // mirror spin test
+	s.registerReconcileRoutes()  // reconciliation endpoints
 }

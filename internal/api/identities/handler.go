@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
+	"dis-core/internal/api"
 	"dis-core/internal/db"
 )
 
@@ -15,15 +15,6 @@ import (
 type IdentityPayload struct {
 	DISUID    string `json:"dis_uid"`
 	Namespace string `json:"namespace"`
-}
-
-// writeJSON sends JSON responses with proper headers.
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("❌ JSON encode error: %v", err)
-	}
 }
 
 // HandleIdentities provides both registration (POST) and listing (GET).
@@ -66,7 +57,7 @@ func HandleIdentities(store *sql.DB) http.HandlerFunc {
 				"namespace":  req.Namespace,
 				"created_at": db.NowRFC3339Nano(),
 			}
-			writeJSON(w, http.StatusCreated, resp)
+			api.JSON(w, http.StatusCreated, resp)
 
 		// === GET /api/identities?limit=50&offset=0 ===
 		case http.MethodGet:
@@ -123,7 +114,7 @@ func HandleIdentities(store *sql.DB) http.HandlerFunc {
 				"count": len(list),
 				"items": list,
 			}
-			writeJSON(w, http.StatusOK, resp)
+			api.JSON(w, http.StatusOK, resp)
 
 		default:
 			http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)

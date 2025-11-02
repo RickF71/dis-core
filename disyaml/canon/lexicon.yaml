@@ -1,0 +1,41 @@
+# ==========================================================
+#  canon/lexicon.yaml
+#  Purpose:
+#     Canonical vocabulary definitions for DIS.
+#     Each term represents a foundational concept with
+#     clear linguistic, moral, and technical scope.
+# ==========================================================
+
+terms:
+
+  authoritant:
+    part_of_speech: noun
+    pronunciation: /ˈɔːθərɪtənt/
+    etymology: >
+      Coined term derived from "authority" + agent suffix "-ant",
+      analogous to "participant" or "applicant".
+    definition: >
+      One who confers, grants, or delegates legitimate authority
+      within a domain through consent. The active agent of authorization,
+      distinct from an "authorized" actor who merely receives permission.
+    dis_context: >
+      In DIS, an Authoritant represents the role or entity empowered
+      to issue or withdraw consent within a defined scope.
+      Every domain has at least one Authoritant responsible for
+      validating and maintaining the moral coherence of actions.
+    relations:
+      - grants: authorization
+      - governs: actors
+      - validated_by: jikka
+      - anchored_in: domain
+    contrast:
+      - authorized: recipient of authority
+      - authoritarian: one who demands authority
+      - authority: the condition or state of legitimate power
+    usage_examples:
+      - "Each domain designates an Authoritant to manage its internal acts of consent."
+      - "The Authoritant’s policy defines who may act_as which ancestor scopes."
+      - "Becoming an Authoritant requires consent from all parent domains."
+    notes: >
+      Introduced in DIS v0.9.7 as the humanized replacement for 'DomAuth'.
+      Intended to unify moral consent and technical authorization.

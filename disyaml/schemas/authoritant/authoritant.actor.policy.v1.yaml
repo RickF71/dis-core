@@ -1,0 +1,116 @@
+# ==========================================================
+#  authoritant.actor.policy.v1.yaml
+#  Canon: authoritant.actor.policy.v1
+#  Purpose:
+#     Defines per-domain authorization rules for which actors
+#     may act_as which ancestor scopes and perform which actions.
+#     Each rule binds a domain's authority to its ancestry chain,
+#     specifying local and inherited privileges.
+# ==========================================================
+
+type: authoritant.actor.policy.v1
+version: 1.0
+description: >
+  Actor policy rules define what a participant (person, org, or agent)
+  may do within a domain and which ancestor scopes they may impersonate
+  ("act_as") when performing those actions. Validation occurs whenever
+  an internal network packet is sent or a domain event is invoked.
+
+schema:
+  actor_policy:
+    type: object
+    required:
+      - version
+      - rules
+    properties:
+      version:
+        type: string
+        description: Version of this actor policy
+      rules:
+        type: array
+        description: >
+          A list of rule entries that describe actor permissions.
+        items:
+          type: object
+          required:
+            - selector
+            - permissions
+          properties:
+            selector:
+              type: object
+              description: >
+                Criteria identifying the actor or group this rule applies to.
+              properties:
+                by:
+                  type: string
+                  description: >
+                    The domain that issued the actor’s identity.
+                    (e.g., domain.usa.wisconsin or domain.terra)
+                actor_type:
+                  type: string
+                  enum: [person, org, ai, system]
+                match:
+                  type: string
+                  description: >
+                    Pattern match or direct UID/group ID
+                    (e.g., "uid-1234", "group:moderators", or "*")
+            permissions:
+              type: object
+              required: [act_as, allow]
+              properties:
+                act_as:
+                  type: array
+                  description: >
+                    Which ancestor scopes this actor may act_as
+                    within this domain. Must be subset of ancestry.
+                  items:
+                    type: string
+                    example: domain.usa
+                allow:
+                  type: array
+                  description: >
+                    List of allowed action types (verbs).
+                  items:
+                    type: string
+                    example: ["read", "write", "invite", "transfer"]
+                deny:
+                  type: array
+                  description: >
+                    Explicitly denied actions (takes precedence).
+                  items:
+                    type: string
+                    example: ["freeze.override"]
+                conditions:
+                  type: array
+                  description: >
+                    Optional runtime conditions (Jikka context expressions).
+                  items:
+                    type: object
+                    properties:
+                      when:
+                        type: string
+                        description: >
+                          Logical expression evaluated at runtime
+                          (e.g., jikka.trust_score > 0.8)
+                      reason:
+                        type: string
+                        description: Human-readable rationale.
+
+example:
+  version: 1.0
+  rules:
+    - selector:
+        by: domain.usa.wisconsin
+        actor_type: person
+        match: group:admins
+      permissions:
+        act_as: [domain.usa, domain.terra]
+        allow: ["read", "write", "invite", "transfer"]
+        deny: ["freeze.override"]
+    - selector:
+        by: domain.usa
+        actor_type: person
+        match: "*"
+      permissions:
+        act_as: [domain.usa]
+        allow: ["read"]

@@ -54,7 +54,7 @@ func (s *Server) Mux() *http.ServeMux { return s.mux }
 
 // handlePing is a simple health endpoint for API status checks.
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	JSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"message": "DIS node alive",
 	})
@@ -62,7 +62,7 @@ func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 
 // handleInfo reports basic build and version info.
 func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
+	JSON(w, http.StatusOK, map[string]any{
 		"version": "0.9.3",
 		"core":    "DIS-Core",
 	})
@@ -110,7 +110,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		status["receipts"] = "unknown"
 		status["health"] = "red"
 		addRuntimeMetrics(status)
-		writeJSON(w, http.StatusOK, status)
+		JSON(w, http.StatusOK, status)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// --- Add runtime metrics
 	addRuntimeMetrics(status)
 
-	writeJSON(w, http.StatusOK, status)
+	JSON(w, http.StatusOK, status)
 }
 
 // helper: convert bytes to MB
@@ -230,7 +230,7 @@ func (s *Server) WithSchemas(reg *schema.Registry) *Server {
 // handleSchemaList returns all registered schema IDs and versions as JSON.
 func (s *Server) handleSchemaList(w http.ResponseWriter, r *http.Request) {
 	if s.schemas == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "schema registry unavailable"})
+		JSON(w, http.StatusServiceUnavailable, map[string]any{"error": "schema registry unavailable"})
 		return
 	}
 	type schemaInfo struct {
@@ -241,7 +241,7 @@ func (s *Server) handleSchemaList(w http.ResponseWriter, r *http.Request) {
 	for _, e := range s.schemasEntries() {
 		out = append(out, schemaInfo{ID: e.ID, Version: e.Version})
 	}
-	writeJSON(w, http.StatusOK, out)
+	JSON(w, http.StatusOK, out)
 }
 
 // schemasEntries returns all schema entries in the registry.

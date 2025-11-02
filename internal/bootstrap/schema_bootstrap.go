@@ -33,6 +33,7 @@ func BootstrapAllTables(dbConn *sql.DB) error {
 		{"handshakes", db.EnsureHandshakesSchema},
 		{"import_receipts", ledger.EnsureImportReceiptsSchema},
 		{"receipts", db.EnsureReceiptsSchema},
+		{"import_warnings", db.EnsureImportWarningsTable},
 	}
 
 	for _, step := range steps {

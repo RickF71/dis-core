@@ -26,6 +26,12 @@ meta:
     - "This schema defines how legitimate authority is instantiated."
     - "Every Seat action must produce a verifiable receipt."
     - "Phantom and Shadow interactions require bindings through oversight."
+  principles:
+    - "Every domain automatically includes an Authoritant Seat."
+    - "The Authoritant Seat is the minimal structure required for a domain to hold authority."
+    - "Through this Seat, a domain can issue receipts, enact policies, and participate in the Sea of Consent."
+    - "A domain without an active Seat cannot exercise or delegate authority."
+
 
 # ============================================================
 # 1. SEAT STRUCTURE
@@ -124,3 +130,25 @@ seat:
   commentary: >
     Seats define where and how authority is instantiated inside DIS.
     They maintain continuity between individual consent and institutional action.
+
+# ============================================================
+# 7. EXTENDED AUTHORITANT INTEGRATION (DIS v0.9.8+)
+# ============================================================
+
+  authoritant_extension:
+    enabled: true
+    notes:
+      - "Seats now serve as operational nodes for Authoritants within the Sea of Consent."
+      - "Each occupied seat must be traceable to a living Authoritant whose consent receipts remain valid."
+      - "A seat’s authority exists in time, not merely by record—its legitimacy decays if not renewed."
+
+  rules:
+    - seat_must_trace_to_authoritant: true
+    - authoritant_consent_must_refresh_periodically: true
+
+  commentary: >
+    Under the Authoritant Republic model, each Seat is more than a static office.
+    It is a living interface through which temporal consent becomes structured
+    authority. Legislative, judicial, and executive seats all operate as
+    specialized Authoritant nodes, their legitimacy synchronized by consent
+    renewal and decay intervals defined in domain policy.

@@ -47,7 +47,7 @@ func (s *Server) handleGetFlowRule(w http.ResponseWriter, r *http.Request) {
 		Aggregation: "product",
 		Threshold:   0.05,
 	}
-	writeJSON(w, http.StatusOK, rule)
+	JSON(w, http.StatusOK, rule)
 }
 
 // handleUpdateFlowRule accepts a new rule from Finagler (JSON body).
@@ -58,7 +58,7 @@ func (s *Server) handleUpdateFlowRule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// TODO: Persist rule to database or var/rules cache
-	writeJSON(w, http.StatusOK, map[string]any{
+	JSON(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"saved":  true,
 	})
@@ -71,7 +71,7 @@ func (s *Server) handleFlowStatus(w http.ResponseWriter, r *http.Request) {
 		{"domain": "government", "kappa": 0.76, "mode": "civic"},
 		{"domain": "terra", "kappa": 0.88, "mode": "ecological"},
 	}
-	writeJSON(w, http.StatusOK, status)
+	JSON(w, http.StatusOK, status)
 }
 
 // handleFlowSimulate performs a simple propagation calculation.
@@ -103,7 +103,7 @@ func (s *Server) handleFlowSimulate(w http.ResponseWriter, r *http.Request) {
 		mag = 0
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	JSON(w, http.StatusOK, map[string]any{
 		"result":      mag,
 		"base":        req.Base,
 		"path":        req.Path,

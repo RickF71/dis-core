@@ -1,0 +1,76 @@
+# ===============================================================
+#  schema: authoritant.link.v1
+#  Purpose:
+#     Defines a verified link between two or more Authoritant entities.
+#     Used for federated consent, cross-domain recognition, or
+#     coordinated validation between independent authorization domains.
+# ===============================================================
+meta:
+  schema_id: authoritant.link.v1
+  schema_version: v0.9.5
+  links_to:
+    - authoritant.definition.v1
+    - schema.definition.v1
+    - jikka.shared-core.triad.v1
+
+description: >
+  An Authoritant Link represents a recognized and verified relationship
+  between multiple authorization domains. It allows authority to
+  flow *through* the link for validation or recognition without
+  altering its origin, ownership, or moral lineage.
+
+fields:
+  - name: link_id
+    type: string
+    required: true
+    description: Unique identifier for this link instance.
+  - name: members
+    type: array
+    required: true
+    items:
+      type: string
+      description: Authoritant identifiers participating in the link.
+  - name: initiator
+    type: string
+    required: true
+    description: Authoritant that initiated the link formation.
+  - name: signatures
+    type: map
+    description: >
+      Each participant provides a cryptographic signature confirming
+      acceptance of the link. Key = Authoritant ID, Value = signature string.
+  - name: link_type
+    type: string
+    required: true
+    enum: [peer, federation, relay]
+    description: >
+      peer: equal bilateral recognition
+      federation: multi-party shared validation field
+      relay: unidirectional validation forwarding
+  - name: ttl
+    type: string
+    description: >
+      Optional time-to-live for this link, e.g. "72h" or ISO8601 duration.
+  - name: proof_hash
+    type: string
+    required: true
+    description: SHA256 hash of the link declaration payload.
+  - name: created_at
+    type: timestamp
+    required: true
+  - name: expires_at
+    type: timestamp
+    description: Optional expiration time.
+  - name: status
+    type: string
+    enum: [forming, active, expired, revoked]
+    default: forming
+  - name: notes
+    type: string
+    description: Optional freeform commentary on the link’s purpose or context.
+
+notes: >
+  An Authoritant.Link enables interoperability between authorization domains
+  without hierarchy or absorption. It is a recognition bridge — not a
+  chain of command. The Jikka Shared Core validates coherence, but does
+  not gain or exert authority over the participants.

@@ -23,7 +23,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 		dataDir := resolveDataDir() // environment-driven path
 		idents, err := db.ListIdentities(s.db, 100, 0)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{
+			JSON(w, http.StatusInternalServerError, map[string]any{
 				"error":   "failed to list identities",
 				"details": err.Error(),
 				"dataDir": dataDir,
@@ -31,7 +31,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]any{
+		JSON(w, http.StatusOK, map[string]any{
 			"status":     "ok",
 			"count":      len(idents),
 			"dataDir":    dataDir,
@@ -47,7 +47,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 			Namespace string `json:"namespace"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
+			JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON body"})
 			return
 		}
 		if input.Namespace == "" {
@@ -56,7 +56,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 
 		uid := uuid.NewString()
 		if _, err := db.InsertIdentity(s.db, uid, input.Namespace); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{
+			JSON(w, http.StatusInternalServerError, map[string]string{
 				"error":   "failed to insert identity",
 				"details": err.Error(),
 			})
@@ -65,7 +65,7 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 
 		// Optional: log to stdout for confirmation
 		repoRoot := os.Getenv("DIS_REPO_ROOT")
-		writeJSON(w, http.StatusCreated, map[string]string{
+		JSON(w, http.StatusCreated, map[string]string{
 			"status":    "created",
 			"dis_uid":   uid,
 			"namespace": input.Namespace,
@@ -74,6 +74,6 @@ func (s *Server) handleIdentities(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		JSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 	}
 }

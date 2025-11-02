@@ -1,0 +1,84 @@
+# ============================================================
+#  domain.null/core.domain-services.v1.yaml
+#  Canon: domain.services.schema.v1
+#  Purpose:
+#     Defines the universal domain service substrate that every domain inherits.
+# ============================================================
+
+type: domain.infrastructure.v1
+domain: domain.null
+version: 0.1
+canon: true
+
+infrastructure:
+  id: core.domain-services
+  name: "Core Domain Service Substrate"
+  description: >
+    The minimal, canonical infrastructure required for any domain to exist
+    within the DISTREE. Guarantees operational readiness and consistent
+    communication with parent and child domains. Each module is replaceable
+    via domain plug-ins satisfying the same interface.
+
+  lifecycle:
+    init:
+      - provision identity
+      - provision membership registry
+      - provision communication channel
+      - provision governance seat
+      - provision audit ledger
+    update:
+      - refresh schema inheritance
+      - sync parent canon policies
+    terminate:
+      - archive receipts
+      - notify parent
+
+  services:
+    - id: identity
+      description: "Provides identity binding and member registry."
+      interface: domain.identity.v1
+      implementation: dis.internal.identity
+      replaceable: true
+
+    - id: membership
+      description: "Handles joining, leaving, and status changes of users."
+      interface: domain.membership.v1
+      implementation: dis.internal.membership
+      replaceable: true
+      permissions:
+        add_member: seat_of_authority
+        remove_member: seat_of_authority
+        list_members: domain.admin
+        view_self: all
+      events:
+        - domain.member.add.v1
+        - domain.member.remove.v1
+        - domain.member.status.v1
+      audit:
+        log: true
+        receipt_type: ci.call.v1
+
+    - id: communication
+      description: "Provides domain message substrate for inter-domain communication."
+      interface: domain.communication.v1
+      implementation: dis.internal.comms
+      replaceable: true
+
+    - id: governance
+      description: "Provides local seat-of-authority decision interface."
+      interface: domain.governance.v1
+      implementation: dis.internal.governance
+      replaceable: true
+
+    - id: audit
+      description: "Provides receipt logging, freeze events, and CI provenance."
+      interface: domain.audit.v1
+      implementation: dis.internal.ledger
+      replaceable: true
+
+  inheritance:
+    propagate_to_children: true
+    allow_overrides: true
+
+  compliance:
+    required_for_activation: true

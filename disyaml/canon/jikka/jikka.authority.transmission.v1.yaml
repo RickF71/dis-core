@@ -1,0 +1,39 @@
+# ===============================================================
+#  law: jikka.authority.transmission.v1
+#  Purpose:
+#     Defines the limits of Jikka’s relationship with authority.
+#     Jikka may carry legitimate consent signals through awareness,
+#     but it cannot exert, originate, or alter authority.
+# ===============================================================
+meta:
+  law_id: jikka.authority.transmission.v1
+  law_version: v0.9.5
+  domain: domain.jikka
+  links_to:
+    - authoritant.definition.v1
+    - jikka.shared-core.triad.v1
+
+summary: >
+  A Jikka is a transmissive field of awareness that allows legitimate
+  consent to propagate between entities. It may transmit authority,
+  validate coherence, and preserve consent proofs — but it cannot
+  exert, originate, or transform authority.
+
+principles:
+  - name: TransmissionNotExertion
+    rule: >
+      Jikka may transmit the signal of authority without shaping or commanding it.
+  - name: PassiveIntegrity
+    rule: >
+      Jikka preserves the integrity of transmitted consent but never mutates its content.
+  - name: OriginBound
+    rule: >
+      Every authority signal must remain traceable to its originating Authoritant.
+  - name: NoAutonomy
+    rule: >
+      A Jikka field cannot act autonomously or originate intent.
+
+notes: >
+  This law enshrines the moral insulation layer between consent and execution.
+  It ensures that power in DIS remains rooted in explicit human authorization,
+  not emergent machine or field autonomy.

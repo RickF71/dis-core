@@ -10,6 +10,7 @@ import (
 
 // CreateSchema lays down all base DIS-CORE tables for PostgreSQL.
 func CreateSchema(db *sql.DB) error {
+	var err error
 	schema := []string{
 		`CREATE TABLE IF NOT EXISTS receipts (
 		       id SERIAL PRIMARY KEY,
@@ -65,10 +66,29 @@ func CreateSchema(db *sql.DB) error {
 	}
 
 	for _, stmt := range schema {
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err = db.Exec(stmt); err != nil {
 			return fmt.Errorf("schema creation failed: %w", err)
 		}
 	}
+
+	// --- Import Warnings Table ---
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS import_warnings (
+			id SERIAL PRIMARY KEY,
+			file_path TEXT,
+			type TEXT,
+			domain TEXT,
+			schema_type TEXT,
+			details TEXT,
+			resolved BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			resolved_at TIMESTAMPTZ
+	);
+	`)
+	if err != nil {
+		return fmt.Errorf("create import_warnings table: %w", err)
+	}
+	fmt.Println("✅ import_warnings table ready")
 
 	fmt.Println("✅ PostgreSQL schema initialized.")
 	return nil

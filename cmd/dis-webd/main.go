@@ -161,7 +161,7 @@ func main() {
 	}
 
 	// Open ledger
-	led, err := ledger.Open(cfg.DatabaseDSN, db)
+	led, err := ledger.Open(cfg.DatabaseDSN, db, reg)
 	if err != nil {
 		log.Fatalf("open ledger: %v", err)
 	}

@@ -1,0 +1,58 @@
+# ===============================================================
+#  schema: jikka.network.router.v1
+#  Purpose:
+#     Defines how Jikka fields transmit consent proofs,
+#     legitimacy packets, and awareness updates between Shared Core nodes.
+# ===============================================================
+meta:
+  schema_id: jikka.network.router.v1
+  schema_version: v0.9.5
+  links_to:
+    - jikka.shared-core.triad.v1
+    - schema.definition.v1
+
+description: >
+  The Jikka Router schema defines the structural rules for transmitting
+  proofs, consent receipts, and domain-awareness packets across a Shared
+  Core network. It specifies how legitimacy signals are routed through
+  awareness fields without alteration of origin or meaning.
+
+fields:
+  - name: source
+    type: string
+    required: true
+    description: Domain or node identifier originating the transmission.
+  - name: target
+    type: string
+    required: true
+    description: Destination domain or node receiving the message.
+  - name: route_policy
+    type: string
+    required: true
+    enum: [direct, relay, distributed]
+    description: >
+      Transmission mode:
+      - direct: direct awareness link
+      - relay: passed through intermediary Shared Cores
+      - distributed: broadcast to multiple awareness nodes
+  - name: proof_hash
+    type: string
+    required: true
+    description: SHA256 hash of the transmitted consent proof.
+  - name: created_at
+    type: timestamp
+    required: true
+    description: Timestamp of transmission initiation.
+  - name: ttl
+    type: string
+    description: >
+      Optional time-to-live for this legitimacy packet, e.g. "48h".
+  - name: signature
+    type: string
+    description: Optional cryptographic signature verifying authenticity.
+
+notes: >
+  The Jikka Router performs message routing but has no authority to act
+  on the transmitted content. It serves as the transmission substrate
+  of the DIS awareness network — ensuring that legitimacy can move
+  without mutation or command.

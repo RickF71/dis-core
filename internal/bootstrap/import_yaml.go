@@ -32,7 +32,21 @@ func ImportYAML(root string, dbConn *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(info.Name(), ".yaml") {
+
+		name := info.Name()
+
+		// Skip directories entirely
+		if info.IsDir() {
+			return nil
+		}
+
+		// Skip hidden files or editor/system artifacts
+		if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+			return nil
+		}
+
+		// Only process YAML or YML files
+		if !(strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml")) {
 			return nil
 		}
 
@@ -55,7 +69,7 @@ func ImportYAML(root string, dbConn *sql.DB) error {
 			return nil
 		}
 
-		fmt.Printf("✅ Imported %s\n", path)
+		//fmt.Printf("✅ Imported %s\n", path)
 		count++
 		return nil
 	})
