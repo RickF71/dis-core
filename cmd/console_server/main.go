@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"dis-core/internal/api"
 	"dis-core/internal/console"
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
@@ -299,6 +300,10 @@ func main() {
 	// =======================================
 	// === POST /api/verify/external (peers) ===
 	// =======================================
+
+	http.HandleFunc("/domain_asset", api.ServeDomainAsset)
+	http.HandleFunc("/domain_asset_meta", api.ServeDomainAssetMeta)
+
 	http.HandleFunc("/api/verify/external", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

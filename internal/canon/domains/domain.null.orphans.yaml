@@ -1,0 +1,23 @@
+# ============================================================
+# DOMAIN.NULL.ORPHANS — Default Neutral Space for Unattached Persons
+# ============================================================
+
+meta:
+  name: Orphan Domain
+  domain_id: domain.null.orphans
+  schema_id: domain.orphan.v1
+  description: >
+    Default neutral space for unattached identities.
+    Provides minimal structure for consent and safe persistence.
+  schema_version: 1.0
+
+consent:
+  gate: dis_consent.v0.1
+  quorum: single
+  feedback_loop: disabled
+
+rooms:
+  default:
+    description: "Initial holding room for new participants"
+    visibility: private
+    membership: automatic

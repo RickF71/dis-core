@@ -5,8 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"dis-core/internal/events"
+	"dis-core/internal/bus"
 	"dis-core/internal/ledger"
+	"dis-core/internal/model"
 	"dis-core/internal/rules"
 )
 
@@ -62,12 +63,26 @@ func (b *DomainBrain) Stop() {
 }
 
 func (b *DomainBrain) processCycle() {
-	evts := events.FetchRecent(b.DomainID)
+	evts := bus.FetchRecent(b.DomainID)
+
 	for _, e := range evts {
-		action := b.Ruleset.Decide(e)
-		if action.Receipt {
-			ledger.EmitReflexiveReceipt(b.DomainID, e, action)
+		// Convert bus.Event -> model.DisEvent
+		modelEvent := model.DisEvent{
+			ID:        0, // not persisted yet
+			TS:        e.CreatedAt,
+			Type:      model.DisEventType(e.Type),
+			Actor:     e.Source,
+			Payload:   []byte("{}"), // optional: encode e.Context here if you like
+			Signature: "",
 		}
+
+		// Now decide and log using the model-level event
+		action := b.Ruleset.Decide(modelEvent)
+
+		if action.Receipt {
+			ledger.EmitReflexiveReceipt(b.DomainID, modelEvent, action)
+		}
+
 		b.updateState(action)
 	}
 }

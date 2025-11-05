@@ -14,8 +14,9 @@ func (s *Server) registerReconcileRoutes() {
 	mux.HandleFunc("/api/reconcile/schemas", s.handleReconcileSchemas)
 	mux.HandleFunc("/api/reconcile/domains", s.handleReconcileDomains)
 	mux.HandleFunc("/api/reconcile/apply", s.handleReconcileApply)
+	mux.HandleFunc("/api/reconcile/list", reconcile.HandleListPending)
 
-	log.Println("✅ Reconcile routes registered")
+	log.Println("✅ Reconcile routes registered---/api/reconcile/**")
 }
 
 // ------------------------------------------------------------

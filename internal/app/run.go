@@ -3,6 +3,7 @@ package app
 import (
 	"dis-core/internal/api"
 	"dis-core/internal/bootstrap"
+	"dis-core/internal/canon"
 	"dis-core/internal/config"
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
@@ -16,15 +17,6 @@ import (
 )
 
 // Run initializes and starts the DIS-Core service.
-//
-// This phase performs:
-//  1. Config + DB setup
-//  2. Schema & ledger initialization
-//  3. Bootstrap table and YAML imports
-//  4. Policy engine setup
-//  5. API + MirrorSpin startup
-//
-// No canon logic is loaded here — only mutable bootstrap state.
 func Run() error {
 	// ============================================================
 	// 1. CONFIGURATION
@@ -38,7 +30,8 @@ func Run() error {
 	// ============================================================
 	// 2. DATABASE CONNECTION
 	// ============================================================
-	database, err := db.Connect(cfg)
+	dsn := cfg.DatabaseURL()
+	database, err := db.ConnectDSN(dsn)
 	if err != nil {
 		return err
 	}
@@ -48,21 +41,29 @@ func Run() error {
 	// ============================================================
 	// 3. SCHEMA REGISTRY
 	// ============================================================
-	reg := schema.NewRegistry()
+	schemaReg := schema.NewRegistry()
 
-	// Load core and domain schemas
-	if err := reg.LoadDir("./disyaml/schemas"); err != nil {
+	if err := schemaReg.LoadDir("./disyaml/schemas"); err != nil {
 		log.Printf("⚠️  Core schema load failed: %v", err)
 	}
-	if err := reg.LoadDir("./disyaml/domains"); err != nil {
+	if err := schemaReg.LoadDir("./disyaml/domains"); err != nil {
 		log.Printf("⚠️  Domain schema load failed: %v", err)
 	}
-	log.Printf("📘 Loaded %d schemas into registry", len(reg.ByKey()))
+	log.Printf("📘 Loaded %d schemas into registry", len(schemaReg.ByKey()))
+
+	// ============================================================
+	// 3.5 CANON REGISTRY AND THEME BOOTSTRAP
+	// ============================================================
+	canonReg := &canon.Registry{DB: database}
+
+	log.Println("🌍 Bootstrapping canonical domain themes...")
+	canon.BootstrapThemes(canonReg)
+	log.Println("✅ Canonical domain themes seeded (Terra + USA).")
 
 	// ============================================================
 	// 4. LEDGER INITIALIZATION
 	// ============================================================
-	led, err := ledger.Open(cfg.DatabaseDSN, database, reg)
+	led, err := ledger.Open(cfg.DatabaseDSN, database, schemaReg)
 	if err != nil {
 		return err
 	}
@@ -71,7 +72,7 @@ func Run() error {
 
 	// Preload domains into the ledger memory view
 	domainDir := filepath.Join(".", "disyaml/domains")
-	if err := led.BootstrapDomains(reg, domainDir); err != nil {
+	if err := led.BootstrapDomains(schemaReg, domainDir); err != nil {
 		log.Printf("⚠️  Domain bootstrap failed: %v", err)
 	} else {
 		log.Println("✅ Domains loaded into ledger")
@@ -82,18 +83,14 @@ func Run() error {
 	// ============================================================
 	log.Println("🚀 Starting bootstrap phase...")
 
-	// 5.1 Ensure all tables exist
 	if err := bootstrap.BootstrapAllTables(database); err != nil {
 		return fmt.Errorf("bootstrap tables: %w", err)
 	}
-
-	// 5.2 Import YAMLs into bootstrap table
 	if err := bootstrap.ImportYAML(".", database); err != nil {
 		log.Printf("⚠️  Bootstrap import failed: %v", err)
 	} else {
 		log.Println("✅ Bootstrap YAML import complete")
 	}
-
 	log.Println("🎯 Bootstrap phase complete.")
 
 	// ============================================================

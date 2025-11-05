@@ -18,7 +18,7 @@ type Config struct {
 	RepoRoot           string `yaml:"repo_root"`
 
 	// PostgreSQL connection string, e.g.:
-	// postgres://user:pass@localhost:5432/dis_core?sslmode=disable
+	// postgres://user:pass@localhost:5432/dis?sslmode=disable
 	DatabaseDSN string `yaml:"database_dsn"`
 
 	Version string // DIS-Core version for startup log
@@ -72,7 +72,7 @@ func Load(path string) (*Config, error) {
 		if env := os.Getenv("DIS_DB_DSN"); env != "" {
 			c.DatabaseDSN = env
 		} else {
-			c.DatabaseDSN = "postgres://dis_user:card567@localhost:5432/dis_core?sslmode=disable"
+			c.DatabaseDSN = ""
 		}
 	}
 

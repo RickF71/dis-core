@@ -1,0 +1,14 @@
+id: domain.governments.usa
+type: government
+derived_from: domain.lima.government
+overlay:
+  target: domain.terra
+  layer: civic
+  shape_ref: overlays/geo/countries/usa.geojson
+metadata:
+  name: United States of America
+  iso2: US
+  iso3: USA
+  region: North America
+  subregion: Northern America
+  flag: "\U0001F1FA\U0001F1F8"

@@ -1,0 +1,27 @@
+type: dis.coin.mint_policy.v1
+version: v1.0
+description: >
+  Policy for issuing DIS-Coin only as reward for verified network operation.
+fields:
+  - name: proof_ref
+    type: receipt_ref
+    required: true
+  - name: operator
+    type: dis_uid
+    required: true
+  - name: operation_type
+    type: string
+    enum: [hosting, coherence_maintenance, relay, audit, enforcement]
+  - name: reward
+    type: float
+    description: Amount of DIS-Coin granted.
+
+policy:
+  on_mint:
+    - validate: "issuer == domain.civitas.bank"
+    - validate: "proof_ref.type in ['dis.node.operation.v1','dis.object.coherence.v1']"
+    - validate: "reward <= domain.civitas.bank.policy.reward_cap"
+    - emit: "dis.coin.mint.v1"
+  on_request:
+    - deny_reason: "deny:purchase:not_allowed"
+status: draft

@@ -1,0 +1,38 @@
+meta:
+  name: "Rick Personal Domain"
+  domain_id: "domain.user.rick"
+  schema_id: "domain.person"
+  schema_version: "v1.0"
+  description: "Rick’s personal sovereign domain root."
+
+parents:
+  - "domain.usa"
+  - "domain.terra"
+
+seats:
+  - id: "seat.root"
+    holder: "rick"
+    type: "root"
+    authority: "authoritant"
+    description: "Root seat and primary moral agent for this domain."
+    permissions:
+      - manage_visuals
+      - manage_subdomains
+      - manage_identity
+
+settings:
+  visual:
+    border_color: "#FFD60A"
+    border_style: "solid"
+    border_width: "8px"
+  permissions:
+    allow_self_override: true
+
+interface:
+  dis_css:
+    ref: "domain.terra"
+    append: |
+      body {
+        border-top: 8px solid limegreen !important;
+        background-color: #f0fff0;
+      }

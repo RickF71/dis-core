@@ -1,0 +1,50 @@
+# ============================================================
+# DOMAIN.ORPHAN v1.0 — Transitional / Holding Domain Schema
+# ============================================================
+meta:
+  schema_id: domain.orphan.v1
+  version: 1.0
+  description: >
+    Transitional schema for unattached identities (orphans).
+    Ensures safety, persistence, and minimal consent structures
+    until a civic or personal domain adopts the person.
+
+intent:
+  category: transitional
+  purpose: "Provide safe neutral space for unattached persons."
+  lifecycle: "temporary"
+
+consent:
+  gate: dis_consent.v0.1
+  quorum: single
+  feedback_loop: disabled
+  visibility: limited
+
+inheritance:
+  parent: domain.null
+  children_allowed: false
+  transfer_rules:
+    - allow: join.civic
+    - allow: join.personal
+    - deny: freeze.override
+
+rooms:
+  default:
+    description: "Orphan domain default room"
+    join_policy: automatic
+    leave_policy: manual
+    moderation: system
+
+rights:
+  - "read.global.public"
+  - "post.orphan.self"
+  - "request.join.domain"
+  - "receive.civic.invite"
+
+obligations:
+  - "must.acknowledge.code.of.conduct"
+  - "must.establish.binding.within.30d"
+
+status:
+  freezeable: true
+  auditable: true

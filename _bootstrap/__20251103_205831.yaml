@@ -1,0 +1,34 @@
+interface:
+  dis_css:
+    append: |
+      body {
+        border-top: 8px solid limegreen !important;
+        background-color: #f0fff0;
+      }
+    ref: domain.terra
+meta:
+  description: Rick’s personal sovereign domain root.
+  domain_id: domain.user.rick
+  name: Rick Personal Domain
+  schema_id: domain.person
+  schema_version: v1.0
+parents:
+- domain.usa
+- domain.terra
+seats:
+- authority: authoritant
+  description: Root seat and primary moral agent for this domain.
+  holder: rick
+  id: seat.root
+  permissions:
+  - manage_visuals
+  - manage_subdomains
+  - manage_identity
+  type: root
+settings:
+  permissions:
+    allow_self_override: true
+  visual:
+    border_color: '#FFD60A'
+    border_style: solid
+    border_width: 8px

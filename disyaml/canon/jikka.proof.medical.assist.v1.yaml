@@ -1,0 +1,12 @@
+type: jikka.proof.medical.assist.v1
+description: >
+  Authorized temporary assist/stabilization mode during a human agency emergency
+  when medical_failsafe is enabled in the proof.
+fields:
+  - proof_id: proof_id
+  - trigger_event: event_ref
+  - scope: list(string)
+  - duration: duration
+  - policy_ref: string
+  - created_at: timestamp
+status: draft

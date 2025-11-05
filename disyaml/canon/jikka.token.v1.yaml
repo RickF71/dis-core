@@ -1,0 +1,29 @@
+type: jikka.token.v1
+description: >
+  Live, reflexive token representing an active human authorization.
+  All actions performed through this token are logged as receipts and
+  merged back into the human's personal domain upon integration.
+fields:
+  - name: id
+    type: string
+  - name: owner
+    type: dis_uid
+  - name: activated_at
+    type: timestamp
+  - name: expires_at
+    type: timestamp
+  - name: active
+    type: bool
+  - name: domain_scope
+    type: list(string)
+  - name: actions
+    type: list(object)
+    description: Recorded acts taken under this token.
+  - name: signatures
+    type: map(string,string)
+metadata:
+  renewable: true
+  transferable: false
+  visible: peers
+  indexed: ["owner", "activated_at"]
+status: draft

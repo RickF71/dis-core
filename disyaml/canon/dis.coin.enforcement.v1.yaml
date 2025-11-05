@@ -1,0 +1,32 @@
+type: dis.coin.enforcement.v1
+version: v1.0
+description: >
+  Policy for validating and enforcing DIS-Coin substrate operations.
+policy:
+  on_mint:
+    - validate: "issuer == domain.civitas.bank"
+    - validate: "total_issued + amount <= reserve_limit"
+    - emit: "dis.coin.audit.v1"
+
+  on_transfer:
+    - validate: "sender.balance >= amount"
+    - validate: "receiver != sender"
+    - emit: "ci.call.v1"
+
+  on_convert:
+    - validate: "issuer == domain.civitas.bank"
+    - validate: "conversion_rate within civic_limits"
+    - emit: "dis.coin.audit.v1"
+
+  on_freeze:
+    - if: "fraud_detected || systemic_risk"
+      action: "domain.freeze.v1"
+      reason: "deny:coin:fraud_or_risk"
+
+minset5:
+  identity_binding: true
+  non_bypass: true
+  signed_receipt: true
+  ci_provenance: dis.coin.enforcement.v1
+  policy_ref: dis.coin.enforcement.v1
+status: draft

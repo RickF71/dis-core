@@ -1,0 +1,44 @@
+authority:
+  seats:
+  - constraints:
+    - consent_gate_required
+    holder: 33333333-3333-4333-8333-333333333333
+    id: s_governor
+    powers:
+    - execute_policy
+    - manage_budget
+    - appoint_officers
+    term: P4Y
+    title: Governor
+  - constraints:
+    - ethics_gate_required
+    holder: 44444444-4444-4444-8444-444444444444
+    id: s_legislature
+    powers:
+    - pass_laws
+    - allocate_funds
+    term: P2Y
+    title: State Legislature
+boundaries:
+  audit_interval: P6M
+  no_automation:
+  - budget_vote
+  - judicial_appointment
+  - emergency_order
+consent:
+  feedback_loop: moral_feedback.v0.1
+  gate: dis_consent.v0.1
+  quorum: simple_majority
+meta:
+  description: |
+    State domain within the United States, exercising delegated sovereignty under the DIS model. Bound to domain.usa and inherits ethical and consent frameworks from its parent.
+  domain_id: domain.us.wisconsin
+  name: domain.us.wisconsin
+  schema_id: domain.government
+  schema_version: domain.governance.v1.1
+  uuid: b7e2e2e2-8c2e-4e2e-9e2e-2e2e2e2e2e2e
+relations:
+  parent_domain: domain.usa
+  peer_domains:
+  - domain.us.illinois
+  - domain.us.minnesota

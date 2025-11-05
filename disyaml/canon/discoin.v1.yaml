@@ -1,0 +1,26 @@
+type: discoin.v1
+version: v1.0
+description: >
+  The base boundary currency of DIS.  Used for civic and infrastructural
+  operations and may be exchanged with external fiat systems under regulation.
+fields:
+  - name: issuer
+    type: domain_ref
+    default: domain.civitas.bank
+  - name: owner
+    type: dis_uid
+  - name: balance
+    type: float
+  - name: last_transaction
+    type: timestamp
+  - name: status
+    type: string
+    enum: [active, frozen, closed]
+policy:
+  on_transfer:
+    - validate: "sender.balance >= amount"
+    - action: "credit receiver, debit sender"
+  on_freeze:
+    - action: "set status=frozen"
+status: draft
+created_at: 2025-11-04T00:00:00Z

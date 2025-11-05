@@ -1,0 +1,23 @@
+type: jikka.proof.enforcement.v1
+description: >
+  Jikka reflexive enforcement policy.  Responds to agency emergencies by
+  freezing or restricting systems under the affected proof.
+policy:
+  conditions:
+    - name: agency_emergency
+      match: jikka.alert.agency_emergency.v1
+      actions:
+        - if: "proof.medical_failsafe.enabled && event.recommended_action == 'assist'"
+          emit: jikka.proof.medical.assist.v1
+        - else: true
+          emit: jikka.proof.freeze.v1
+  override:
+    event: jikka.proof.override.v1
+    quorum: "2-of-3-human"
+minset5:
+  identity_binding: true
+  non_bypass: true
+  signed_receipt: true
+  ci_provenance: jikka.proof.enforcement.v1
+  policy_ref: jikka.proof.enforcement.v1
+status: draft

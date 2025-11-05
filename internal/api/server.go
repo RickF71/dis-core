@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"runtime"
@@ -11,11 +13,11 @@ import (
 
 	"dis-core/internal/config"
 	"dis-core/internal/domain"
+	"dis-core/internal/events"
 	"dis-core/internal/ledger"
 	"dis-core/internal/overlay"
 	"dis-core/internal/policy"
 	"dis-core/internal/schema"
-	//"dis-core/internal/schema"
 )
 
 // WithLedger sets the Ledger pointer and returns the server (chainable)
@@ -52,21 +54,13 @@ type Server struct {
 // Mux returns the internal HTTP mux for this server.
 func (s *Server) Mux() *http.ServeMux { return s.mux }
 
-// handlePing is a simple health endpoint for API status checks.
-func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{
-		"status":  "ok",
-		"message": "DIS node alive",
-	})
-}
-
 // handleInfo reports basic build and version info.
-func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{
-		"version": "0.9.3",
-		"core":    "DIS-Core",
-	})
-}
+// func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
+// 	JSON(w, http.StatusOK, map[string]any{
+// 		"version": "0.9.3",
+// 		"core":    "DIS-Core",
+// 	})
+// }
 
 // =====================================================
 //  /api/health — Node health, runtime, and subsystem status
@@ -262,6 +256,42 @@ func (s *Server) schemasEntriesMap() map[string]schema.Entry {
 		return nil
 	}
 	return s.schemas.ByKey()
+}
+
+// HandleEventsLive streams domain events as SSE for Finagler's live map
+func (s *Server) HandleEventsLive(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// --- demo: alternate between freeze / unfreeze every few seconds
+	states := []events.DisEventType{"domain.freeze.v1", "domain.unfreeze.v1"}
+	idx := 0
+
+	for {
+		ev := events.DisEvent{
+			ID:        idx,
+			TS:        time.Now(),
+			Type:      states[idx%len(states)],
+			Actor:     "domain.usa",
+			Payload:   []byte(fmt.Sprintf(`{"domain":"domain.usa","state":"%s"}`, states[idx%len(states)])),
+			Signature: "",
+		}
+
+		bytes, _ := json.Marshal(ev)
+		fmt.Fprintf(w, "event: domain.update\n")
+		fmt.Fprintf(w, "data: %s\n\n", string(bytes))
+		flusher.Flush()
+
+		idx++
+		time.Sleep(4 * time.Second)
+	}
 }
 
 func (s *Server) Run(ctx context.Context) error {

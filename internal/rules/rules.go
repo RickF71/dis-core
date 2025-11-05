@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"dis-core/internal/events"
+	"dis-core/internal/model"
 	"log"
 	"strings"
 )
@@ -32,10 +32,10 @@ type BehaviorSet struct {
 	Rules []BehaviorRule
 }
 
-// Decide interprets an incoming event using matching rules.
-func (bs *BehaviorSet) Decide(e events.Event) Action {
+// Decide interprets an incoming DisEvent using matching rules.
+func (bs *BehaviorSet) Decide(e model.DisEvent) Action {
 	for _, r := range bs.Rules {
-		if r.EventType == e.Type && matchCondition(r.Condition, e.Context) {
+		if r.EventType == string(e.Type) {
 			log.Printf("🧩 Rule matched: %s (%s)", r.ID, e.Type)
 			return r.Action
 		}
@@ -45,6 +45,7 @@ func (bs *BehaviorSet) Decide(e events.Event) Action {
 }
 
 // matchCondition performs a simple string equality check for now.
+// (Kept for later use when DisEvent gains a Context map)
 func matchCondition(cond string, ctx map[string]any) bool {
 	if cond == "" {
 		return true

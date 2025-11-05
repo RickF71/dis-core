@@ -1,0 +1,35 @@
+type: jikka.receipt.integration.v1
+version: v1.0
+description: >
+  A reflexive receipt issued by domain.jikka when a token successfully
+  integrates its ledger into a personal domain.  Confirms closure of
+  the active session and immutably seals all actions performed.
+
+fields:
+  - name: token_id
+    type: string
+    required: true
+  - name: owner
+    type: dis_uid
+    required: true
+  - name: merged_actions
+    type: integer
+    required: true
+  - name: hash
+    type: string
+    required: true
+  - name: policy_ref
+    type: string
+    default: jikka.integrate.v1
+  - name: created_at
+    type: timestamp
+    required: true
+
+minset5:
+  identity_binding: true
+  non_bypass: true
+  signed_receipt: true
+  ci_provenance: jikka.integrate.v1
+  policy_ref: jikka.integrate.v1
+status: draft
+created_at: 2025-11-04T00:00:00Z

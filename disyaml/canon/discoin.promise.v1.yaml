@@ -1,0 +1,38 @@
+type: discoin.promise.v1
+version: v1.0
+description: >
+  Creates a conditional promise of Discoin payment for a real-world or
+  cross-domain service.  Discoin is released only when the promised
+  service is verified as delivered.
+fields:
+  - name: promisor
+    type: dis_uid
+  - name: promisee
+    type: dis_uid
+  - name: amount
+    type: float
+  - name: proof_of_work
+    type: receipt_ref
+    description: "Reference to verification of service completion."
+  - name: due_date
+    type: timestamp
+  - name: status
+    type: string
+    enum: [open, fulfilled, cancelled, expired]
+    default: open
+
+policy:
+  on_fulfill:
+    - validate: "proof_of_work.valid == true"
+    - action: "transfer amount from promisor to promisee"
+    - emit: "discoin.transfer.v1"
+  on_cancel:
+    - action: "mark status=cancelled"
+  on_expire:
+    - validate: "now() > due_date"
+    - action: "mark status=expired"
+metadata:
+  transferable: false
+  auditable: true
+  indexed: ["promisor", "promisee", "status"]
+status: draft

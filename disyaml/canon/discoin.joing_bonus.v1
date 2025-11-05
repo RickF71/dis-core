@@ -1,0 +1,37 @@
+type: discoin.join_bonus.v1
+version: v1.0
+description: >
+  Grants a one-time 1 000 discoin bonus to each newly rooted human domain.
+  Triggered automatically by terra.person.giveroot.v1 proof.
+fields:
+  - name: dis_uid
+    type: dis_uid
+    required: true
+  - name: proof_ref
+    type: receipt_ref
+    required: true
+  - name: amount
+    type: float
+    default: 1000.0
+  - name: issuer
+    type: domain_ref
+    default: domain.civitas.bank
+  - name: status
+    type: string
+    enum: [pending, issued, revoked]
+    default: pending
+
+policy:
+  on_giveroot:
+    - validate: "proof_ref.type == 'terra.person.giveroot.v1'"
+    - validate: "not previously_issued(dis_uid)"
+    - action: "credit dis_uid.account with amount"
+    - emit: "dis.coin.mint.v1"
+  on_revoke:
+    - action: "debit dis_uid.account amount"
+    - emit: "dis.coin.burn.v1"
+metadata:
+  renewable: false
+  transferable: false
+  indexed: ["dis_uid", "status"]
+status: draft

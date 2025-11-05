@@ -19,13 +19,23 @@ func (s *Server) RegisterAPIs() {
 	// ============================================================
 	//  CORE / SYSTEM ROUTES
 	// ============================================================
+	// Live event stream for Finagler map demo
+	mux.HandleFunc("/api/events/live", s.HandleEventsLive)
+
 	mux.HandleFunc("/api/ping", s.handlePing)
-	mux.HandleFunc("/api/info", s.handleInfo)
+	mux.HandleFunc("/api/info", s.handleDomainInfo)
 	mux.HandleFunc("/api/health", s.handleHealth)
 
 	// Status & domain metadata
 	mux.HandleFunc("/api/status", s.handleStatus)
+
+	mux.HandleFunc("/api/domain/dis/", s.handleDisDomainGet)
+	mux.HandleFunc("/api/domain/meta", s.handleDomainMeta)
 	mux.HandleFunc("/api/domain/info", s.handleDomainInfo)
+	mux.HandleFunc("/api/domain/list", s.handleDomainList)
+	mux.HandleFunc("/api/domain/theme/", s.handleDomainTheme)
+
+	mux.HandleFunc("/api/bootstrap/canonize", s.handleBootstrapCanonize)
 
 	// Identity management
 	mux.HandleFunc("/api/identities", s.handleIdentities)
@@ -69,12 +79,15 @@ func (s *Server) RegisterAPIs() {
 	// ============================================================
 	//  ADDITIONAL ROUTE GROUPS
 	// ============================================================
-	registerFlowAPI(s)           // workflow orchestration
-	s.registerImportListRoute()  // import list
-	s.registerImportRoutes()     // import POST
-	s.registerNetworkRoutes()    // peer/network layer
-	s.registerDBRoutes()         // DB diagnostics
-	s.registerVersionRoutes()    // version info
-	s.registerMirrorSpinRoutes() // mirror spin test
-	s.registerReconcileRoutes()  // reconciliation endpoints
+	registerFlowAPI(s)              // workflow orchestration
+	s.registerImportListRoute()     // import list
+	s.registerImportRoutes()        // import POST
+	s.registerNetworkRoutes()       // peer/network layer
+	s.registerDBRoutes()            // DB diagnostics
+	s.registerVersionRoutes()       // version info
+	s.registerMirrorSpinRoutes()    // mirror spin test
+	s.registerReconcileRoutes()     // reconciliation endpoints
+	s.registerFileRoutes()          // virtual file API
+	s.registerRuntimeDomainRoutes() // domain CSS/JS management
+
 }

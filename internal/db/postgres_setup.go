@@ -34,15 +34,28 @@ func CreateSchema(db *sql.DB) error {
 
 		// Updated domains table schema with JSONB 'data' column and new structure
 		`CREATE TABLE IF NOT EXISTS domains (
+				-- internal row identity
 				id TEXT PRIMARY KEY,
-				parent_id TEXT,
-				name TEXT NOT NULL UNIQUE,
+
+				-- sovereign identity (FDN)
+				long_path_name TEXT UNIQUE NOT NULL,
+
+				-- parent via sovereign lineage
+				parent_long_path TEXT NOT NULL,
+
+				-- leaf name only (can collide)
+				name TEXT NOT NULL,
+
+				-- domain schema linkage
+				schema_long_path TEXT NOT NULL,
+
 				data JSONB DEFAULT '{}'::jsonb,
 				is_notech BOOLEAN NOT NULL DEFAULT FALSE,
 				requires_inside_domain BOOLEAN NOT NULL DEFAULT TRUE,
+
 				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-				FOREIGN KEY (parent_id) REFERENCES domains(id)
-			);`,
+				FOREIGN KEY (parent_long_path) REFERENCES domains(long_path_name)
+		);`,
 
 		`CREATE TABLE IF NOT EXISTS handshakes (
 				id SERIAL PRIMARY KEY,
