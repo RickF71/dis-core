@@ -1,18 +1,21 @@
 package api
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type cascadeNode struct {
-	ID       string         `json:"id"`
-	DomainID string         `json:"domain_id"`
-	ParentID sql.NullString `json:"-"`
-	CSS      string         `json:"css"`
+	ID       string      `json:"id"`
+	DomainID string      `json:"domain_id"`
+	ParentID pgtype.Text `json:"-"`
+	CSS      string      `json:"css"`
 }
 
 type cascadeResp struct {
@@ -28,6 +31,7 @@ func (s *Server) handleDomainCascade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/")
 	ref = strings.TrimSuffix(ref, "/cascade")
 	ref = strings.TrimSpace(ref)
@@ -37,13 +41,13 @@ func (s *Server) handleDomainCascade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve ref → internal id
-	internalID, err := s.resolveDomainInternalID(ref)
+	internalID, err := s.resolveDomainInternalID(ctx, ref)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	chain, err := s.buildCascadeChain(internalID)
+	chain, err := s.buildCascadeChain(ctx, internalID)
 	if err != nil {
 		http.Error(w, "cascade error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -69,18 +73,18 @@ func (s *Server) handleDomainCascade(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildCascadeChain returns nodes from ROOT→ACTIVE (domain.null at index 0)
-func (s *Server) buildCascadeChain(internalID string) ([]cascadeNode, error) {
+func (s *Server) buildCascadeChain(ctx context.Context, internalID string) ([]cascadeNode, error) {
 	// Walk up: active → root
 	var up []cascadeNode
 	curr := internalID
 	for {
 		var n cascadeNode
-		err := s.DB().QueryRow(`
+		err := s.DB().QueryRow(ctx, `
 			SELECT id, COALESCE(domain_id, ''), parent_id, COALESCE(css, '')
 			FROM domains
 			WHERE id = $1
 		`, curr).Scan(&n.ID, &n.DomainID, &n.ParentID, &n.CSS)
-		if err == sql.ErrNoRows {
+		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("domain not found (id=%s)", curr)
 		}
 		if err != nil {

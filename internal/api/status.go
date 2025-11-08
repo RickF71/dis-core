@@ -1,11 +1,13 @@
 package api
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // BuildVersion is optionally injected at build time:
@@ -37,18 +39,19 @@ func (s *Server) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	// --- Safe DB queries ---
 	if s.DB != nil {
-		if err := s.DB().QueryRow(`SELECT COUNT(*) FROM canon WHERE type='domain'`).Scan(&resp.Domains); err != nil && err != sql.ErrNoRows {
+		ctx := context.Background() // TODO: pass request context through
+		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM canon WHERE type='domain'`).Scan(&resp.Domains); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
 		}
-		if err := s.DB().QueryRow(`SELECT COUNT(*) FROM receipts`).Scan(&resp.Receipts); err != nil && err != sql.ErrNoRows {
+		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM receipts`).Scan(&resp.Receipts); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
 		}
-		if err := s.DB().QueryRow(`SELECT COUNT(*) FROM schemas`).Scan(&resp.Schemas); err != nil && err != sql.ErrNoRows {
+		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM schemas`).Scan(&resp.Schemas); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
 		}
 
 		startPing := time.Now()
-		if err := s.DB().Ping(); err == nil {
+		if err := s.DB().Ping(ctx); err == nil {
 			resp.DBLatency = time.Since(startPing).Milliseconds()
 		} else {
 			resp.DBLatency = -1

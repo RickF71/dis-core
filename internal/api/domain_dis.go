@@ -1,11 +1,14 @@
 package api
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // DisBundle represents the resolved visual layer for a domain.
@@ -27,6 +30,7 @@ func (s *Server) handleDomainDIS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	domainID := strings.TrimPrefix(r.URL.Path, "/api/domain/dis/")
 	domainID = strings.TrimSpace(domainID)
 	if domainID == "" {
@@ -35,7 +39,7 @@ func (s *Server) handleDomainDIS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var raw json.RawMessage
-	err := s.Ledger().DB.QueryRow(
+	err := s.Ledger().DB.QueryRow(ctx,
 		`SELECT content
 		   FROM canon
 		  WHERE type = 'domain'
@@ -44,7 +48,7 @@ func (s *Server) handleDomainDIS(w http.ResponseWriter, r *http.Request) {
 	).Scan(&raw)
 
 	switch {
-	case err == sql.ErrNoRows:
+	case err == pgx.ErrNoRows:
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return
 
@@ -73,6 +77,7 @@ func (s *Server) resolveInterface(domainID string) (string, string, error) {
 }
 
 func (s *Server) resolveInterfaceRecursive(domainID string, seen map[string]bool, depth int) (string, string, error) {
+	ctx := context.Background() // TODO: pass context through
 	if depth <= 0 {
 		return "", "", fmt.Errorf("too many nested refs (possible loop)")
 	}
@@ -81,8 +86,8 @@ func (s *Server) resolveInterfaceRecursive(domainID string, seen map[string]bool
 	}
 	seen[domainID] = true
 
-	var cssRaw, jsxRaw sql.NullString
-	err := s.Ledger().DB.QueryRow(`
+	var cssRaw, jsxRaw pgtype.Text
+	err := s.Ledger().DB.QueryRow(ctx, `
 		SELECT
 		  content->'interface'->'dis_css',
 		  content->'interface'->'dis_jsx'
@@ -91,7 +96,7 @@ func (s *Server) resolveInterfaceRecursive(domainID string, seen map[string]bool
 		  AND content->'meta'->>'domain_id' = $1
 	`, domainID).Scan(&cssRaw, &jsxRaw)
 
-	if err == sql.ErrNoRows {
+	if err == pgx.ErrNoRows {
 		return "", "", fmt.Errorf("domain not found: %s", domainID)
 	}
 	if err != nil {

@@ -1,11 +1,11 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // DomainInput is what the client sends in JSON
@@ -17,6 +17,7 @@ type DomainInput struct {
 
 // POST /api/domain
 func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	var input DomainInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -26,8 +27,8 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 	// Validate parent if provided
 	if input.ParentID != nil {
 		var exists bool
-		err := s.DB().QueryRow(`SELECT true FROM domains WHERE id = $1`, *input.ParentID).Scan(&exists)
-		if err == sql.ErrNoRows {
+		err := s.DB().QueryRow(ctx, `SELECT true FROM domains WHERE id = $1`, input.ParentID.String()).Scan(&exists)
+		if err == pgx.ErrNoRows {
 			http.Error(w, "parent not found", http.StatusBadRequest)
 			return
 		}
@@ -40,10 +41,16 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 	// Generate a new UUID for the domain
 	newID := uuid.New()
 
-	_, err := s.DB().Exec(`
+	var parentIDStr *string
+	if input.ParentID != nil {
+		s := input.ParentID.String()
+		parentIDStr = &s
+	}
+
+	_, err := s.DB().Exec(ctx, `
 		INSERT INTO domains (id, parent_id, data)
 		VALUES ($1, $2, $3)
-	`, newID, input.ParentID, input.Data)
+	`, newID.String(), parentIDStr, input.Data)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -51,11 +58,11 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var d Domain
-	err = s.DB().QueryRow(`
+	err = s.DB().QueryRow(ctx, `
 		SELECT id, parent_id, data, created_at, updated_at
 		FROM domains
 		WHERE id = $1
-	`, newID).Scan(&d.ID, &d.ParentID, &d.Data, &d.CreatedAt, &d.UpdatedAt)
+	`, newID.String()).Scan(&d.ID, &d.ParentID, &d.Data, &d.CreatedAt, &d.UpdatedAt)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

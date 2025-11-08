@@ -1,12 +1,12 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // Domain represents a single domain record.
@@ -20,6 +20,7 @@ type Domain struct {
 
 // GET /api/domain/{id}
 func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	idParam := r.PathValue("id")
 	idParam = strings.TrimSpace(idParam)
 
@@ -35,14 +36,14 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 
 	// Try as UUID if possible
 	if _, parseErr := uuid.Parse(idParam); parseErr == nil {
-		err = s.DB().QueryRow(`
+		err = s.DB().QueryRow(ctx, `
 			SELECT id::text, parent_id::text, data, created_at, updated_at
 			FROM domains
 			WHERE id = $1::uuid
 		`, idParam).Scan(&d.ID, &d.ParentID, &d.Data, &d.CreatedAt, &d.UpdatedAt)
 	} else {
 		// Treat it as canonical domain ID (e.g. "domain.null")
-		err = s.DB().QueryRow(`
+		err = s.DB().QueryRow(ctx, `
 			SELECT id, parent_id, data, created_at, updated_at
 			FROM domains
 			WHERE id = $1
@@ -50,7 +51,7 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch {
-	case err == sql.ErrNoRows:
+	case err == pgx.ErrNoRows:
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return
 	case err != nil:
