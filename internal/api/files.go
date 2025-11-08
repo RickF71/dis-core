@@ -40,7 +40,7 @@ func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := s.db.Query(`
+	rows, err := s.DB().Query(`
 		SELECT id, rel_path, filename,
 		       octet_length(content) AS size,
 		       COALESCE(exported_to, '') AS exported_to,
@@ -100,7 +100,7 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		var filename, relPath string
 		var content []byte
 
-		if err := s.db.QueryRow(`
+		if err := s.DB().QueryRow(`
 			SELECT filename, rel_path, content
 			FROM bootstrap_files WHERE id = $1
 		`, id).Scan(&filename, &relPath, &content); err != nil {
@@ -141,7 +141,7 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			decoded = body
 		}
 
-		_, err = s.db.Exec(`UPDATE bootstrap_files SET content = $1 WHERE id = $2`, decoded, id)
+		_, err = s.DB().Exec(`UPDATE bootstrap_files SET content = $1 WHERE id = $2`, decoded, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -173,7 +173,7 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	like := "%" + strings.ToLower(query) + "%"
-	rows, err := s.db.Query(`
+	rows, err := s.DB().Query(`
 		SELECT id, rel_path, filename,
 		       octet_length(content) AS size,
 		       COALESCE(exported_to, '') AS exported_to,
@@ -259,10 +259,10 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 			SET exported_to = $%d, exported_at = NOW()
 			WHERE id IN (%s) AND exported_to IS NULL
 		`, len(args), strings.Join(placeholders, ","))
-		result, err = s.db.Exec(q, args...)
+		result, err = s.DB().Exec(q, args...)
 	} else {
 		// Single update by rel_path
-		result, err = s.db.Exec(`
+		result, err = s.DB().Exec(`
 			UPDATE bootstrap_files
 			SET exported_to = $1, exported_at = NOW()
 			WHERE rel_path = $2 AND exported_to IS NULL

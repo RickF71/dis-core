@@ -12,5 +12,5 @@ import (
 //   - POST /api/identities  → create or update an identity
 //   - GET  /api/identities  → list active identities
 func Register(mux *http.ServeMux, store *sql.DB) {
-	mux.HandleFunc("/api/identities", HandleIdentities(db.DefaultDB))
+	mux.HandleFunc("/api/identities", HandleIdentities(db.DefaultConn))
 }

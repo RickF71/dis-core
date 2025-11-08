@@ -36,7 +36,7 @@
       "receipts": "dis-core/internal/receipts",
       "schema": "dis-core/internal/schema",
       "net": "dis-core/internal/net",
-      "api": "dis-core/internal/api"
+      "api": "dis-core/internal/api/server"
     },
     "prompt_tone": "act as a collaborator inside the DIS development team: proactive, reflective, and grounded in the DIS ethos (amplify power, never authorize it).",
     "edit_preferences": {

@@ -1,4 +1,4 @@
-package api
+package main
 
 import (
 	"bytes"
@@ -54,17 +54,24 @@ func main() {
 	ac := console.NewConsole("domain.terra", "DIS-CORE v1.0", seats)
 	console.LoadLastVerification()
 
-	// Load network configuration
-	netCfg, err := console.LoadNetworkConfig("versions/v0.7/network.yaml")
+	// --- Connect to Postgres ---
+	dsn := "postgres://dis_user@localhost/dis?sslmode=disable"
+	dbConn, err := db.ConnectPostgres(dsn)
 	if err != nil {
-		log.Fatalf("❌ Failed to load network config: %v", err)
+		log.Fatalf("❌ Failed to connect to database: %v", err)
+	}
+	defer dbConn.Close()
+
+	// --- Load network peers (slice of peers) ---
+	netCfg, err := db.LoadNetworkPeers(dbConn)
+	if err != nil {
+		log.Fatalf("❌ Failed to load network peers: %v", err)
 	}
 
-	// Load or create the trust ledger
-	ledgerPath := "versions/v0.7/ledger/trust.json"
-	trust, err := ledger.LoadTrustLedger(ledgerPath)
+	// --- Open trust ledger (DB-backed) ---
+	trust, err := ledger.OpenTrustLedger(dbConn)
 	if err != nil {
-		log.Fatalf("❌ Failed to load trust ledger: %v", err)
+		log.Fatalf("❌ Failed to open trust ledger: %v", err)
 	}
 
 	// --- Background 30-minute verification loop ---
@@ -92,10 +99,11 @@ func main() {
 		for {
 			log.Println("🌍 Heartbeat: publishing latest verification receipt to peers...")
 
-			// Find the most recent domain.verify.v1 receipt
+			// TEMP (file-based): Find the most recent domain.verify receipt to broadcast
 			dir := "versions/v0.6/receipts/generated"
 			var latestFile string
 			var latestTime time.Time
+
 			filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 				if err == nil && !d.IsDir() && strings.HasSuffix(d.Name(), ".json") {
 					if info, err := os.Stat(path); err == nil && info.ModTime().After(latestTime) {
@@ -119,9 +127,9 @@ func main() {
 				continue
 			}
 
-			// Broadcast to trusted peers
-			for _, peer := range netCfg.Peers {
-				if peer.TrustLevel != "trusted" {
+			// --- Broadcast to trusted peers ---
+			for _, peer := range netCfg {
+				if strings.ToLower(peer.TrustLevel) != "trusted" {
 					continue
 				}
 
@@ -138,17 +146,21 @@ func main() {
 				if err != nil {
 					entry.Status = "unreachable"
 					entry.Notes = err.Error()
-					trust.Add(entry)
+					_ = trust.Add(entry)
 					log.Printf("🌐 Failed to reach %s (%s): %v", peer.Name, peer.URL, err)
 					continue
 				}
-				//defer resp.Body.Close()
 
 				var result map[string]any
-				_ = json.NewDecoder(resp.Body).Decode(&result)
-				entry.Status = "ok"
-				trust.Add(entry)
+				if decodeErr := json.NewDecoder(resp.Body).Decode(&result); decodeErr != nil {
+					entry.Status = "decode_error"
+					entry.Notes = decodeErr.Error()
+				} else {
+					entry.Status = "ok"
+				}
+				resp.Body.Close()
 
+				_ = trust.Add(entry)
 				log.Printf("🤝 Heartbeat result for %s: %v", peer.Name, result)
 			}
 
@@ -194,12 +206,12 @@ func main() {
 			http.DefaultServeMux.ServeHTTP(rw, reportReq)
 
 			var report map[string]any
-			json.Unmarshal(rw.data, &report)
+			_ = json.Unmarshal(rw.data, &report)
 			resp["verification_report"] = report
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 
 		log.Printf("✅ Action %s logged from %s\n", act.Type, req.Initiator)
 	})
@@ -213,7 +225,7 @@ func main() {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(ac)
+		_ = json.NewEncoder(w).Encode(ac)
 	})
 
 	// ===========================
@@ -228,7 +240,7 @@ func main() {
 		dir := "versions/v0.6/receipts/generated"
 		files := []string{}
 
-		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 			if err == nil && !d.IsDir() && strings.HasSuffix(d.Name(), ".json") {
 				files = append(files, filepath.Base(path))
 			}
@@ -236,7 +248,7 @@ func main() {
 		})
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"receipts": files})
+		_ = json.NewEncoder(w).Encode(map[string]any{"receipts": files})
 	})
 
 	// ===================================
@@ -266,7 +278,7 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(data)
+		_, _ = w.Write(data)
 	})
 
 	// ======================================
@@ -294,13 +306,12 @@ func main() {
 			"verification_receipt":    receipt,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	// =======================================
 	// === POST /api/verify/external (peers) ===
 	// =======================================
-
 	http.HandleFunc("/domain_asset", api.ServeDomainAsset)
 	http.HandleFunc("/domain_asset_meta", api.ServeDomainAssetMeta)
 
@@ -315,7 +326,7 @@ func main() {
 			http.Error(w, "invalid JSON body", http.StatusBadRequest)
 			return
 		}
-		defer r.Body.Close()
+		_ = r.Body.Close()
 
 		log.Printf("🤝 Received external verification receipt from peer")
 		resp := map[string]any{
@@ -324,7 +335,7 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	log.Println("🌐 DIS Authority Console API listening on :8080")

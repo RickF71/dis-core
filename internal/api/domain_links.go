@@ -1,32 +1,55 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 )
 
-// GET /api/domain/links
+// ------------------------------------------------------------
+//
+//	GET /api/domain/links — returns parent→child relationships
+//	using the new JSONB domains table
+//
+// ------------------------------------------------------------
 func (s *Server) handleDomainLinks(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.Ledger.DB.Query(`
-		SELECT content->'meta'->>'domain_id' AS child,
-		       content->'meta'->>'parent' AS parent
-		FROM canon
-		WHERE type='domain' AND content->'meta' ? 'parent'
+	rows, err := s.DB().Query(`
+		SELECT
+			data->>'domain_id' AS child,
+			data->>'parent_name' AS parent
+		FROM domains
+		WHERE (data->>'parent_name') IS NOT NULL
+		      AND (data->>'parent_name') <> ''
 	`)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	var links []map[string]string
+	type Link struct {
+		Source string `json:"source"`
+		Target string `json:"target"`
+	}
+
+	links := []Link{}
 	for rows.Next() {
 		var child, parent string
-		rows.Scan(&child, &parent)
-		if parent != "" {
-			links = append(links, map[string]string{"source": child, "target": parent})
+		if err := rows.Scan(&child, &parent); err != nil {
+			http.Error(w, "scan error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if child != "" && parent != "" {
+			links = append(links, Link{Source: child, Target: parent})
 		}
 	}
+	if err := rows.Err(); err != nil && err != sql.ErrNoRows {
+		http.Error(w, "iteration error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(links)
+	if err := json.NewEncoder(w).Encode(links); err != nil {
+		http.Error(w, "encode error: "+err.Error(), http.StatusInternalServerError)
+	}
 }

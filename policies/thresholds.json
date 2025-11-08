@@ -1,7 +1,0 @@
-{
-  "description": "Threshold settings",
-  "version": "0.9.2",
-  "thresholds": {
-    "risk_allow_threshold": 0.75
-  }
-}

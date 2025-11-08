@@ -26,19 +26,19 @@ func (s *Server) resolveDomainInternalID(ref string) (string, error) {
 	var id string
 
 	// Try DB internal ID first
-	err := s.db.QueryRow(`SELECT id FROM domains WHERE id=$1`, ref).Scan(&id)
+	err := s.DB().QueryRow(`SELECT id FROM domains WHERE id=$1`, ref).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
 
 	// Try DIS longname style (domain_id)
-	err = s.db.QueryRow(`SELECT id FROM domains WHERE domain_id=$1`, ref).Scan(&id)
+	err = s.DB().QueryRow(`SELECT id FROM domains WHERE domain_id=$1`, ref).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
 
 	// Try the "name" column as last fallback
-	err = s.db.QueryRow(`SELECT id FROM domains WHERE name=$1`, ref).Scan(&id)
+	err = s.DB().QueryRow(`SELECT id FROM domains WHERE name=$1`, ref).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
@@ -46,44 +46,9 @@ func (s *Server) resolveDomainInternalID(ref string) (string, error) {
 	return "", fmt.Errorf("domain not found: %s", ref)
 }
 
-// ---- GET /api/domain/{id} ----
-// Returns CSS + JSX for Finagler to apply the domain theme
-func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
-	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/")
-	if ref == "" {
-		http.Error(w, "missing domain id", http.StatusBadRequest)
-		return
-	}
-
-	// Resolve internal UUID/id first
-	internalID, err := s.resolveDomainInternalID(ref)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	var resp DomainResponse
-	err = s.db.QueryRow(
-		`SELECT domain_id, COALESCE(css, ''), COALESCE(jsx, '')
-		   FROM domains WHERE id=$1`,
-		internalID,
-	).Scan(&resp.DomainID, &resp.CSS, &resp.JSX)
-
-	if err == sql.ErrNoRows {
-		http.Error(w, "domain not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		http.Error(w, fmt.Sprintf("db error: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
-}
-
 // ---- PUT /api/domain/{id}/css ----
 // Saves CSS for a domain (your editor calls this)
+// POST /api/domain/{id}/css
 func (s *Server) handleUpdateDomainCSS(w http.ResponseWriter, r *http.Request) {
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/")
 	ref = strings.TrimSuffix(ref, "/css")
@@ -93,40 +58,44 @@ func (s *Server) handleUpdateDomainCSS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "read body error", http.StatusBadRequest)
-		return
-	}
-
 	var payload struct {
 		CSS string `json:"css"`
 	}
-	if err := json.Unmarshal(body, &payload); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
+	if payload.CSS == "" {
+		http.Error(w, "empty CSS not allowed", http.StatusBadRequest)
+		return
+	}
 
-	// Resolve to internal ID
+	// Resolve UUID if needed (your helper supports both name and id)
 	internalID, err := s.resolveDomainInternalID(ref)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	// Update row
-	_, err = s.db.Exec(
-		`UPDATE domains SET css=$1 WHERE id=$2`,
-		payload.CSS, internalID,
-	)
+	//fmt.Printf("DEBUG: updating css for domain %s (internalID=%s)\n", ref, internalID)
+
+	// ✅ Update JSONB field inside "data"
+	_, err = s.DB().Exec(`
+		UPDATE domains
+		   SET data = jsonb_set(
+		     COALESCE(data, '{}'::jsonb),
+		     '{css}',
+		     to_jsonb($1::text)
+		   )
+		 WHERE id = $2
+	`, payload.CSS, internalID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("db error: %v", err), http.StatusInternalServerError)
+		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"ok":true}`))
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, `{"ok":true}`)
 }
 
 // ---- ROUTER ----
@@ -177,7 +146,7 @@ func (s *Server) handleDisDomainGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var raw json.RawMessage
-	err := s.Ledger.DB.QueryRow(
+	err := s.Ledger().DB.QueryRow(
 		`SELECT content
 		   FROM canon
 		  WHERE type = 'domain'
@@ -217,7 +186,7 @@ func (s *Server) handleDomainTheme(w http.ResponseWriter, r *http.Request) {
 
 	// TEMP fake cascade: null base + domain css
 	var css string
-	err = s.db.QueryRow(`SELECT COALESCE(css,'') FROM domains WHERE id=$1`, internalID).Scan(&css)
+	err = s.DB().QueryRow(`SELECT COALESCE(css,'') FROM domains WHERE id=$1`, internalID).Scan(&css)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), 500)
 		return

@@ -5,49 +5,29 @@ import (
 	"os"
 )
 
-// DatabaseURL builds the DSN with proper precedence:
-// 1) Config.DatabaseDSN (config.yaml or loaded config)
-// 2) DIS_DB_DSN env var
-// 3) constructed DSN from component env vars
-// 4) fallback local dev default
-func (c *Config) DatabaseURL() string {
-	// #1 Explicit config value wins
-	if c.DatabaseDSN != "" {
-		return c.DatabaseDSN
-	}
-
-	// #2 Env override
+// DatabaseURL builds the Postgres DSN using environment variables,
+// with sensible local defaults for development.
+func DatabaseURL() string {
+	// 1) Single env var override
 	if env := os.Getenv("DIS_DB_DSN"); env != "" {
 		return env
 	}
 
-	// #3 Construct from ENV pieces or defaults
-	user := os.Getenv("DIS_DB_USER")
-	if user == "" {
-		user = "dis_user"
-	}
-
-	pass := os.Getenv("DIS_DB_PASSWORD")
-	if pass == "" {
-		pass = "card567"
-	}
-
-	host := os.Getenv("DIS_DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-
-	port := os.Getenv("DIS_DB_PORT")
-	if port == "" {
-		port = "5432"
-	}
-
-	name := os.Getenv("DIS_DB_NAME")
-	if name == "" {
-		name = "dis"
-	}
+	// 2) Compose from parts or defaults
+	user := getenvDefault("DIS_DB_USER", "dis_user")
+	pass := getenvDefault("DIS_DB_PASSWORD", "card567")
+	host := getenvDefault("DIS_DB_HOST", "localhost")
+	port := getenvDefault("DIS_DB_PORT", "5432")
+	name := getenvDefault("DIS_DB_NAME", "dis")
 
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		user, pass, host, port, name,
-	)
+		user, pass, host, port, name)
+}
+
+// getenvDefault returns the env value or a fallback default.
+func getenvDefault(key, def string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return def
 }

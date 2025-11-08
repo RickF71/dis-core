@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"dis-core/internal/api"
+	"dis-core/internal/api/server"
 	"dis-core/internal/db"
 )
 
@@ -57,7 +57,7 @@ func HandleIdentities(store *sql.DB) http.HandlerFunc {
 				"namespace":  req.Namespace,
 				"created_at": db.NowRFC3339Nano(),
 			}
-			api.JSON(w, http.StatusCreated, resp)
+			server.JSON(w, http.StatusCreated, resp)
 
 		// === GET /api/identities?limit=50&offset=0 ===
 		case http.MethodGet:
@@ -114,7 +114,7 @@ func HandleIdentities(store *sql.DB) http.HandlerFunc {
 				"count": len(list),
 				"items": list,
 			}
-			api.JSON(w, http.StatusOK, resp)
+			server.JSON(w, http.StatusOK, resp)
 
 		default:
 			http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)

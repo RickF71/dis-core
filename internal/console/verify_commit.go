@@ -35,10 +35,12 @@ func (c *Console) CommitVerification(report VerifyReport) (*ledger.Receipt, erro
 	os.WriteFile(filename, payloadBytes, 0644)
 
 	// Generate the signed receipt
-	r := ledger.NewReceipt(c.BoundDomain, "domain.verify.v1", c.BoundCore, c.ID, c.SeatHolders[0])
-	if err := ledger.SaveReceipt(r); err != nil {
+	r, err := ledger.NewReceipt(c.BoundDomain, "domain.verify.v1", c.BoundCore, c.ID, c.SeatHolders[0])
+	if err != nil {
 		return nil, err
 	}
+	// TODO: Add database connection parameter to save receipt
+	// _ = r.Save(ctx, conn)
 
 	return r, nil
 }

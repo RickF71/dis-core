@@ -15,7 +15,7 @@ func (s *Server) registerDBRoutes() {
 			return
 		}
 
-		status, err := s.Ledger.GetDBStatus()
+		status, err := s.Ledger().GetDBStatus()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

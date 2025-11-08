@@ -264,17 +264,25 @@ func (g *Gate) AuthorizeAction(ctx context.Context, req ConsentRequest) (Decisio
 		return Decision{}, nil, err
 	}
 
-	rcpt := &ledger.Receipt{
-		By:        req.Initiator.ID,
-		Action:    req.Action,
-		CreatedAt: g.timeNow().Format(time.RFC3339Nano),
-		// Optionally fill Provenance, Metadata, etc. if available
-		Metadata: ledger.Metadata{
-			IssuedFromConsole:  "consent-gate",
-			IssuerSeat:         "gate",
-			VerifiedAt:         g.timeNow().Format(time.RFC3339Nano),
-			VerificationMethod: "consent-gate",
-		},
+	// Create receipt using the new Receipt structure
+	metadata := map[string]interface{}{
+		"IssuedFromConsole": "consent-gate",
+		"IssuerSeat":        "gate",
+		"VerifiedAt":        g.timeNow().Format(time.RFC3339Nano),
+	}
+
+	rcpt, err := ledger.NewReceipt(
+		req.Action,       // type
+		req.Initiator.ID, // actor
+		"",               // target
+		"consent",        // domain
+		metadata,         // payload
+	)
+	if err != nil {
+		return Decision{
+			Allowed: false,
+			Reason:  "failed to create receipt: " + err.Error(),
+		}, nil, err
 	}
 
 	// Persist receipt if a poster is configured.

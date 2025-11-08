@@ -75,7 +75,7 @@ func (s *Server) buildCascadeChain(internalID string) ([]cascadeNode, error) {
 	curr := internalID
 	for {
 		var n cascadeNode
-		err := s.db.QueryRow(`
+		err := s.DB().QueryRow(`
 			SELECT id, COALESCE(domain_id, ''), parent_id, COALESCE(css, '')
 			FROM domains
 			WHERE id = $1

@@ -6,21 +6,21 @@ import (
 	"net/http"
 	"time"
 
-	"dis-core/internal/api"
+	apiserver "dis-core/internal/api/server"
 	"dis-core/internal/db"
 )
 
 func buildServer() *http.ServeMux {
-	store := db.DefaultDB
+	store := db.DefaultConn
 	if store == nil {
 		log.Fatal("database not initialized")
 	}
 
-	// If you don't yet load a real config or policy, just pass nil and empty strings
-	s := api.NewServer(nil, nil, store)
+	// Create server with database (ledger will be nil for now)
+	s := apiserver.New(store, nil)
 
 	// The NewServer call already registers all routes and sets up the mux
-	return s.Mux() // We'll add this accessor next if it's missing
+	return s.Handler() // Updated method name
 }
 
 // RunServer starts the HTTP server and listens until context cancel.

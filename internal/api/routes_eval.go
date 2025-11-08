@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
 	"encoding/json"
@@ -25,15 +26,20 @@ func (s *Server) RegisterEvalRoute(engine policy.PolicyEngine) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		receipt := ledger.NewReceipt(
+		ctx := context.Background()
+		receipt, err := ledger.NewReceipt(
 			input["by"].(string),
 			input["action"].(string),
 			"",          // TODO: frozenCoreHash
 			"console-1", // TODO: consoleID
 			"seat-1",    // TODO: issuerSeat
 		)
-		if err := ledger.SaveReceipt(receipt); err != nil {
-			log.Printf("receipt save error: %v", err)
+		if err != nil {
+			log.Printf("receipt creation error: %v", err)
+		} else {
+			if saveErr := receipt.Save(ctx, s.DB()); saveErr != nil {
+				log.Printf("receipt save error: %v", saveErr)
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{

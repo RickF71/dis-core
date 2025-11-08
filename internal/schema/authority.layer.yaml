@@ -1,0 +1,57 @@
+# ============================================================
+# DIS Schema Metadata — Authority Layer
+# ============================================================
+version: 0.9.3
+kind: schema
+name: dis.authority.layer.v0.9.3
+description: >
+  Defines the canonical governance layer of DIS-Core.
+  The Authority Layer is the first active phase of system initialization,
+  where constitutional schema and baseline policies are installed.
+
+fields:
+  - name: schema_ref
+    type: string
+    description: Reference to the canonical authority.console schema (schema.json).
+
+  - name: policies
+    type: array
+    description: >
+      Set of baseline policies forming the governance base.
+      Includes gates.rego, risk.rego, and freeze.rego.
+    items:
+      type: string
+
+  - name: version
+    type: string
+    description: Semantic version of the authority layer bootstrap sequence.
+
+  - name: seeded_at
+    type: timestamp
+    description: Time this authority layer was initialized.
+
+  - name: by
+    type: string
+    description: >
+      DIS identity (id-*) or domain responsible for initialization (usually domain.null).
+
+  - name: hash
+    type: string
+    description: SHA256 hash of combined schema + policy bundle at bootstrap.
+
+defaults:
+  version: "0.9.3"
+  policies: ["gates.rego", "risk.rego", "freeze.rego"]
+  by: "domain.null"
+
+status:
+  active: true
+  canonical: true
+  last_verified: 2025-11-08T00:00:00Z
+
+notes: |
+  The Authority Layer defines the "moment of coherence" for a DIS node —
+  the point where validation (schema) and governance (policy) fuse into
+  a trusted substrate. Every higher domain inherits legitimacy from it.
+
+  “You’ve just added a soul to the machine.”

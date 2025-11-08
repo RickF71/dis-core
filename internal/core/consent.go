@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"time"
 
 	"dis-core/internal/bridge"
-	"dis-core/internal/config"
 	dbpkg "dis-core/internal/db"
 	"dis-core/internal/policy"
 	"dis-core/internal/util/crypto"
@@ -16,7 +17,7 @@ import (
 
 // PerformConsentAction validates policy and inserts a receipt.
 // Returns: receiptID, nonce, createdAt, signature, error
-func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce string, cfg *config.Config, pol *policy.Policy, polSum string) (int64, string, string, string, error) {
+func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce string, pol *policy.Policy, polSum string) (int64, string, string, string, error) {
 	var id string
 	if err := sqlDB.QueryRow("SELECT id FROM identities ORDER BY created_at DESC LIMIT 1").Scan(&id); err != nil {
 		return 0, "", "", "", fmt.Errorf("no identity found, create one first")
@@ -31,10 +32,19 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 	}
 
 	action := "consent:grant"
+
+	// Determine nonce length (env or default)
+	nonceBytes := 16
+	if env := os.Getenv("DIS_NONCE_BYTES"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			nonceBytes = n
+		}
+	}
+
 	nonce := providedNonce
 	if nonce == "" {
 		var genErr error
-		nonce, genErr = crypto.RandomNonce(cfg.NonceBytes)
+		nonce, genErr = crypto.RandomNonce(nonceBytes)
 		if genErr != nil {
 			return 0, "", "", "", genErr
 		}
@@ -45,7 +55,7 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 	// Signature includes policy checksum
 	sig := crypto.Sign(action, id, by, scope, nonce, bridge.CanonicalTime(ts), polSum)
 
-	// 1️⃣ Construct new-style receipt record
+	// Construct receipt record
 	r := &dbpkg.Receipt{
 		ReceiptID: fmt.Sprintf("rcpt-%s", nonce[:8]),
 		SchemaRef: "bridge-receipt-template.v0",

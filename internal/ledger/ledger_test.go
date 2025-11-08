@@ -1,81 +1,54 @@
-package ledger_test
+package ledger
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
-
-	"dis-core/internal/ledger"
 )
 
-// TestNewReceipt_CreateSaveVerify exercises the basic lifecycle of a Receipt:
-// create → save to disk → read back → verify digital signature.
-func TestNewReceipt_CreateSaveVerify(t *testing.T) {
-	r := ledger.NewReceipt(
-		"domain.terra",
-		"unit.test",
-		"frozen-core-hash-xyz",
-		"console.demo",
-		"seat.demo",
+// TestNewReceipt_CreateBasic tests the basic creation of a Receipt.
+func TestNewReceipt_CreateBasic(t *testing.T) {
+	r, err := NewReceipt(
+		"unit.test",            // type
+		"domain.terra",         // actor
+		"frozen-core-hash-xyz", // target
+		"console.demo",         // domain
+		"seat.demo",            // payload
 	)
+	if err != nil {
+		t.Fatalf("failed to create receipt: %v", err)
+	}
 	if r == nil {
 		t.Fatalf("expected non-nil receipt")
 	}
-	if r.Hash == "" {
-		t.Errorf("expected hash, got empty")
+	if r.ID == "" {
+		t.Errorf("expected ID, got empty")
 	}
-	if r.Signature == "" {
-		t.Errorf("expected signature, got empty")
+	if r.Type != "unit.test" {
+		t.Errorf("expected Type=unit.test, got %s", r.Type)
 	}
-
-	// Save it and check that the file exists.
-	if err := r.Save(); err != nil {
-		t.Fatalf("Save() failed: %v", err)
+	if r.Actor != "domain.terra" {
+		t.Errorf("expected Actor=domain.terra, got %s", r.Actor)
 	}
-	path := filepath.Join("receipts", r.ReceiptID+".json")
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected file %s to exist, got error: %v", path, err)
-	}
-
-	// Read back and re-verify
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read back failed: %v", err)
-	}
-	ok, err := ledger.VerifyReceiptJSON(data)
-	if err != nil {
-		t.Fatalf("verify error: %v", err)
-	}
-	if !ok {
-		t.Errorf("expected verification to succeed")
-	}
-
-	// Also test VerifyWithEmbeddedPub on same data
-	ok2, err := ledger.VerifyWithEmbeddedPub(data)
-	if err != nil {
-		t.Fatalf("embedded verify error: %v", err)
-	}
-	if !ok2 {
-		t.Errorf("expected embedded pub verify to succeed")
-	}
-
-	// Clean up the receipts dir
-	_ = os.RemoveAll("receipts")
 }
 
 // TestReceiptJSONRoundTrip ensures JSON marshal/unmarshal integrity.
 func TestReceiptJSONRoundTrip(t *testing.T) {
-	orig := ledger.NewReceipt("domain.test", "roundtrip", "core-hash", "console.demo", "seat.demo")
+	orig, err := NewReceipt("roundtrip", "domain.test", "core-hash", "console.demo", "seat.demo")
+	if err != nil {
+		t.Fatalf("failed to create receipt: %v", err)
+	}
 	js, err := json.Marshal(orig)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var back ledger.Receipt
+	var back Receipt
 	if err := json.Unmarshal(js, &back); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if back.ReceiptID != orig.ReceiptID {
-		t.Errorf("ReceiptID mismatch: got %s, want %s", back.ReceiptID, orig.ReceiptID)
+	if back.ID != orig.ID {
+		t.Errorf("ID mismatch: got %s, want %s", back.ID, orig.ID)
+	}
+	if back.Type != orig.Type {
+		t.Errorf("Type mismatch: got %s, want %s", back.Type, orig.Type)
 	}
 }

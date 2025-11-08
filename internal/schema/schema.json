@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DIS Authority Console Schema",
+  "description": "Defines the canonical shape of authority and consent events within DIS.",
+  "version": "0.9.3",
+  "type": "object",
+  "required": ["actor_ref", "action_ref", "policy_ref", "decision"],
+  "properties": {
+    "actor_ref": {
+      "type": "string",
+      "pattern": "^(id|domain|ai)-[a-zA-Z0-9_.-]+$",
+      "description": "Reference to the actor initiating the action (person, domain, or AI)."
+    },
+    "action_ref": {
+      "type": "string",
+      "pattern": "^[a-z]+\\.[a-z0-9_.-]+\\.v[0-9]+$",
+      "description": "The action event under evaluation (e.g., domain.freeze.v1)."
+    },
+    "policy_ref": {
+      "type": "string",
+      "pattern": "^[a-z]+\\.[a-z0-9_.-]+\\.v[0-9]+$",
+      "description": "Reference to the policy rule or bundle that governs this decision."
+    },
+    "authorization_path": {
+      "type": "array",
+      "description": "Ordered list of consent lineage references that authorized this decision.",
+      "items": {
+        "type": "string",
+        "pattern": "^(id|rcpt|policy)-[a-zA-Z0-9_.-]+$"
+      }
+    },
+    "consent_status": {
+      "type": "string",
+      "enum": ["granted", "revoked", "unknown"],
+      "description": "Consent status at the moment of evaluation."
+    },
+    "decision": {
+      "type": "object",
+      "required": ["outcome", "timestamp"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["allow", "deny", "override"],
+          "description": "Final decision outcome."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable explanation or reason code (e.g., deny:freeze:scope)."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "RFC3339 timestamp of evaluation."
+        },
+        "receipt_ref": {
+          "type": "string",
+          "pattern": "^rcpt-[a-zA-Z0-9_.-]+$",
+          "description": "Link to the receipt object capturing this decision."
+        },
+        "evaluator": {
+          "type": "string",
+          "description": "Optional name of the decision engine (e.g., OPA, Cedar)."
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Optional contextual information (domain, risk, CI details).",
+      "properties": {
+        "domain_ref": { "type": "string" },
+        "risk_score": { "type": "number" },
+        "ci_rule": { "type": "string" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "System metadata such as schema version and provenance.",
+      "properties": {
+        "schema_version": { "type": "string" },
+        "source": { "type": "string" },
+        "hash": { "type": "string" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "actor_ref": "id-rick",
+      "action_ref": "domain.freeze.v1",
+      "policy_ref": "policy.freeze.control.v1",
+      "authorization_path": ["id-rick", "policy.freeze.control.v1"],
+      "consent_status": "granted",
+      "decision": {
+        "outcome": "deny",
+        "reason": "deny:freeze:scope",
+        "timestamp": "2025-11-08T05:00:00Z",
+        "receipt_ref": "rcpt-001"
+      },
+      "context": { "domain_ref": "domain.terra", "risk_score": 0.2 }
+    },
+    {
+      "actor_ref": "id-rick",
+      "action_ref": "ci.call.v1",
+      "policy_ref": "policy.identity.verify.v1",
+      "authorization_path": ["id-rick", "policy.identity.verify.v1"],
+      "consent_status": "granted",
+      "decision": {
+        "outcome": "allow",
+        "timestamp": "2025-11-08T06:00:00Z",
+        "receipt_ref": "rcpt-002"
+      },
+      "context": { "domain_ref": "domain.user.rick" }
+    }
+  ]
+}

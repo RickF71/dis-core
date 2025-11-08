@@ -65,12 +65,13 @@ func (c *Console) LogAction(actionType, policyRef, initiator string) (*ConsoleAc
 	actionID := generateActionID()
 
 	// Generate the receipt via receipts.NewReceipt
-	r := ledger.NewReceipt(c.BoundDomain, actionType, c.BoundCore, c.ID, initiator)
-
-	// Save the receipt to disk under the current version’s receipt folder
-	if err := ledger.SaveReceipt(r); err != nil {
-		return nil, fmt.Errorf("failed to save receipt: %v", err)
+	r, err := ledger.NewReceipt(c.BoundDomain, actionType, c.BoundCore, c.ID, initiator)
+	if err != nil {
+		return nil, err
 	}
+
+	// TODO: Add database connection parameter to save receipt
+	// _ = r.Save(ctx, conn)
 
 	act := ConsoleAction{
 		ID:        actionID,

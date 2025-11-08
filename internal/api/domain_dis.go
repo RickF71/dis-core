@@ -35,7 +35,7 @@ func (s *Server) handleDomainDIS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var raw json.RawMessage
-	err := s.Ledger.DB.QueryRow(
+	err := s.Ledger().DB.QueryRow(
 		`SELECT content
 		   FROM canon
 		  WHERE type = 'domain'
@@ -82,7 +82,7 @@ func (s *Server) resolveInterfaceRecursive(domainID string, seen map[string]bool
 	seen[domainID] = true
 
 	var cssRaw, jsxRaw sql.NullString
-	err := s.Ledger.DB.QueryRow(`
+	err := s.Ledger().DB.QueryRow(`
 		SELECT
 		  content->'interface'->'dis_css',
 		  content->'interface'->'dis_jsx'

@@ -1,302 +1,104 @@
 package api
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"runtime"
-	"runtime/debug"
-	"time"
 
-	"dis-core/internal/config"
-	"dis-core/internal/domain"
-	"dis-core/internal/events"
 	"dis-core/internal/ledger"
-	"dis-core/internal/overlay"
 	"dis-core/internal/policy"
 	"dis-core/internal/schema"
+
+	"github.com/jackc/pgx/v5"
 )
 
-// WithLedger sets the Ledger pointer and returns the server (chainable)
-func (s *Server) WithLedger(led *ledger.Ledger) *Server {
-	s.Ledger = led
-	return s
-}
-
+// TODO: Refactor Server struct to idiomatic Go style.
+// - Use lowercase field names for internal-only data (db, ledger, mux, etc).
+// - Keep fields unexported since this package is internal.
+// - Provide exported getter methods only where needed (e.g., Handler()).
+// - Ensure all references in other files match the new lowercase fields.
+// Server is the core API instance for DIS-Core.
 type Server struct {
-	PolicyEngine policy.PolicyEngine
-	mux          *http.ServeMux
-	db           *sql.DB
-	cfg          *config.Config
-
-	// Core components
-	Ledger *ledger.Ledger
-
-	// Managers (YAML import & domain logic)
-	DomainManager  *domain.Manager
-	SchemaManager  *schema.Manager
-	PolicyManager  *policy.Manager
-	OverlayManager *overlay.Manager // safe to keep even if stub
-
-	// Optional legacy store field (some older routes expect it)
-	Store *ledger.Store
-
-	// Optional logger
-	logger *log.Logger
-
-	// Optional schema registry (for validation)
+	db      *pgx.Conn
+	ledger  *ledger.Ledger
+	mux     *http.ServeMux
 	schemas *schema.Registry
+	logger  *log.Logger
+
+	policy policy.PolicyEngine
 }
 
-// Mux returns the internal HTTP mux for this server.
-func (s *Server) Mux() *http.ServeMux { return s.mux }
-
-// handleInfo reports basic build and version info.
-// func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
-// 	JSON(w, http.StatusOK, map[string]any{
-// 		"version": "0.9.3",
-// 		"core":    "DIS-Core",
-// 	})
-// }
-
-// =====================================================
-//  /api/health — Node health, runtime, and subsystem status
-// =====================================================
-
-// Global start timestamp for uptime calculation.
-var serverStart = time.Now()
-
-// handleHealth performs a comprehensive self-check and reports system status.
-// Exposed at /api/health.
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	status := map[string]any{
-		"core":     "DIS-Core",
-		"version":  s.cfg.Version,
-		"status":   "ok",
-		"health":   "green",
-		"schemas":  0,
-		"domains":  0,
-		"receipts": 0,
-	}
-
-	// --- Schema registry health
-	if s.schemas != nil {
-		status["schemas"] = len(s.schemas.ByKey())
-	} else {
-		status["schemas"] = "unavailable"
-		status["health"] = "yellow"
-	}
-
-	// --- Manager subsystem health
-	status["managers"] = map[string]any{
-		"domain_manager":  healthState(s.DomainManager != nil),
-		"schema_manager":  healthState(s.SchemaManager != nil),
-		"policy_manager":  healthState(s.PolicyManager != nil),
-		"overlay_manager": healthState(s.OverlayManager != nil),
-	}
-
-	// --- Database / Ledger health
-	if s.Ledger == nil || s.Ledger.DB == nil {
-		status["domains"] = "unknown"
-		status["receipts"] = "unknown"
-		status["health"] = "red"
-		addRuntimeMetrics(status)
-		JSON(w, http.StatusOK, status)
-		return
-	}
-
-	// Count registered domains
-	var domainCount int
-	if err := s.Ledger.DB.QueryRow(`SELECT COUNT(*) FROM canon WHERE type = 'domain'`).Scan(&domainCount); err != nil {
-		status["domains"] = "error"
-		status["health"] = "yellow"
-	} else {
-		status["domains"] = domainCount
-	}
-
-	// Count stored receipts
-	var receiptCount int
-	if err := s.Ledger.DB.QueryRow(`SELECT COUNT(*) FROM receipts`).Scan(&receiptCount); err != nil {
-		status["receipts"] = "error"
-		status["health"] = "yellow"
-	} else {
-		status["receipts"] = receiptCount
-	}
-
-	// --- DB ping latency
-	startPing := time.Now()
-	if err := s.Ledger.DB.Ping(); err != nil {
-		status["db_latency_ms"] = "unreachable"
-		status["health"] = "red"
-	} else {
-		status["db_latency_ms"] = time.Since(startPing).Milliseconds()
-	}
-
-	// --- Add runtime metrics
-	addRuntimeMetrics(status)
-
-	JSON(w, http.StatusOK, status)
-}
-
-// helper: convert bytes to MB
-func bToMb(b uint64) float64 { return float64(b) / 1024.0 / 1024.0 }
-
-func addRuntimeMetrics(status map[string]any) {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	// Go version via build info (fallback to "unknown")
-	gov := "unknown"
-	if bi, ok := debug.ReadBuildInfo(); ok && bi != nil && bi.GoVersion != "" {
-		gov = bi.GoVersion
-	}
-
-	// seconds since last GC (guard when LastGC == 0)
-	var lastGCSec float64
-	if m.LastGC != 0 {
-		lastGCSec = time.Since(time.Unix(0, int64(m.LastGC))).Seconds()
-	} else {
-		lastGCSec = -1 // means "no GC yet"
-	}
-
-	status["runtime"] = map[string]any{
-		"uptime":       time.Since(serverStart).Round(time.Second).String(),
-		"goroutines":   runtime.NumGoroutine(),
-		"alloc_mb":     bToMb(m.Alloc),
-		"sys_mb":       bToMb(m.Sys),
-		"heap_objects": m.HeapObjects,
-		"num_gc":       m.NumGC,
-		"last_gc_sec":  lastGCSec,
-		"go_version":   gov,
-		"num_cpu":      runtime.NumCPU(),
-		"arch":         runtime.GOARCH,
-		"os":           runtime.GOOS,
-	}
-}
-
-func healthState(ok bool) string {
-	if ok {
-		return "ok"
-	}
-	return "missing"
-}
-
-// NewServer constructs and initializes a DIS-Core API server.
-func NewServer(cfg *config.Config, led *ledger.Ledger, db *sql.DB) *Server {
+func New(db *pgx.Conn, led *ledger.Ledger) *Server {
 	s := &Server{
-		cfg:     cfg, // <— store config so s.cfg.Version works
-		mux:     http.NewServeMux(),
-		db:      db,
-		Ledger:  led,
-		schemas: nil, // will fill below if ledger has registry
+		db:     db,
+		ledger: led,
+		mux:    http.NewServeMux(),
+		logger: log.Default(),
 	}
 
-	// Initialize store and API routes
-	s.Store = ledger.NewStore(db)
-	s.RegisterAPIs() // reconnect routes from routes.go
-
-	// Try to attach registry from the ledger if available
-	if led != nil {
-		if reg := led.Registry(); reg != nil {
-			s.schemas = reg
-		}
+	// --- Policy engine wiring ---
+	modules := map[string]string{
+		"gates.rego":  "package dis.gates\n default allow = true", // stub content
+		"risk.rego":   "package dis.risk\n default risk = 0",
+		"freeze.rego": "package dis.freeze\n default frozen = false",
+	}
+	eng, err := policy.NewEngine(modules)
+	if err != nil {
+		s.logger.Printf("policy engine init failed: %v", err)
+	} else {
+		s.policy = eng
+		s.logger.Println("policy engine initialized")
 	}
 
-	// Do NOT wrap s.mux with CORS here; wrap at ListenAndServe
+	s.registerRoutes()
 	return s
 }
 
-// WithLogger sets a custom logger and returns the server (chainable)
-func (s *Server) WithLogger(l *log.Logger) *Server {
-	s.logger = l
-	return s
+// registerRoutes sets up all the API routes
+func (s *Server) registerRoutes() {
+	s.RegisterAPIs()
 }
 
-// WithSchemas sets a schema registry and returns the server (chainable)
-func (s *Server) WithSchemas(reg *schema.Registry) *Server {
-	s.schemas = reg
-	return s
+// RegisterRoutes is an alias for registerRoutes for backward compatibility
+func (s *Server) RegisterRoutes() {
+	s.registerRoutes()
 }
 
-// handleSchemaList returns all registered schema IDs and versions as JSON.
-func (s *Server) handleSchemaList(w http.ResponseWriter, r *http.Request) {
-	if s.schemas == nil {
-		JSON(w, http.StatusServiceUnavailable, map[string]any{"error": "schema registry unavailable"})
+// HandleBootstrapStatus provides a bootstrap status endpoint
+func (s *Server) HandleBootstrapStatus(w http.ResponseWriter, r *http.Request) {
+	// Basic status response
+	resp := map[string]interface{}{
+		"status":       "ok",
+		"bootstrapped": true,
+		"timestamp":    "2024-11-07T00:00:00Z",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
+	input := map[string]interface{}{
+		"action": "domain.freeze.v1",
+		"user":   "rick",
+	}
+	decision, err := s.policy.EvaluateAction(input)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	type schemaInfo struct {
-		ID      string `json:"id"`
-		Version string `json:"version"`
-	}
-	var out []schemaInfo
-	for _, e := range s.schemasEntries() {
-		out = append(out, schemaInfo{ID: e.ID, Version: e.Version})
-	}
-	JSON(w, http.StatusOK, out)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(decision)
 }
 
-// schemasEntries returns all schema entries in the registry.
-func (s *Server) schemasEntries() []schema.Entry {
-	if s.schemas == nil {
-		return nil
-	}
-	entries := make([]schema.Entry, 0, len(s.schemasEntriesMap()))
-	for _, e := range s.schemasEntriesMap() {
-		entries = append(entries, e)
-	}
-	return entries
-}
+// Handler returns the underlying HTTP mux for ListenAndServe.
+func (s *Server) Handler() *http.ServeMux { return s.mux }
 
-// schemasEntriesMap returns the byKey map from the registry (read-only).
-func (s *Server) schemasEntriesMap() map[string]schema.Entry {
-	if s.schemas == nil {
-		return nil
-	}
-	return s.schemas.ByKey()
-}
+// DB returns the database connection
+func (s *Server) DB() *pgx.Conn { return s.db }
 
-// HandleEventsLive streams domain events as SSE for Finagler's live map
-func (s *Server) HandleEventsLive(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+// Ledger returns the ledger instance
+func (s *Server) Ledger() *ledger.Ledger { return s.ledger }
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	// --- demo: alternate between freeze / unfreeze every few seconds
-	states := []events.DisEventType{"domain.freeze.v1", "domain.unfreeze.v1"}
-	idx := 0
-
-	for {
-		ev := events.DisEvent{
-			ID:        idx,
-			TS:        time.Now(),
-			Type:      states[idx%len(states)],
-			Actor:     "domain.usa",
-			Payload:   []byte(fmt.Sprintf(`{"domain":"domain.usa","state":"%s"}`, states[idx%len(states)])),
-			Signature: "",
-		}
-
-		bytes, _ := json.Marshal(ev)
-		fmt.Fprintf(w, "event: domain.update\n")
-		fmt.Fprintf(w, "data: %s\n\n", string(bytes))
-		flusher.Flush()
-
-		idx++
-		time.Sleep(4 * time.Second)
-	}
-}
-
-func (s *Server) Run(ctx context.Context) error {
-	// TODO: Start HTTP server, handle graceful shutdown
-	return nil
-}
-
-// TODO: Keep RegisterAPIs() as canonical, and split per-route files as needed.
+// Mux returns the HTTP mux (alias for Handler for backward compatibility)
+func (s *Server) Mux() *http.ServeMux { return s.mux }

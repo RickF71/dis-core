@@ -5,6 +5,10 @@ import (
 	"dis-core/internal/util"
 )
 
+// DefaultSchemaDir defines the canonical location for DIS schema files.
+// All schema managers and loaders should build paths relative to this root.
+var DefaultSchemaDir = "schemas"
+
 type Manager struct{ db *sql.DB }
 
 func NewManager(db *sql.DB) *Manager { return &Manager{db: db} }
