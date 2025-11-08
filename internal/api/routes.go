@@ -2,15 +2,15 @@ package api
 
 import (
 	"database/sql"
-	"dis-core/internal/registry/atlas"
-	"dis-core/internal/registry/auth"
-	"dis-core/internal/registry/identities"
-	"dis-core/internal/registry/receipts"
-	"dis-core/internal/registry/terra"
-
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"dis-core/internal/api/auth"
+	"dis-core/internal/api/identities"
+	"dis-core/internal/registry/atlas"
+	"dis-core/internal/registry/receipts"
+	"dis-core/internal/registry/terra"
 )
 
 // RegisterAPIs wires all endpoint groups into the server mux.
@@ -80,9 +80,9 @@ func (s *Server) RegisterAPIs() {
 	s.registerVersionRoutes()
 	s.registerMirrorSpinRoutes()
 	s.registerFileRoutes()
-	s.registerPolicyRoutes()
+	// s.registerPolicyRoutes() // FIXME: disabled during pgx migration
 	s.registerPolicyFileRoutes()
-	s.registerSchemaRoutes()
+	// s.registerSchemaRoutes() // FIXME: disabled during pgx migration
 
 }
 
@@ -93,7 +93,8 @@ func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := s.DB().Query(`SELECT id, parent_id, name, data, created_at, updated_at FROM domains ORDER BY created_at ASC`)
+	ctx := r.Context()
+	rows, err := s.DB().Query(ctx, `SELECT id, parent_id, name, data, created_at, updated_at FROM domains ORDER BY created_at ASC`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

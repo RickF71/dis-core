@@ -32,7 +32,8 @@ func (s *Server) handleDomainAnnounce(w http.ResponseWriter, r *http.Request) {
 	)
 
 	q := `SELECT name, COALESCE(data->>'description','') FROM domains WHERE id = $1`
-	err := s.DB().QueryRow(q, id).Scan(&name, &description)
+	ctx := r.Context()
+	err := s.DB().QueryRow(ctx, q, id).Scan(&name, &description)
 	if err == sql.ErrNoRows {
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return

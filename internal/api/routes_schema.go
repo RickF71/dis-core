@@ -1,11 +1,8 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-
-	"dis-core/internal/schema"
 )
 
 // RegisterSchemaRoutes registers all schema-related API routes.
@@ -17,30 +14,14 @@ func (s *Server) registerSchemaRoutes() {
 
 // GET /api/schema/active
 func (s *Server) handleGetActiveSchema(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-	active, err := schema.GetActiveSchema(ctx, s.db)
-	if err != nil {
-		http.Error(w, "failed to get active schema: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	response := map[string]interface{}{
-		"name":      active.Name,
-		"version":   active.Version,
-		"is_active": active.IsActive,
-		"hash":      active.Hash,
-		"schema":    json.RawMessage(active.JSON),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	http.Error(w, "Schema handlers temporarily disabled during pgx migration", http.StatusNotImplemented)
 }
 
 // GET /api/schema/list
 func (s *Server) handleListSchemas(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.db.Query(ctx, `
 		SELECT name, version, is_active
 		FROM schemas
 		ORDER BY created_at DESC
@@ -68,6 +49,13 @@ func (s *Server) handleListSchemas(w http.ResponseWriter, r *http.Request) {
 		list = append(list, entry)
 	}
 
+	if rows.Err() != nil {
+		http.Error(w, "rows error: "+rows.Err().Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(list)
+	if err := json.NewEncoder(w).Encode(list); err != nil {
+		http.Error(w, "encode error: "+err.Error(), http.StatusInternalServerError)
+	}
 }

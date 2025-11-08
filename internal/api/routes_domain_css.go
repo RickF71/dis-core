@@ -12,7 +12,8 @@ func (s *Server) handleDomainCSS(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var css sql.NullString
-	err := s.db.QueryRow(`SELECT data->>'css' FROM domains WHERE id = $1`, id).Scan(&css)
+	ctx := r.Context()
+	err := s.db.QueryRow(ctx, `SELECT data->>'css' FROM domains WHERE id = $1`, id).Scan(&css)
 	if err == sql.ErrNoRows {
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return

@@ -51,7 +51,7 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("open ledger: %w", err)
 	}
-	defer led.Close()
+	defer led.Close(ctx)
 	log.Println("✅ Ledger ready (DB-native)")
 
 	// ============================================================

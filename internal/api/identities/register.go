@@ -1,9 +1,9 @@
 package identities
 
 import (
-	"database/sql"
-	"dis-core/internal/db"
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Register wires all identity-related routes to the main mux.
@@ -11,6 +11,6 @@ import (
 // Currently exposes:
 //   - POST /api/identities  → create or update an identity
 //   - GET  /api/identities  → list active identities
-func Register(mux *http.ServeMux, store *sql.DB) {
-	mux.HandleFunc("/api/identities", HandleIdentities(db.DefaultConn))
+func Register(mux *http.ServeMux, store *pgx.Conn) {
+	mux.HandleFunc("/api/identities", HandleIdentities(store))
 }

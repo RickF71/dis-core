@@ -1,10 +1,11 @@
 package console
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"dis-core/internal/db"
 )
@@ -23,7 +24,7 @@ type consoleAuthResponse struct {
 
 // Handle returns an http.HandlerFunc that verifies a console token
 // and returns acceptance or rejection.
-func Handle(store *sql.DB) http.HandlerFunc {
+func Handle(store *pgx.Conn) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

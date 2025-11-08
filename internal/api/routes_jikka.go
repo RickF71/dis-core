@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/lib/pq"
 
 	"dis-core/internal/jikka" // where your Jikka struct and logic live
@@ -17,20 +16,23 @@ func (s *Server) handleGetJikka(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing id parameter", http.StatusBadRequest)
 		return
 	}
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
-		return
-	}
+	// FIXME: jikka.GetJikkaByID expects *sql.DB but we have *pgx.Conn
+	// Need to migrate internal/jikka package to pgx
+	// id, err := uuid.Parse(idStr)
+	// if err != nil {
+	// 	http.Error(w, "invalid id", http.StatusBadRequest)
+	// 	return
+	// }
+	// j, err := jikka.GetJikkaByID(s.DB(), id)
+	// if err != nil {
+	// 	http.Error(w, "jikka not found", http.StatusNotFound)
+	// 	return
+	// }
+	//
+	// w.Header().Set("Content-Type", "application/json")
+	// json.NewEncoder(w).Encode(j)
 
-	j, err := jikka.GetJikkaByID(s.DB(), id)
-	if err != nil {
-		http.Error(w, "jikka not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(j)
+	http.Error(w, "Jikka handlers temporarily disabled during pgx migration", http.StatusNotImplemented)
 }
 
 // POST /api/jikka
@@ -45,19 +47,24 @@ func (s *Server) handleCreateJikka(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := jikka.CreateJikka(s.DB(), &j)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// FIXME: jikka.CreateJikka expects *sql.DB but we have *pgx.Conn
+	// Need to migrate internal/jikka package to pgx
+	// created, err := jikka.CreateJikka(s.DB(), &j)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+	//
+	// w.Header().Set("Content-Type", "application/json")
+	// json.NewEncoder(w).Encode(created)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(created)
+	http.Error(w, "Jikka creation temporarily disabled during pgx migration", http.StatusNotImplemented)
 }
 
 // GET /api/jikka/list
 func (s *Server) handleListJikkas(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.DB().Query(`SELECT id, participants, type, flows, rules, state, created_at, updated_at FROM jikkas ORDER BY created_at DESC`)
+	ctx := r.Context()
+	rows, err := s.DB().Query(ctx, `SELECT id, participants, type, flows, rules, state, created_at, updated_at FROM jikkas ORDER BY created_at DESC`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

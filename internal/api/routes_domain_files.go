@@ -15,9 +15,10 @@ import (
 // GET /api/domain/{id}/files  →  list file names
 func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	ctx := r.Context()
 
 	q := `SELECT jsonb_object_keys(files) FROM domains WHERE id = $1`
-	rows, err := s.DB().Query(q, id)
+	rows, err := s.DB().Query(ctx, q, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -45,12 +46,13 @@ func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDomainFileGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	ctx := r.Context()
 
 	//var content sql.NullString
 	q := `SELECT files->>$2 FROM domains WHERE id=$1`
 	// ↑ this pulls the full JSON string for that key (the whole object)
 	var raw sql.NullString
-	err := s.DB().QueryRow(q, id, filename).Scan(&raw)
+	err := s.DB().QueryRow(ctx, q, id, filename).Scan(&raw)
 	if err == sql.ErrNoRows {
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return
@@ -80,6 +82,7 @@ func (s *Server) handleDomainFileGet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDomainFilePut(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	ctx := r.Context()
 
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -102,7 +105,7 @@ func (s *Server) handleDomainFilePut(w http.ResponseWriter, r *http.Request) {
 	  )
 	  WHERE id = $1::uuid
 	`
-	if _, err := s.DB().Exec(q, id, filename, content); err != nil {
+	if _, err := s.DB().Exec(ctx, q, id, filename, content); err != nil {
 		http.Error(w, "db update failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -116,9 +119,10 @@ func (s *Server) handleDomainFilePut(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDomainFileDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	ctx := r.Context()
 
 	q := `UPDATE domains SET files = files - $2 WHERE id=$1::uuid`
-	if _, err := s.DB().Exec(q, id, filename); err != nil {
+	if _, err := s.DB().Exec(ctx, q, id, filename); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -128,6 +132,7 @@ func (s *Server) handleDomainFileDelete(w http.ResponseWriter, r *http.Request) 
 // POST /api/domain/{id}/file/rename  →  rename an existing file
 func (s *Server) handleDomainFileRename(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	ctx := r.Context()
 
 	var req struct {
 		Old string `json:"old"`
@@ -152,7 +157,7 @@ func (s *Server) handleDomainFileRename(w http.ResponseWriter, r *http.Request) 
 	)
 	WHERE id = $1::uuid
 	`
-	if _, err := s.DB().Exec(q, id, req.Old, req.New); err != nil {
+	if _, err := s.DB().Exec(ctx, q, id, req.Old, req.New); err != nil {
 		http.Error(w, "rename failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -170,6 +175,7 @@ func (s *Server) handleDomainFileRename(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleDomainFileCreate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	ctx := r.Context()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -198,7 +204,7 @@ func (s *Server) handleDomainFileCreate(w http.ResponseWriter, r *http.Request) 
 	`
 
 	var existed sql.NullBool
-	if err := s.DB().QueryRow(q, id, filename, content).Scan(&existed); err != nil {
+	if err := s.DB().QueryRow(ctx, q, id, filename, content).Scan(&existed); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

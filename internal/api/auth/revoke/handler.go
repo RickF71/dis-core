@@ -1,12 +1,13 @@
 package revoke
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"dis-core/internal/db"
 )
@@ -23,8 +24,9 @@ type RevocationEntry struct {
 }
 
 // Handle returns an http.HandlerFunc bound to the given DB.
-func Handle(store *sql.DB) http.HandlerFunc {
+func Handle(store *pgx.Conn) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		switch r.Method {
 		case http.MethodPost:
 			var entry RevocationEntry
@@ -38,8 +40,8 @@ func Handle(store *sql.DB) http.HandlerFunc {
 				entry.ValidUntil = time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339)
 			}
 
-			_, err := store.Exec(`
-				INSERT INTO revocations 
+			_, err := store.Exec(ctx, `
+				INSERT INTO revocations
 				(revocation_id, revoked_ref, revoked_type, reason, revoked_by, revocation_time, valid_until, signature)
 				VALUES ($1,$2,$3,$4,$5,$6::timestamptz,$7::timestamptz,$8);
 			`, entry.RevocationID, entry.RevokedRef, entry.RevokedType, entry.Reason,
@@ -51,7 +53,7 @@ func Handle(store *sql.DB) http.HandlerFunc {
 
 			content := fmt.Sprintf("Revocation: %s of %s by %s (reason: %s)",
 				entry.RevokedType, entry.RevokedRef, entry.RevokedBy, entry.Reason)
-			_, err = store.Exec(`
+			_, err = store.Exec(ctx, `
 				INSERT INTO receipts (receipt_id, schema_ref, content, timestamp)
 				VALUES ($1, $2, $3, NOW());
 			`, "rcpt-"+entry.RevocationID, "bridge-receipt-template.v0", content)
@@ -63,7 +65,7 @@ func Handle(store *sql.DB) http.HandlerFunc {
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "revoked", "entry": entry})
 
 		case http.MethodGet:
-			rows, err := store.Query(`
+			rows, err := store.Query(ctx, `
 				SELECT revocation_id, revoked_ref, revoked_type, reason, revoked_by,
 				       revocation_time, valid_until, signature
 				FROM revocations

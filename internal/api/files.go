@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,6 +8,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *Server) registerFileRoutes() {
@@ -40,7 +43,8 @@ func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := s.DB().Query(`
+	ctx := r.Context()
+	rows, err := s.DB().Query(ctx, `
 		SELECT id, rel_path, filename,
 		       octet_length(content) AS size,
 		       COALESCE(exported_to, '') AS exported_to,
@@ -59,11 +63,19 @@ func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 		var id int
 		var relPath, filename, exportedTo string
 		var size int
-		var importedAt, exportedAt sql.NullTime
+		var importedAt, exportedAt *time.Time
 
 		if err := rows.Scan(&id, &relPath, &filename, &size, &exportedTo, &importedAt, &exportedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		var importedAtVal, exportedAtVal interface{}
+		if importedAt != nil {
+			importedAtVal = *importedAt
+		}
+		if exportedAt != nil {
+			exportedAtVal = *exportedAt
 		}
 
 		files = append(files, map[string]any{
@@ -72,8 +84,8 @@ func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 			"filename":    filename,
 			"size":        size,
 			"exported_to": exportedTo,
-			"imported_at": importedAt.Time,
-			"exported_at": exportedAt.Time,
+			"imported_at": importedAtVal,
+			"exported_at": exportedAtVal,
 		})
 	}
 
@@ -97,14 +109,15 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		ctx := r.Context()
 		var filename, relPath string
 		var content []byte
 
-		if err := s.DB().QueryRow(`
+		if err := s.DB().QueryRow(ctx, `
 			SELECT filename, rel_path, content
 			FROM bootstrap_files WHERE id = $1
 		`, id).Scan(&filename, &relPath, &content); err != nil {
-			if err == sql.ErrNoRows {
+			if err == pgx.ErrNoRows {
 				http.NotFound(w, r)
 				return
 			}
@@ -119,6 +132,7 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(content)
 
 	case http.MethodPut:
+		ctx := r.Context()
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "read body: "+err.Error(), http.StatusBadRequest)
@@ -141,7 +155,7 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			decoded = body
 		}
 
-		_, err = s.DB().Exec(`UPDATE bootstrap_files SET content = $1 WHERE id = $2`, decoded, id)
+		_, err = s.DB().Exec(ctx, `UPDATE bootstrap_files SET content = $1 WHERE id = $2`, decoded, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -173,7 +187,8 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	like := "%" + strings.ToLower(query) + "%"
-	rows, err := s.DB().Query(`
+	ctx := r.Context()
+	rows, err := s.DB().Query(ctx, `
 		SELECT id, rel_path, filename,
 		       octet_length(content) AS size,
 		       COALESCE(exported_to, '') AS exported_to,
@@ -193,19 +208,28 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 		var id int
 		var relPath, filename, exportedTo string
 		var size int
-		var importedAt, exportedAt sql.NullTime
+		var importedAt, exportedAt *time.Time
 		if err := rows.Scan(&id, &relPath, &filename, &size, &exportedTo, &importedAt, &exportedAt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		var importedAtVal, exportedAtVal interface{}
+		if importedAt != nil {
+			importedAtVal = *importedAt
+		}
+		if exportedAt != nil {
+			exportedAtVal = *exportedAt
+		}
+
 		files = append(files, map[string]any{
 			"id":          id,
 			"rel_path":    relPath,
 			"filename":    filename,
 			"size":        size,
 			"exported_to": exportedTo,
-			"imported_at": importedAt.Time,
-			"exported_at": exportedAt.Time,
+			"imported_at": importedAtVal,
+			"exported_at": exportedAtVal,
 		})
 	}
 
@@ -224,6 +248,7 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	var req struct {
 		IDs        []int  `json:"ids"`         // optional: list of IDs to mark
 		RelPath    string `json:"rel_path"`    // or a single path
@@ -241,7 +266,7 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 		req.ExportedTo = "canon"
 	}
 
-	var result sql.Result
+	var result pgconn.CommandTag
 	var err error
 
 	if len(req.IDs) > 0 {
@@ -259,10 +284,10 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 			SET exported_to = $%d, exported_at = NOW()
 			WHERE id IN (%s) AND exported_to IS NULL
 		`, len(args), strings.Join(placeholders, ","))
-		result, err = s.DB().Exec(q, args...)
+		result, err = s.DB().Exec(ctx, q, args...)
 	} else {
 		// Single update by rel_path
-		result, err = s.DB().Exec(`
+		result, err = s.DB().Exec(ctx, `
 			UPDATE bootstrap_files
 			SET exported_to = $1, exported_at = NOW()
 			WHERE rel_path = $2 AND exported_to IS NULL
@@ -274,7 +299,7 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	affected, _ := result.RowsAffected()
+	affected := result.RowsAffected()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"status":      "ok",

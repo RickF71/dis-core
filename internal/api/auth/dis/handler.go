@@ -1,12 +1,13 @@
 package dis
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"dis-core/internal/db"
 )
@@ -22,8 +23,9 @@ type DISAuthHandshake struct {
 }
 
 // Handle returns an http.HandlerFunc bound to a specific DB.
-func Handle(store *sql.DB) http.HandlerFunc {
+func Handle(store *pgx.Conn) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		switch r.Method {
 		case http.MethodPost:
 			var h DISAuthHandshake
@@ -36,7 +38,7 @@ func Handle(store *sql.DB) http.HandlerFunc {
 			h.ResultToken = "tok-" + h.HandshakeID
 			h.ExpiresAt = time.Now().UTC().Add(1 * time.Hour).Format(time.RFC3339)
 
-			_, err := store.Exec(`
+			_, err := store.Exec(ctx, `
 				INSERT INTO handshakes
 					(handshake_id, initiator, responder, scope, consent_proof, result_token, expires_at)
 				VALUES
@@ -48,7 +50,7 @@ func Handle(store *sql.DB) http.HandlerFunc {
 			}
 
 			content := fmt.Sprintf("Handshake: %s → %s (scope: %s)", h.Initiator, h.Responder, h.Scope)
-			_, err = store.Exec(`
+			_, err = store.Exec(ctx, `
 				INSERT INTO receipts (receipt_id, schema_ref, content, timestamp)
 				VALUES ($1, $2, $3, NOW());
 			`, "rcpt-"+h.HandshakeID, "bridge-receipt-template.v0", content)
@@ -60,7 +62,7 @@ func Handle(store *sql.DB) http.HandlerFunc {
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "handshake": h})
 
 		case http.MethodGet:
-			rows, err := store.Query(`
+			rows, err := store.Query(ctx, `
 				SELECT handshake_id, initiator, responder, scope,
 				       consent_proof, result_token, expires_at
 				FROM handshakes

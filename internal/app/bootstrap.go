@@ -17,8 +17,6 @@ import (
 // It seeds canonical data (themes), ensures schema registration,
 // and inserts null-domain policies if missing.
 func BootstrapAuthority(db *pgx.Conn, reg *schema.Registry) error {
-	ctx := context.Background()
-
 	log.Println("[bootstrap] Starting DIS-Core initialization...")
 
 	// ---- Step 2: Register core schema ----

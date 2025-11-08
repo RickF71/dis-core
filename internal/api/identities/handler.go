@@ -1,11 +1,12 @@
 package identities
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/jackc/pgx/v5"
 
 	"dis-core/internal/api/server"
 	"dis-core/internal/db"
@@ -18,8 +19,9 @@ type IdentityPayload struct {
 }
 
 // HandleIdentities provides both registration (POST) and listing (GET).
-func HandleIdentities(store *sql.DB) http.HandlerFunc {
+func HandleIdentities(store *pgx.Conn) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		switch r.Method {
 
 		// === POST /api/identities ===
@@ -36,7 +38,7 @@ func HandleIdentities(store *sql.DB) http.HandlerFunc {
 			}
 
 			var id int64
-			err := store.QueryRow(`
+			err := store.QueryRow(ctx, `
 				INSERT INTO identities (dis_uid, namespace, created_at, active)
 				VALUES ($1, $2, NOW(), TRUE)
 				ON CONFLICT (dis_uid) DO UPDATE
@@ -72,7 +74,7 @@ func HandleIdentities(store *sql.DB) http.HandlerFunc {
 				offset = 0
 			}
 
-			rows, err := store.Query(`
+			rows, err := store.Query(ctx, `
 				SELECT id, dis_uid, namespace, created_at, updated_at, active
 				FROM identities
 				WHERE active = TRUE

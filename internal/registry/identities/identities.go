@@ -2,10 +2,11 @@ package identities
 
 // stub for identities registry
 import (
-	"database/sql"
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
 )
 
-func Register(mux *http.ServeMux, db *sql.DB) {
+func Register(mux *http.ServeMux, db *pgx.Conn) {
 	// TODO: implement identities routes
 }

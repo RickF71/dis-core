@@ -28,7 +28,8 @@ func (s *Server) registerPolicyFileRoutes() {
 
 // GET /api/policy/list
 func (s *Server) handleListPolicies(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.Query(`SELECT id, domain_id, name, content, created_at FROM policies ORDER BY name`)
+	ctx := r.Context()
+	rows, err := s.db.Query(ctx, `SELECT id, domain_id, name, content, created_at FROM policies ORDER BY name`)
 	if err != nil {
 		http.Error(w, "failed to list policies: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -52,7 +53,8 @@ func (s *Server) handleListPolicies(w http.ResponseWriter, r *http.Request) {
 // GET /api/policy/{name}
 func (s *Server) handleGetPolicy(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	row := s.db.QueryRow(`SELECT id, domain_id, name, content, created_at FROM policies WHERE name = $1`, name)
+	ctx := r.Context()
+	row := s.db.QueryRow(ctx, `SELECT id, domain_id, name, content, created_at FROM policies WHERE name = $1`, name)
 	var p PolicyRecord
 	if err := row.Scan(&p.ID, &p.DomainID, &p.Name, &p.Content, &p.CreatedAt); err != nil {
 		http.Error(w, "policy not found: "+err.Error(), http.StatusNotFound)
@@ -65,10 +67,11 @@ func (s *Server) handleGetPolicy(w http.ResponseWriter, r *http.Request) {
 // PUT /api/policy/{name}
 func (s *Server) handlePutPolicy(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	ctx := r.Context()
 	body, _ := io.ReadAll(r.Body)
 	content := string(body)
 
-	_, err := s.db.Exec(`
+	_, err := s.db.Exec(ctx, `
 		INSERT INTO policies (name, content)
 		VALUES ($1, $2)
 		ON CONFLICT (name) DO UPDATE SET content = EXCLUDED.content, created_at = NOW()
@@ -85,7 +88,8 @@ func (s *Server) handlePutPolicy(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/policy/{name}
 func (s *Server) handleDeletePolicy(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	_, err := s.db.Exec(`DELETE FROM policies WHERE name = $1`, name)
+	ctx := r.Context()
+	_, err := s.db.Exec(ctx, `DELETE FROM policies WHERE name = $1`, name)
 	if err != nil {
 		http.Error(w, "failed to delete policy: "+err.Error(), http.StatusInternalServerError)
 		return
