@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -39,7 +40,7 @@ func (l *Ledger) RecordImport(target, summary string) (*ImportReceipt, error) {
 		CreatedAt: time.Now(),
 	}
 
-	_, err := l.DB.Exec(`
+	_, err := l.DB.Exec(context.Background(), `
 	       INSERT INTO import_receipts (id, type, target, summary, created_at)
 	       VALUES ($1, $2, $3, $4, $5)
        `, rec.ID, rec.Type, rec.Target, rec.Summary, rec.CreatedAt)
@@ -49,7 +50,7 @@ func (l *Ledger) RecordImport(target, summary string) (*ImportReceipt, error) {
 
 // ListImports returns the most recent import receipts.
 func (l *Ledger) ListImports(limit int) ([]ImportReceipt, error) {
-	rows, err := l.DB.Query(`
+	rows, err := l.DB.Query(context.Background(), `
 	       SELECT id, type, target, summary, created_at
 	       FROM import_receipts
 	       ORDER BY created_at DESC

@@ -97,13 +97,13 @@ func ListReceipts(db *sql.DB, opts ListOpts) ([]Receipt, error) {
 
 // SaveReceipt inserts a receipt directly using the default DB handle.
 func SaveReceipt(r Receipt) error {
-	if DefaultDB == nil {
+	if DefaultConn == nil {
 		return fmt.Errorf("db not initialized")
 	}
 	if r.CreatedAt.IsZero() {
 		r.CreatedAt = time.Now().UTC()
 	}
-	_, err := DefaultDB.Exec(`
+	_, err := DefaultConn.Exec(context.Background(), `
 	       INSERT INTO receipts (receipt_id, schema_ref, content, created_at)
 	       VALUES ($1, $2, $3, $4);
        `, r.ReceiptID, r.SchemaRef, r.Content, r.CreatedAt)
@@ -112,10 +112,10 @@ func SaveReceipt(r Receipt) error {
 
 // CountReceipts returns total count of receipts in the database.
 func CountReceipts() (int64, error) {
-	if DefaultDB == nil {
+	if DefaultConn == nil {
 		return 0, fmt.Errorf("db not initialized")
 	}
 	var n int64
-	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM receipts;`).Scan(&n)
+	err := DefaultConn.QueryRow(context.Background(), `SELECT COUNT(1) FROM receipts;`).Scan(&n)
 	return n, err
 }

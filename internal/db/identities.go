@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -207,11 +208,11 @@ func ReactivateIdentity(db *sql.DB, uid string) error {
 
 // CountIdentities returns the total number of identities in DB.
 func CountIdentities() (int64, error) {
-	if DefaultDB == nil {
+	if DefaultConn == nil {
 		return 0, fmt.Errorf("db not initialized")
 	}
 	var n int64
-	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM identities;`).Scan(&n)
+	err := DefaultConn.QueryRow(context.Background(), `SELECT COUNT(1) FROM identities;`).Scan(&n)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count identities: %w", err)
 	}

@@ -1,126 +1,95 @@
 package app
 
 import (
+	"context"
 	"dis-core/internal/api"
+	"dis-core/internal/api/server"
 	"dis-core/internal/bootstrap"
-	"dis-core/internal/canon"
 	"dis-core/internal/config"
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
-	"dis-core/internal/mirrorspin"
-	"dis-core/internal/policy"
 	"dis-core/internal/schema"
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
+	"os"
 )
 
-// Run initializes and starts the DIS-Core service.
 func Run() error {
+	ctx := context.Background()
+
 	// ============================================================
-	// 1. CONFIGURATION
+	// 1. CONFIGURATION (env / defaults only)
 	// ============================================================
-	cfg, err := config.Load("config.yaml")
-	if err != nil {
-		log.Printf("⚠️  No config.yaml found, using defaults: %v", err)
-		cfg = &config.Config{}
-	}
+	host := getenvDefault("DIS_API_HOST", "0.0.0.0")
+	port := getenvDefault("DIS_API_PORT", "8080")
+	version := getenvDefault("DIS_VERSION", "v1.0-dev")
+	dsn := config.DatabaseURL()
+
+	log.Printf("🔧 Using database DSN: %s", dsn)
 
 	// ============================================================
 	// 2. DATABASE CONNECTION
 	// ============================================================
-	dsn := cfg.DatabaseURL()
-	database, err := db.ConnectDSN(dsn)
+	database, err := db.ConnectPostgres(dsn)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect postgres: %w", err)
 	}
-	defer database.Close()
+	defer database.Close(ctx)
 	log.Println("✅ Connected to PostgreSQL ledger")
 
 	// ============================================================
 	// 3. SCHEMA REGISTRY
 	// ============================================================
 	schemaReg := schema.NewRegistry()
-
-	if err := schemaReg.LoadDir("./disyaml/schemas"); err != nil {
-		log.Printf("⚠️  Core schema load failed: %v", err)
-	}
-	if err := schemaReg.LoadDir("./disyaml/domains"); err != nil {
-		log.Printf("⚠️  Domain schema load failed: %v", err)
-	}
-	log.Printf("📘 Loaded %d schemas into registry", len(schemaReg.ByKey()))
-
-	// ============================================================
-	// 3.5 CANON REGISTRY AND THEME BOOTSTRAP
-	// ============================================================
-	canonReg := &canon.Registry{DB: database}
-
-	log.Println("🌍 Bootstrapping canonical domain themes...")
-	canon.BootstrapThemes(canonReg)
-	log.Println("✅ Canonical domain themes seeded (Terra + USA).")
+	log.Println("📘 Schema registry initialized (DB-native mode)")
 
 	// ============================================================
 	// 4. LEDGER INITIALIZATION
 	// ============================================================
-	led, err := ledger.Open(cfg.DatabaseDSN, database, schemaReg)
+	led, err := ledger.Open(ctx, dsn, database, schemaReg)
 	if err != nil {
-		return err
+		return fmt.Errorf("open ledger: %w", err)
 	}
 	defer led.Close()
-	log.Println("✅ Ledger ready")
-
-	// Preload domains into the ledger memory view
-	domainDir := filepath.Join(".", "disyaml/domains")
-	if err := led.BootstrapDomains(schemaReg, domainDir); err != nil {
-		log.Printf("⚠️  Domain bootstrap failed: %v", err)
-	} else {
-		log.Println("✅ Domains loaded into ledger")
-	}
+	log.Println("✅ Ledger ready (DB-native)")
 
 	// ============================================================
-	// 5. BOOTSTRAP PHASE
+	// 5. BOOTSTRAP PHASE (migrations only)
 	// ============================================================
-	log.Println("🚀 Starting bootstrap phase...")
-
+	log.Println("🚀 Ensuring tables and baseline state...")
 	if err := bootstrap.BootstrapAllTables(database); err != nil {
 		return fmt.Errorf("bootstrap tables: %w", err)
 	}
-	if err := bootstrap.ImportYAML(".", database); err != nil {
-		log.Printf("⚠️  Bootstrap import failed: %v", err)
-	} else {
-		log.Println("✅ Bootstrap YAML import complete")
-	}
-	log.Println("🎯 Bootstrap phase complete.")
+	log.Println("🎯 Bootstrap phase complete (no YAML import).")
 
 	// ============================================================
-	// 6. POLICY ENGINE
+	// 6. CORE INITIALIZATION (schema + null policies)
 	// ============================================================
-	base := "./policies"
-	opaEngine, err := policy.NewOPAEngine()
-	if err != nil {
-		return fmt.Errorf("failed to start policy engine: %w", err)
+	log.Println("🧱 Initializing DIS-Core canonical data (schema + policies)...")
+	if err := BootstrapAuthority(database, schemaReg); err != nil {
+		return fmt.Errorf("bootstrap core: %w", err)
 	}
-	engine := policy.NewPolicyEngineImpl(opaEngine)
-	log.Printf("✅ Policy engine initialized (using %s)", base)
+	log.Println("✅ Core schema + null policies initialized.")
 
 	// ============================================================
 	// 7. API SERVER
 	// ============================================================
-	server := api.NewServer(cfg, led, database)
-	server.RegisterEvalRoute(engine)
-	log.Println("✅ Registered route(s)")
+	addr := fmt.Sprintf("%s:%s", host, port)
+	log.Printf("🚀 DIS-Core %s starting on http://%s", version, addr)
 
-	// Start MirrorSpin diagnostics
-	if err := mirrorspin.Start(database); err != nil {
-		return err
+	srv := api.New(database, led) // Use the main api package
+
+	handler := server.WithCORS(srv.Handler()) // Use Handler() method
+
+	// Single ListenAndServe call
+	return http.ListenAndServe(addr, handler)
+
+}
+
+func getenvDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-
-	// ============================================================
-	// 8. START HTTP SERVER
-	// ============================================================
-	addr := fmt.Sprintf("%s:%d", cfg.APIHost, cfg.APIPort)
-	log.Printf("🚀 DIS-Core v%s starting on %s", cfg.Version, addr)
-
-	return http.ListenAndServe(addr, api.WithCORS(server.Mux()))
+	return def
 }

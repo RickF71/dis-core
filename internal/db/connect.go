@@ -1,26 +1,33 @@
 package db
 
 import (
-	"database/sql"
-	"dis-core/internal/config"
+	"context"
 	"fmt"
+	"os"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 )
 
-// ConnectPostgres opens a PostgreSQL connection pool.
-func ConnectPostgres(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dsn)
+// ConnectPostgres opens a PostgreSQL connection using pgx.
+func ConnectPostgres(dsn string) (*pgx.Conn, error) {
+	conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := conn.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("ping: %w", err)
 	}
-	return db, nil
+	return conn, nil
 }
 
-func EnsureTables(db *sql.DB, cfg *config.Config) error {
-	// TODO: Bootstrap/migrate all tables, call schema bootstrapper
-	return nil
+// ConnectFromEnv connects using DATABASE_URL environment variable
+func ConnectFromEnv() (*pgx.Conn, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = os.Getenv("DIS_DB_DSN")
+	}
+	if dsn == "" {
+		dsn = "postgres://dis_user:card567@localhost:5432/dis_core?sslmode=disable"
+	}
+	return ConnectPostgres(dsn)
 }

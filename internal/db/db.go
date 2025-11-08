@@ -1,11 +1,11 @@
 package db
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"os"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 )
 
 // Config interface for database configuration
@@ -13,44 +13,44 @@ type ConfigProvider interface {
 	DatabaseURL() string
 }
 
-var DefaultDB *sql.DB
+var DefaultConn *pgx.Conn
 
 // Connect establishes a database connection using config-based DSN
-func Connect(cfg ConfigProvider) (*sql.DB, error) {
+func Connect(cfg ConfigProvider) (*pgx.Conn, error) {
 	dsn := cfg.DatabaseURL()
 	return ConnectDSN(dsn)
 }
 
-func SetupDatabase() (*sql.DB, error) {
+func SetupDatabase() (*pgx.Conn, error) {
 	dsn := os.Getenv("DIS_DB_DSN")
 	if dsn == "" {
 		dsn = "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
 		fmt.Println("⚠️ Using default Postgres DSN:", dsn)
 	}
 
-	db, err := sql.Open("postgres", dsn)
+	conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open postgres: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		db.Close()
+	if err := conn.Ping(context.Background()); err != nil {
+		conn.Close(context.Background())
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
-	DefaultDB = db
+	DefaultConn = conn
 	fmt.Println("✅ Connected to PostgreSQL:", dsn)
-	return db, nil
+	return conn, nil
 }
 
 func CloseDatabase() {
-	if DefaultDB != nil {
-		_ = DefaultDB.Close()
-		DefaultDB = nil
+	if DefaultConn != nil {
+		_ = DefaultConn.Close(context.Background())
+		DefaultConn = nil
 	}
 }
 
-func ConnectDSN(dsn string) (*sql.DB, error) {
+func ConnectDSN(dsn string) (*pgx.Conn, error) {
 	if dsn == "" {
 		// fallback to env or default
 		dsn = os.Getenv("DIS_DB_DSN")
@@ -59,15 +59,15 @@ func ConnectDSN(dsn string) (*sql.DB, error) {
 		}
 	}
 
-	db, err := sql.Open("postgres", dsn)
+	conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open postgres: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		db.Close()
+	if err := conn.Ping(context.Background()); err != nil {
+		conn.Close(context.Background())
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
-	return db, nil
+	return conn, nil
 }

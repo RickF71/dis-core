@@ -1,101 +1,96 @@
 package ledger
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"dis-core/internal/util/crypto"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
-// Receipt defines the DIS ci.call.v1 structure
+// Receipt represents a ci.call.v1 log entry.
 type Receipt struct {
-	ReceiptID      string       `json:"receipt_id"`
-	By             string       `json:"by"`
-	Action         string       `json:"action"`
-	CreatedAt      string       `json:"created_at"`
-	Hash           string       `json:"hash"`
-	Provenance     []Provenance `json:"provenance"`
-	Signature      string       `json:"signature"`
-	FrozenCoreHash string       `json:"frozen_core_hash"`
-	Metadata       Metadata     `json:"metadata"`
+	ID        string          `json:"id"`
+	Type      string          `json:"type"`
+	Actor     string          `json:"actor"`
+	Target    string          `json:"target"`
+	Domain    string          `json:"domain"`
+	Payload   json.RawMessage `json:"payload"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
-type Provenance struct {
-	Type           string   `json:"type"`
-	Ref            string   `json:"ref"`
-	Status         string   `json:"status"`
-	RedactedFields []string `json:"redacted_fields,omitempty"`
-}
+// NewReceipt constructs a new in-memory receipt before DB insert.
+func NewReceipt(rtype, actor, target, domain string, payload interface{}) (*Receipt, error) {
+	var payloadJSON []byte
+	if payload != nil {
+		var err error
+		payloadJSON, err = json.Marshal(payload)
+		if err != nil {
+			return nil, fmt.Errorf("marshal payload: %w", err)
+		}
+	} else {
+		payloadJSON = []byte(`{}`)
+	}
 
-type Metadata struct {
-	IssuedFromConsole  string `json:"issued_from_console"`
-	IssuerSeat         string `json:"issuer_seat"`
-	VerifiedAt         string `json:"verified_at,omitempty"`
-	VerificationMethod string `json:"verification_method,omitempty"`
-	SignerPublicKeyB64 string `json:"signer_public_key_b64,omitempty"`
-}
-
-// NewReceipt creates a signed ci.call.v1 receipt for an action.
-func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Receipt {
-	createdAt := time.Now().Format(time.RFC3339Nano)
-
-	// Payload to hash/sign (stable ordering!)
-	payload := fmt.Sprintf("%s|%s|%s|%s|%s|%s",
-		by, action, createdAt, frozenCoreHash, consoleID, issuerSeat)
-
-	// Hash payload
-	hash := sha256.Sum256([]byte(payload))
-	hashHex := hex.EncodeToString(hash[:])
-
-	// Ensure domain keys & sign hashHex
-	signer, _ := crypto.EnsureDomainKeys(by) // domain-scoped keys (e.g., "domain.terra")
-	sigB64 := signer.Sign([]byte(hashHex))
+	id, err := generateReceiptID()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Receipt{
-		ReceiptID:      generateReceiptID(),
-		By:             by,
-		Action:         action,
-		CreatedAt:      createdAt,
-		Hash:           hashHex,
-		Signature:      sigB64,
-		FrozenCoreHash: frozenCoreHash,
-		Metadata: Metadata{
-			IssuedFromConsole: consoleID,
-			IssuerSeat:        issuerSeat,
-			SignerPublicKeyB64: base64.StdEncoding.EncodeToString(
-				signer.Pub), // assuming crypto.Signer has Pub []byte or ed25519.PublicKey
-		},
-	}
+		ID:        id,
+		Type:      rtype,
+		Actor:     actor,
+		Target:    target,
+		Domain:    domain,
+		Payload:   payloadJSON,
+		CreatedAt: time.Now().UTC(),
+	}, nil
 }
 
-// generateReceiptID returns a random SHA-256-based identifier.
-func generateReceiptID() string {
-	buf := make([]byte, 16)
+// Insert writes the receipt to the receipts table (no filesystem writes).
+func (r *Receipt) Insert(ctx context.Context, tx pgx.Tx) error {
+	const q = `
+		INSERT INTO receipts (id, type, actor, target, domain, payload, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+	_, err := tx.Exec(ctx, q, r.ID, r.Type, r.Actor, r.Target, r.Domain, r.Payload, r.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("insert receipt: %w", err)
+	}
+	return nil
+}
+
+// generateReceiptID creates a cryptographically derived ID without filesystem dependency.
+func generateReceiptID() (string, error) {
+	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
-		panic(err)
+		return "", err
 	}
-	sum := sha256.Sum256(buf)
-	return hex.EncodeToString(sum[:8]) // 16 hex chars, enough for uniqueness
+	hash := sha256.Sum256(buf)
+	return "rcpt-" + base64.RawURLEncoding.EncodeToString(hash[:8]), nil
 }
 
-// Save writes the receipt JSON into the receipts directory.
-func (r *Receipt) Save() error {
-	dir := "receipts"
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
+// VerifyHash creates a short hash summary of the payload for integrity auditing.
+func (r *Receipt) VerifyHash() string {
+	sum := sha256.Sum256(r.Payload)
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
 
-	data, err := json.MarshalIndent(r, "", "  ")
+// Save convenience wrapper: begins + commits a tx for standalone inserts.
+func (r *Receipt) Save(ctx context.Context, conn *pgx.Conn) error {
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
-	filename := filepath.Join(dir, fmt.Sprintf("%s.json", r.ReceiptID))
-	return os.WriteFile(filename, data, 0644)
+	if err := r.Insert(ctx, tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

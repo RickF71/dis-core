@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"context"
 	"database/sql"
 	"time"
 )
@@ -27,7 +28,7 @@ func (l *Ledger) GetDBStatus() (*DBStatus, error) {
 	// Detect database name
 	if l.DB != nil {
 		var dbName string
-		_ = l.DB.QueryRow("SELECT current_database()").Scan(&dbName)
+		_ = l.DB.QueryRow(context.Background(), "SELECT current_database()").Scan(&dbName)
 		status.DBName = dbName
 	}
 
@@ -35,7 +36,7 @@ func (l *Ledger) GetDBStatus() (*DBStatus, error) {
 	tables := []string{"receipts", "import_receipts", "domains"}
 	for _, tbl := range tables {
 		var count int64
-		err := l.DB.QueryRow("SELECT COUNT(*) FROM " + tbl).Scan(&count)
+		err := l.DB.QueryRow(context.Background(), "SELECT COUNT(*) FROM "+tbl).Scan(&count)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				count = 0

@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -28,7 +29,7 @@ func (l *Ledger) VerifySchema() error {
 
 	for table, cols := range expected {
 		var exists bool
-		err := l.DB.QueryRow(`
+		err := l.DB.QueryRow(context.Background(), `
 			SELECT EXISTS (
 				SELECT FROM information_schema.tables
 				WHERE table_schema = 'public' AND table_name = $1
@@ -44,7 +45,7 @@ func (l *Ledger) VerifySchema() error {
 		}
 
 		// check columns
-		rows, err := l.DB.Query(`
+		rows, err := l.DB.Query(context.Background(), `
 			SELECT column_name
 			FROM information_schema.columns
 			WHERE table_schema = 'public' AND table_name = $1`, table)

@@ -1,35 +1,35 @@
 package ledger
 
 import (
+	"context"
 	"crypto/sha256"
-	"database/sql"
 	"dis-core/internal/schema"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 )
 
 // Ledger provides the core persistence layer for DIS-Core.
 // It manages schema creation, config, canon, and event logging.
 type Ledger struct {
-	DB  *sql.DB
+	DB  *pgx.Conn
 	reg *schema.Registry
 }
 
 // Open initializes the ledger. It can accept either an existing DB handle
 // or a DSN string. If db is nil, it opens a new connection using the DSN.
 // Optionally, a schema registry can be attached for validation and linkage.
-func Open(dsn string, db *sql.DB, reg *schema.Registry) (*Ledger, error) {
-	var conn *sql.DB
+func Open(ctx context.Context, dsn string, db *pgx.Conn, reg *schema.Registry) (*Ledger, error) {
+	var conn *pgx.Conn
 	var err error
 
 	if db != nil {
 		conn = db
 	} else {
-		conn, err = sql.Open("postgres", dsn)
+		conn, err = pgx.Connect(ctx, dsn)
 		if err != nil {
 			return nil, fmt.Errorf("open ledger db: %w", err)
 		}
@@ -63,7 +63,7 @@ func Open(dsn string, db *sql.DB, reg *schema.Registry) (*Ledger, error) {
 	}
 
 	for _, stmt := range schemaStatements {
-		if _, err := conn.Exec(stmt); err != nil {
+		if _, err := conn.Exec(context.Background(), stmt); err != nil {
 			return nil, fmt.Errorf("create tables: %w", err)
 		}
 	}
@@ -78,14 +78,14 @@ func Open(dsn string, db *sql.DB, reg *schema.Registry) (*Ledger, error) {
 }
 
 // Close cleanly shuts down the ledger database connection.
-func (l *Ledger) Close() error {
-	return l.DB.Close()
+func (l *Ledger) Close(ctx context.Context) error {
+	return l.DB.Close(ctx)
 }
 
 // Record inserts a generic event receipt into the ledger.
-func (l *Ledger) Record(eventType string, payload map[string]any) error {
+func (l *Ledger) Record(ctx context.Context, eventType string, payload map[string]any) error {
 	j, _ := json.Marshal(payload)
-	_, err := l.DB.Exec(`
+	_, err := l.DB.Exec(ctx, `
 		INSERT INTO receipts (type, payload)
 		VALUES ($1, $2);`, eventType, string(j))
 	if err != nil {
@@ -95,7 +95,7 @@ func (l *Ledger) Record(eventType string, payload map[string]any) error {
 }
 
 // StoreCanon inserts or updates a canonical record from a parsed YAML.
-func (l *Ledger) StoreCanon(rec any) error {
+func (l *Ledger) StoreCanon(ctx context.Context, rec any) error {
 	b, _ := json.Marshal(rec)
 
 	var r struct {
@@ -119,7 +119,7 @@ func (l *Ledger) StoreCanon(rec any) error {
 			hash = EXCLUDED.hash,
 			imported_at = NOW();`
 
-	_, err := l.DB.Exec(stmt,
+	_, err := l.DB.Exec(ctx, stmt,
 		r.ID,
 		r.Type,
 		r.Version,
@@ -127,14 +127,16 @@ func (l *Ledger) StoreCanon(rec any) error {
 		getMetaString(r.Meta, "source_file"),
 		r.Hash,
 	)
-	err = fmt.Errorf("store canon: %w", err)
+	if err != nil {
+		return fmt.Errorf("store canon: %w", err)
+	}
 
 	return nil
 }
 
 // SetConfig updates or inserts a configuration key/value pair.
-func (l *Ledger) SetConfig(key, value string) error {
-	_, err := l.DB.Exec(`
+func (l *Ledger) SetConfig(ctx context.Context, key, value string) error {
+	_, err := l.DB.Exec(ctx, `
 		INSERT INTO config (key, value, updated_at)
 		VALUES ($1, $2, NOW())
 		ON CONFLICT (key) DO UPDATE SET
@@ -148,13 +150,13 @@ func (l *Ledger) SetConfig(key, value string) error {
 }
 
 // GetConfig retrieves a config value.
-func (l *Ledger) GetConfig(key string) (string, error) {
+func (l *Ledger) GetConfig(ctx context.Context, key string) (string, error) {
 	var value string
-	err := l.DB.QueryRow(`SELECT value FROM config WHERE key = $1;`, key).Scan(&value)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
+	err := l.DB.QueryRow(ctx, `SELECT value FROM config WHERE key = $1;`, key).Scan(&value)
 	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return "", nil
+		}
 		return "", fmt.Errorf("get config: %w", err)
 	}
 	return value, nil

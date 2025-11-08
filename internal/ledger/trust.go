@@ -1,57 +1,75 @@
 package ledger
 
 import (
-	"encoding/json"
-	"os"
-	"sync"
+	"database/sql"
 	"time"
 )
 
 // TrustEntry represents one verification event between peers.
 type TrustEntry struct {
-	Peer       string    `json:"peer"`
-	Action     string    `json:"action"` // "sent" or "received"
-	Status     string    `json:"status"` // "ok", "fail", "unreachable"
-	ReceiptID  string    `json:"receipt_id"`
-	CoreHash   string    `json:"core_hash"`
-	VerifiedAt time.Time `json:"verified_at"`
-	Notes      string    `json:"notes,omitempty"`
+	Peer       string
+	Action     string // "sent" or "received"
+	Status     string // "ok", "fail", "unreachable"
+	ReceiptID  string
+	CoreHash   string
+	VerifiedAt time.Time
+	Notes      string
 }
 
-// TrustLedger stores all trust events persistently.
+// TrustLedger provides DB-backed persistence for trust events.
 type TrustLedger struct {
-	mu      sync.Mutex
-	Entries []TrustEntry `json:"entries"`
-	Path    string       `json:"-"`
+	DB *sql.DB
 }
 
-// LoadTrustLedger loads an existing ledger or creates a new one.
-func LoadTrustLedger(path string) (*TrustLedger, error) {
-	data, err := os.ReadFile(path)
+// OpenTrustLedger ensures the trust_entries table exists and returns a handle.
+func OpenTrustLedger(db *sql.DB) (*TrustLedger, error) {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS trust_entries (
+			id SERIAL PRIMARY KEY,
+			peer TEXT,
+			action TEXT,
+			status TEXT,
+			receipt_id TEXT,
+			core_hash TEXT,
+			verified_at TIMESTAMPTZ DEFAULT now(),
+			notes TEXT
+		);
+	`)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return &TrustLedger{Entries: []TrustEntry{}, Path: path}, nil
-		}
 		return nil, err
 	}
-
-	var l TrustLedger
-	if err := json.Unmarshal(data, &l); err != nil {
-		return nil, err
-	}
-	l.Path = path
-	return &l, nil
+	return &TrustLedger{DB: db}, nil
 }
 
-// Add appends a new entry and writes the updated ledger back to disk.
+// Add inserts a new trust entry.
 func (l *TrustLedger) Add(entry TrustEntry) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	_, err := l.DB.Exec(`
+		INSERT INTO trust_entries (peer, action, status, receipt_id, core_hash, verified_at, notes)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
+	`, entry.Peer, entry.Action, entry.Status, entry.ReceiptID, entry.CoreHash, entry.VerifiedAt, entry.Notes)
+	return err
+}
 
-	l.Entries = append(l.Entries, entry)
-	data, err := json.MarshalIndent(l, "", "  ")
+// List returns the most recent trust entries.
+func (l *TrustLedger) List(limit int) ([]TrustEntry, error) {
+	rows, err := l.DB.Query(`
+		SELECT peer, action, status, receipt_id, core_hash, verified_at, notes
+		FROM trust_entries
+		ORDER BY verified_at DESC
+		LIMIT $1
+	`, limit)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return os.WriteFile(l.Path, data, 0644)
+	defer rows.Close()
+
+	var out []TrustEntry
+	for rows.Next() {
+		var e TrustEntry
+		if err := rows.Scan(&e.Peer, &e.Action, &e.Status, &e.ReceiptID, &e.CoreHash, &e.VerifiedAt, &e.Notes); err != nil {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out, nil
 }

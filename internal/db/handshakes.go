@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -37,10 +38,10 @@ func EnsureHandshakesSchema(db *sql.DB) error {
 
 // ListExpiredActiveHandshakes finds expired and not-yet-revoked tokens.
 func ListExpiredActiveHandshakes(now time.Time) ([]Handshake, error) {
-	rows, err := DefaultDB.Query(`
+	rows, err := DefaultConn.Query(context.Background(), `
 		SELECT id, token, subject, initiator, expires_at, revoked_at
 		FROM handshakes
-		WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at < ?;
+		WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at < $1;
 	`, now.Format(time.RFC3339))
 	if err != nil {
 		return nil, fmt.Errorf("query expired handshakes: %w", err)
@@ -68,7 +69,7 @@ func ListExpiredActiveHandshakes(now time.Time) ([]Handshake, error) {
 
 // MarkHandshakeRevoked marks a handshake as revoked.
 func MarkHandshakeRevoked(id int64, when time.Time, reason string) error {
-	_, err := DefaultDB.Exec(`
+	_, err := DefaultConn.Exec(context.Background(), `
 		UPDATE handshakes
 		SET revoked_at = ?
 		WHERE id = ?;
@@ -83,7 +84,7 @@ func MarkHandshakeRevoked(id int64, when time.Time, reason string) error {
 func GetHandshakeByToken(token string) (Handshake, error) {
 	var hs Handshake
 	var expires, revoked sql.NullString
-	row := DefaultDB.QueryRow(`
+	row := DefaultConn.QueryRow(context.Background(), `
 		SELECT id, token, subject, initiator, expires_at, revoked_at
 		FROM handshakes
 		WHERE token = ?;
@@ -105,13 +106,13 @@ func GetHandshakeByToken(token string) (Handshake, error) {
 // CountHandshakes returns total handshake records.
 func CountHandshakes() (int64, error) {
 	var n int64
-	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM handshakes;`).Scan(&n)
+	err := DefaultConn.QueryRow(context.Background(), `SELECT COUNT(1) FROM handshakes;`).Scan(&n)
 	return n, err
 }
 
 // CountRevocations returns number of revoked handshakes.
 func CountRevocations() (int64, error) {
 	var n int64
-	err := DefaultDB.QueryRow(`SELECT COUNT(1) FROM handshakes WHERE revoked_at IS NOT NULL;`).Scan(&n)
+	err := DefaultConn.QueryRow(context.Background(), `SELECT COUNT(1) FROM handshakes WHERE revoked_at IS NOT NULL;`).Scan(&n)
 	return n, err
 }

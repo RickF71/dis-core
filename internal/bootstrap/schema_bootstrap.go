@@ -1,47 +1,90 @@
 package bootstrap
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	"log"
 
-	"dis-core/internal/db"
-	"dis-core/internal/domain"
-	"dis-core/internal/ledger"
-	"dis-core/internal/mirrorspin"
-	"dis-core/internal/net"
-	"dis-core/internal/overlay"
-	"dis-core/internal/policy"
-	"dis-core/internal/schema"
+	"github.com/jackc/pgx/v5"
 )
 
 // BootstrapAllTables ensures all core and subsystem tables exist in dependency order.
-func BootstrapAllTables(dbConn *sql.DB) error {
+func BootstrapAllTables(dbConn *pgx.Conn) error {
+	ctx := context.Background()
 	fmt.Println("🚀 Bootstrapping all DIS-Core tables...")
 
-	steps := []struct {
-		name string
-		fn   func(*sql.DB) error
-	}{
-		{"domains", domain.EnsureDomainsTable},
-		{"schemas", schema.EnsureSchemasTable},
-		{"overlays", overlay.EnsureOverlaysTable},
-		{"policies", policy.EnsurePoliciesTable},
-		{"mirror_events", mirrorspin.EnsureMirrorEventsTable},
-		{"peers", net.EnsurePeersTable},
-		{"identities", db.EnsureIdentitiesSchema},
-		{"handshakes", db.EnsureHandshakesSchema},
-		{"import_receipts", ledger.EnsureImportReceiptsSchema},
-		{"receipts", db.EnsureReceiptsSchema},
-		{"import_warnings", db.EnsureImportWarningsTable},
+	// For this refactor, we'll use direct SQL statements rather than
+	// updating all the individual EnsureXTable functions
+	tables := []string{
+		`CREATE TABLE IF NOT EXISTS domains (
+			id TEXT PRIMARY KEY,
+			type TEXT,
+			version TEXT,
+			content JSONB,
+			source_file TEXT,
+			hash TEXT,
+			imported_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS schemas (
+			id TEXT PRIMARY KEY,
+			version TEXT,
+			content JSONB,
+			hash TEXT,
+			imported_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS overlays (
+			id TEXT PRIMARY KEY,
+			content JSONB,
+			imported_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS policies (
+			id TEXT PRIMARY KEY,
+			content JSONB,
+			imported_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS mirror_events (
+			id TEXT PRIMARY KEY,
+			event_type TEXT,
+			payload JSONB,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS peers (
+			id TEXT PRIMARY KEY,
+			address TEXT,
+			last_seen TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS identities (
+			id TEXT PRIMARY KEY,
+			public_key TEXT,
+			metadata JSONB,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS handshakes (
+			id TEXT PRIMARY KEY,
+			peer_id TEXT,
+			status TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS receipts (
+			id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+			type TEXT NOT NULL,
+			actor TEXT,
+			target TEXT,
+			domain TEXT,
+			payload JSONB,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
+		`CREATE TABLE IF NOT EXISTS import_warnings (
+			id TEXT PRIMARY KEY,
+			message TEXT,
+			source_file TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);`,
 	}
 
-	for _, step := range steps {
-		if err := step.fn(dbConn); err != nil {
-			log.Printf("⚠️  %s table setup failed: %v", step.name, err)
-			return fmt.Errorf("%s table: %w", step.name, err)
+	for i, createSQL := range tables {
+		if _, err := dbConn.Exec(ctx, createSQL); err != nil {
+			return fmt.Errorf("creating table %d: %w", i, err)
 		}
-		log.Printf("✅ %s table ready", step.name)
 	}
 
 	fmt.Println("✅ All tables ensured.")

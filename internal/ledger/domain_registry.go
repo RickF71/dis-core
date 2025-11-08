@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"context"
 	"dis-core/internal/schema"
 	"fmt"
 	"io/fs"
@@ -38,7 +39,7 @@ func (l *Ledger) BootstrapDomains(reg *schema.Registry, dir string) error {
 			continue
 		}
 
-		if err := l.StoreCanon(dom); err != nil {
+		if err := l.StoreCanon(context.Background(), dom); err != nil {
 			failed++
 			fmt.Printf("❌ Failed to store %s: %v\n", dom.ID, err)
 			continue
