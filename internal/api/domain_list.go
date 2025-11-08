@@ -1,9 +1,10 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // DomainSummary represents a minimal domain record for selection lists.
@@ -18,7 +19,8 @@ type DomainSummary struct {
 //
 // ------------------------------------------------------------
 func (s *Server) handleDomainList(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.DB().Query(`
+	ctx := r.Context()
+	rows, err := s.DB().Query(ctx, `
 		SELECT
 			id::text AS id,
 			name
@@ -40,7 +42,7 @@ func (s *Server) handleDomainList(w http.ResponseWriter, r *http.Request) {
 		}
 		list = append(list, d)
 	}
-	if err := rows.Err(); err != nil && err != sql.ErrNoRows {
+	if err := rows.Err(); err != nil && err != pgx.ErrNoRows {
 		http.Error(w, "iteration error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -11,6 +11,7 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	id := r.PathValue("id")
 	var body struct {
 		CSS string `json:"css"`
@@ -21,7 +22,7 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update only the "css" field inside JSONB column "data"
-	_, err := s.DB().Exec(`
+	_, err := s.DB().Exec(ctx, `
 		UPDATE domains
 		SET data = jsonb_set(
 			COALESCE(data, '{}'::jsonb),

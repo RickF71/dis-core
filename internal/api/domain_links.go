@@ -1,9 +1,10 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // ------------------------------------------------------------
@@ -13,7 +14,8 @@ import (
 //
 // ------------------------------------------------------------
 func (s *Server) handleDomainLinks(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.DB().Query(`
+	ctx := r.Context()
+	rows, err := s.DB().Query(ctx, `
 		SELECT
 			data->>'domain_id' AS child,
 			data->>'parent_name' AS parent
@@ -43,7 +45,7 @@ func (s *Server) handleDomainLinks(w http.ResponseWriter, r *http.Request) {
 			links = append(links, Link{Source: child, Target: parent})
 		}
 	}
-	if err := rows.Err(); err != nil && err != sql.ErrNoRows {
+	if err := rows.Err(); err != nil && err != pgx.ErrNoRows {
 		http.Error(w, "iteration error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

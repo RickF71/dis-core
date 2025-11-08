@@ -1,5 +1,7 @@
 package policy
 
+import "context"
+
 // PolicyEngine is a light wrapper that exposes EvaluateAction
 // through the existing OPAEngine implementation.
 
@@ -16,9 +18,9 @@ func NewPolicyEngineImpl(e *OPAEngine) *PolicyEngineImpl {
 }
 
 // EvaluateAction proxies to the OPAEngine's method.
-func (p *PolicyEngineImpl) EvaluateAction(input map[string]interface{}) (*PolicyDecision, error) {
+func (p *PolicyEngineImpl) EvaluateAction(ctx context.Context, input map[string]interface{}) (*PolicyDecision, error) {
 	if p.engine == nil {
 		return nil, nil
 	}
-	return p.engine.EvaluateAction(input)
+	return p.engine.EvaluateAction(ctx, input)
 }

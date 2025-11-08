@@ -17,7 +17,7 @@ var _ PolicyEngine = (*OPAEngine)(nil)
 
 // PolicyEngine is the interface for runtime policy evaluation.
 type PolicyEngine interface {
-	EvaluateAction(input map[string]interface{}) (*PolicyDecision, error)
+	EvaluateAction(ctx context.Context, input map[string]interface{}) (*PolicyDecision, error)
 }
 
 // NewEngine creates a new OPA-based policy engine with the given modules.
@@ -58,7 +58,7 @@ func NewEngine(modules map[string]string) (*OPAEngine, error) {
 	}, nil
 }
 
-func (e *OPAEngine) EvaluateAction(input map[string]interface{}) (*PolicyDecision, error) {
+func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interface{}) (*PolicyDecision, error) {
 	if e.gatesRego == nil && e.riskRego == nil && e.freezeRego == nil {
 		return &PolicyDecision{
 			Allow:  true,
@@ -66,7 +66,6 @@ func (e *OPAEngine) EvaluateAction(input map[string]interface{}) (*PolicyDecisio
 		}, nil
 	}
 
-	ctx := context.Background()
 	allow := true
 	details := map[string]interface{}{}
 

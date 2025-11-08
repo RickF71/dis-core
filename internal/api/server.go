@@ -78,11 +78,12 @@ func (s *Server) HandleBootstrapStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	input := map[string]interface{}{
 		"action": "domain.freeze.v1",
 		"user":   "rick",
 	}
-	decision, err := s.policy.EvaluateAction(input)
+	decision, err := s.policy.EvaluateAction(ctx, input)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -26,6 +26,7 @@ func (s *Server) handleEvaluateDomainPolicy(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	ctx := r.Context()
 	domainID := r.PathValue("id")
 	if domainID == "" {
 		http.Error(w, "missing domain ID", http.StatusBadRequest)
@@ -71,7 +72,7 @@ func (s *Server) handleEvaluateDomainPolicy(w http.ResponseWriter, r *http.Reque
 		log.Printf("[policy] loaded module: %s", k)
 	}
 
-	decision, err := engine.EvaluateAction(input)
+	decision, err := engine.EvaluateAction(ctx, input)
 	if err != nil {
 		http.Error(w, "policy evaluation failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -87,6 +88,7 @@ func (s *Server) handleEvaluateDomainPolicy(w http.ResponseWriter, r *http.Reque
 // Evaluates policies for the NULL domain only (global evaluator).
 // -----------------------------------------------------------------------------
 func (s *Server) handlePolicyEval(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	var input map[string]interface{}
 
 	if r.Method == http.MethodPost {
@@ -125,7 +127,7 @@ func (s *Server) handlePolicyEval(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ✅ Step 3: Evaluate and respond
-	decision, err := engine.EvaluateAction(input)
+	decision, err := engine.EvaluateAction(ctx, input)
 	if err != nil {
 		http.Error(w, "policy evaluation error: "+err.Error(), http.StatusInternalServerError)
 		return

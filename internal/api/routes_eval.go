@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
 	"encoding/json"
@@ -11,6 +10,7 @@ import (
 
 func (s *Server) RegisterEvalRoute(engine policy.PolicyEngine) {
 	s.mux.HandleFunc("/api/eval", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -21,12 +21,11 @@ func (s *Server) RegisterEvalRoute(engine policy.PolicyEngine) {
 			return
 		}
 		// TODO: Check domain freeze and BreakGlassToken here
-		decision, err := engine.EvaluateAction(input)
+		decision, err := engine.EvaluateAction(ctx, input)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		ctx := context.Background()
 		receipt, err := ledger.NewReceipt(
 			input["by"].(string),
 			input["action"].(string),
