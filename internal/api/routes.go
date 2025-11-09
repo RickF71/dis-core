@@ -88,6 +88,9 @@ func (s *Server) RegisterAPIs() {
 	s.registerPolicyFileRoutes()
 	// s.registerSchemaRoutes() // FIXME: disabled during pgx migration
 	s.registerReceiptRoutes()
+
+	// Register admin routes for authority console integration
+	s.registerAdminRoutes()
 }
 
 // handleListDomains returns all domains as JSON

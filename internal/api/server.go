@@ -51,6 +51,9 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/ping", s.handlePing)
 	s.mux.HandleFunc("/api/status", s.handleStatus)
 	s.mux.HandleFunc("/api/domain/", s.handleDomainGet)
+
+	// Register admin routes
+	s.registerAdminRoutes()
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
