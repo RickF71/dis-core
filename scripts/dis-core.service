@@ -1,0 +1,38 @@
+[Unit]
+Description=DIS-Core Authority Daemon
+Documentation=https://github.com/RickF71/dis-core
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/dis-core
+WorkingDirectory=/var/lib/dis-core
+Restart=on-failure
+RestartSec=5
+User=discore
+Group=discore
+
+# Environment variables
+Environment=DIS_API_PORT=8080
+Environment=DIS_API_HOST=0.0.0.0
+Environment=DIS_VERSION=v1.0-production
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dis-core /var/log/dis-core
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dis-core
+
+[Install]
+WantedBy=multi-user.target

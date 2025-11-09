@@ -22,6 +22,7 @@ func (s *Server) RegisterAPIs() {
 	// ============================================================
 	// CORE / SYSTEM ROUTES
 	// ============================================================
+	mux.HandleFunc("GET /api/ping", s.handlePing)
 	mux.HandleFunc("GET /api/status", s.HandleStatus)
 
 	// ============================================================
