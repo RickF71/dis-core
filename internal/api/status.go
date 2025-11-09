@@ -38,7 +38,7 @@ func (s *Server) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- Safe DB queries ---
-	if s.DB != nil {
+	if s.DB() != nil {
 		ctx := context.Background() // TODO: pass request context through
 		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM canon WHERE type='domain'`).Scan(&resp.Domains); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
