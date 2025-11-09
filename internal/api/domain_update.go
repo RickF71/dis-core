@@ -38,5 +38,15 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record domain update using ci.call.v1
+	if s.ledger != nil {
+		_ = s.ledger.RecordCall(ctx, "api", id, "domain", "domain.update.v1", map[string]any{
+			"domain_id":  id,
+			"updated_by": "api.domain.update",
+			"field":      "css",
+			"css_length": len(body.CSS),
+		})
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

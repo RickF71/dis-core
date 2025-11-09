@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"io/fs"
 	"log"
 	"net/http"
@@ -49,13 +50,24 @@ func (m *mockResponseWriter) WriteHeader(statusCode int) {
 }
 
 func main() {
+	// Parse command line flags
+	portFlag := flag.String("port", "", "Port for the console server (overrides DIS_PORT env)")
+	flag.Parse()
+	port := *portFlag
+	if port == "" {
+		port = os.Getenv("DIS_PORT")
+	}
+	if port == "" {
+		port = "8080"
+	}
+
 	// Initialize Authority Console
 	seats := []string{"uid-terracouncil-001", "uid-terracouncil-002"}
 	ac := console.NewConsole("domain.terra", "DIS-CORE v1.0", seats)
 	console.LoadLastVerification()
 
 	// --- Connect to Postgres ---
-	dsn := "postgres://dis_user@localhost/dis?sslmode=disable"
+	dsn := "postgres://dis_user:card567@localhost/dis?sslmode=disable"
 	dbConn, err := db.ConnectPostgres(dsn)
 	if err != nil {
 		log.Fatalf("❌ Failed to connect to database: %v", err)
@@ -86,7 +98,7 @@ func main() {
 				log.Printf("❌ Scheduled verification failed: %v", err)
 			} else {
 				log.Printf("✅ Scheduled verification complete: %d valid, %d invalid — receipt %s",
-					report.Valid, report.Invalid, receipt.ReceiptID)
+					report.Valid, report.Invalid, receipt.ID)
 			}
 
 			time.Sleep(30 * time.Minute)
@@ -237,23 +249,17 @@ func main() {
 			return
 		}
 
-		dir := "versions/v0.6/receipts/generated"
-		files := []string{}
-
-		_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err == nil && !d.IsDir() && strings.HasSuffix(d.Name(), ".json") {
-				files = append(files, filepath.Base(path))
-			}
-			return nil
-		})
+		ctx := r.Context()
+		list, err := db.ListReceipts(ctx, dbConn, 100, 0)
+		if err != nil {
+			http.Error(w, "failed to load receipts: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"receipts": files})
+		_ = json.NewEncoder(w).Encode(map[string]any{"receipts": list})
 	})
 
-	// ===================================
-	// === GET /api/receipts/{id}.json ===
-	// ===================================
 	http.HandleFunc("/api/receipts/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -266,19 +272,20 @@ func main() {
 			return
 		}
 
-		file := filepath.Join("versions/v0.6/receipts/generated", id)
-		if !strings.HasSuffix(file, ".json") {
-			file += ".json"
-		}
+		ctx := r.Context()
+		var rec db.Receipt
+		err := dbConn.QueryRow(ctx, `
+		SELECT id, type, actor, target, domain, payload, created_at
+		FROM receipts WHERE id = $1
+	`, id).Scan(&rec.ID, &rec.Type, &rec.Actor, &rec.Target, &rec.Domain, &rec.Payload, &rec.CreatedAt)
 
-		data, err := os.ReadFile(file)
 		if err != nil {
 			http.Error(w, "receipt not found", http.StatusNotFound)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(data)
+		_ = json.NewEncoder(w).Encode(rec)
 	})
 
 	// ======================================
@@ -302,7 +309,7 @@ func main() {
 			"valid":                   report.Valid,
 			"invalid":                 report.Invalid,
 			"results":                 report.Results,
-			"verification_receipt_id": receipt.ReceiptID,
+			"verification_receipt_id": receipt.ID,
 			"verification_receipt":    receipt,
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -338,6 +345,6 @@ func main() {
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 
-	log.Println("🌐 DIS Authority Console API listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Printf("🌐 DIS Authority Console API listening on :%s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

@@ -3,16 +3,12 @@ package auth
 import (
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
-
 	"dis-core/internal/api/auth/console"
-	"dis-core/internal/api/auth/dis"
-	"dis-core/internal/api/auth/revoke"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Register wires all authentication-related routes.
-func Register(mux *http.ServeMux, store *pgx.Conn) {
+// Register wires all authentication routes to the main mux.
+func Register(mux *http.ServeMux, store *pgxpool.Pool) {
 	console.Register(mux, store)
-	dis.Register(mux, store)
-	revoke.Register(mux, store)
 }

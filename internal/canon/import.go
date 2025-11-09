@@ -1,6 +1,7 @@
 package canon
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,8 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"database/sql"
-
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"
 
 	"dis-core/internal/ledger"
@@ -51,9 +51,10 @@ func (c *CanonImporter) ImportDir(dir string) error {
 		h := sha256.Sum256(data)
 		record := CanonRecord{}
 		if err := yaml.Unmarshal(data, &record); err != nil {
-			_ = c.Ledger.Record("canon.import.failed.v1", map[string]any{
+			_ = c.Ledger.RecordCall(context.Background(), "system", f, "canon", "import.failed.v1", map[string]any{
 				"file":  f,
 				"error": err.Error(),
+				"hash":  hex.EncodeToString(h[:]),
 			})
 			continue
 		}
@@ -65,24 +66,36 @@ func (c *CanonImporter) ImportDir(dir string) error {
 			"hash":        record.Hash,
 		}
 
-		if err := c.Ledger.StoreCanon(record); err != nil {
-			_ = c.Ledger.Record("canon.import.failed.v1", map[string]any{
+		if err := c.Ledger.StoreCanon(context.Background(), record); err != nil {
+			_ = c.Ledger.RecordCall(context.Background(), "system", f, "canon", "store.failed.v1", map[string]any{
 				"file":  f,
 				"error": err.Error(),
+				"hash":  record.Hash,
 			})
 			continue
 		}
 
-		_ = c.Ledger.Record("canon.import.v1", map[string]any{
+		_ = c.Ledger.RecordCall(context.Background(), "system", f, "canon", "import.success.v1", map[string]any{
 			"file": f,
 			"hash": record.Hash,
+			"type": record.Type,
+			"id":   record.ID,
 		})
 		fmt.Printf("✅ Imported %s (%s)\n", f, record.ID)
 	}
 	return nil
 }
 
-func Import(db *sql.DB) error {
+// Import initializes CanonImporter with the given pgxpool connection
+func Import(pool *pgxpool.Pool) error {
+	log.Println("📜 Canon import starting")
+	led := &ledger.Ledger{DB: pool}
+	importer := &CanonImporter{Ledger: led}
+	// In the future, pass directory path dynamically
+	err := importer.ImportDir("./canon")
+	if err != nil {
+		return fmt.Errorf("canon import failed: %w", err)
+	}
 	log.Println("📜 Canon import complete")
 	return nil
 }

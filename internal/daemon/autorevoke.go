@@ -46,9 +46,9 @@ func StartAutoRevocationDaemon(ctx context.Context, interval time.Duration) {
 			}
 
 			rc := db.Receipt{
-				ReceiptID: generateReceiptID("rcpt-revoke"),
-				SchemaRef: "revocation.v0",
-				Content:   "Revocation: handshake " + hs.Token + " for " + hs.Subject + " (reason: expired)",
+				ID:        generateReceiptID("rcpt-revoke"),
+				Type:      "revocation.v0",
+				Payload:   map[string]any{"content": "Revocation: handshake " + hs.Token + " for " + hs.Subject + " (reason: expired)"},
 				CreatedAt: now, // now is time.Time
 			}
 

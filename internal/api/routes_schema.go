@@ -14,7 +14,11 @@ func (s *Server) registerSchemaRoutes() {
 
 // GET /api/schema/active
 func (s *Server) handleGetActiveSchema(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Schema handlers temporarily disabled during pgx migration", http.StatusNotImplemented)
+	if s.authoritySchema == nil {
+		http.Error(w, "schema not loaded", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(s.authoritySchema)
 }
 
 // GET /api/schema/list

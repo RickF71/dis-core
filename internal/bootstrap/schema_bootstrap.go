@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // BootstrapAllTables ensures all core and subsystem tables exist in dependency order.
-func BootstrapAllTables(dbConn *pgx.Conn) error {
+func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 	ctx := context.Background()
 	fmt.Println("🚀 Bootstrapping all DIS-Core tables...")
 

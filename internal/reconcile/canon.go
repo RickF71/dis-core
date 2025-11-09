@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -25,6 +26,7 @@ func New(repoRoot string, schemas *schema.Registry, led *ledger.Ledger) *CanonRe
 }
 
 func (r *CanonReconciler) ReconcileDomain(code string) error {
+	ctx := context.Background() // ✅ add context
 	code = strings.ToLower(strings.TrimSpace(code))
 	if len(code) != 3 {
 		return fmt.Errorf("invalid domain code %q (expect 3 letters)", code)
@@ -46,20 +48,19 @@ func (r *CanonReconciler) ReconcileDomain(code string) error {
 	}
 
 	// 3) Ensure schema exists (name + version)
-	//    Try domain-specific schema first, then fallback to default.
-	schemaName := fmt.Sprintf("schema.%s", strings.ToLower(dom.Code)) // name WITHOUT version
-	const v = "v1"                                                    // adjust if your registry uses another current version
+	schemaName := fmt.Sprintf("schema.%s", strings.ToLower(dom.Code))
+	const v = "v1"
 
 	if _, ok := r.Schemas.Get(schemaName, v); !ok {
 		schemaName = "schema.default"
 		if _, ok := r.Schemas.Get(schemaName, v); !ok {
-			return fmt.Errorf("no schema found: tried %s/%s and %s/%s", fmt.Sprintf("schema.%s", strings.ToLower(dom.Code)), v, "schema.default", v)
+			return fmt.Errorf("no schema found: tried %s/%s and %s/%s",
+				fmt.Sprintf("schema.%s", strings.ToLower(dom.Code)), v, "schema.default", v)
 		}
 	}
 
 	// 4) Record in ledger
 	payload := map[string]any{
-		"action":  "domain.reconcile",
 		"domain":  dom.Code,
 		"name":    dom.Name,
 		"parent":  parent,
@@ -68,7 +69,9 @@ func (r *CanonReconciler) ReconcileDomain(code string) error {
 		"source":  filepath.Join("domains", strings.ToLower(dom.Code), fmt.Sprintf("domain.%s.yaml", strings.ToLower(dom.Code))),
 		"canon":   true,
 	}
-	if err := r.Ledger.Record("ci.call.v1", payload); err != nil {
+
+	// ✅ Use RecordCall for ci.call.v1 format
+	if err := r.Ledger.RecordCall(ctx, "system", dom.Code, "reconcile", "domain.reconcile.v1", payload); err != nil {
 		return fmt.Errorf("ledger record: %w", err)
 	}
 

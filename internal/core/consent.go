@@ -1,7 +1,7 @@
 package core
 
 import (
-	"database/sql"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -13,13 +13,15 @@ import (
 	dbpkg "dis-core/internal/db"
 	"dis-core/internal/policy"
 	"dis-core/internal/util/crypto"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PerformConsentAction validates policy and inserts a receipt.
 // Returns: receiptID, nonce, createdAt, signature, error
-func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce string, pol *policy.Policy, polSum string) (int64, string, string, string, error) {
+func PerformConsentAction(pool *pgxpool.Pool, by string, scope string, providedNonce string, pol *policy.Policy, polSum string) (int64, string, string, string, error) {
 	var id string
-	if err := sqlDB.QueryRow("SELECT id FROM identities ORDER BY created_at DESC LIMIT 1").Scan(&id); err != nil {
+	if err := pool.QueryRow(context.Background(), "SELECT id FROM identities ORDER BY created_at DESC LIMIT 1").Scan(&id); err != nil {
 		return 0, "", "", "", fmt.Errorf("no identity found, create one first")
 	}
 
@@ -57,17 +59,17 @@ func PerformConsentAction(sqlDB *sql.DB, by string, scope string, providedNonce 
 
 	// Construct receipt record
 	r := &dbpkg.Receipt{
-		ReceiptID: fmt.Sprintf("rcpt-%s", nonce[:8]),
-		SchemaRef: "bridge-receipt-template.v0",
-		Content:   fmt.Sprintf("Consent granted by %s for scope '%s'. Sig=%s", by, scope, sig[:16]),
+		ID:        fmt.Sprintf("rcpt-%s", nonce[:8]),
+		Type:      "bridge-receipt-template.v0",
+		Payload:   map[string]any{"content": fmt.Sprintf("Consent granted by %s for scope '%s'. Sig=%s", by, scope, sig[:16])},
 		CreatedAt: ts,
 	}
 
-	recID, err := dbpkg.InsertReceipt(sqlDB, r)
+	err := dbpkg.SaveReceipt(context.Background(), pool, r)
 	if err != nil {
 		return 0, "", "", "", err
 	}
 
-	log.Printf("✅ Consent action recorded: by=%s scope=%s receipt_id=%d", by, scope, recID)
-	return recID, nonce, bridge.CanonicalTime(ts), sig, nil
+	log.Printf("✅ Consent action recorded: by=%s scope=%s receipt_id=%s", by, scope, r.ID)
+	return 1, nonce, bridge.CanonicalTime(ts), sig, nil
 }

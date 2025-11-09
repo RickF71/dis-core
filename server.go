@@ -1,3 +1,4 @@
+// server.go — root package main
 package main
 
 import (
@@ -6,24 +7,30 @@ import (
 	"net/http"
 	"time"
 
-	apiserver "dis-core/internal/api/server"
+	"dis-core/internal/api"
 	"dis-core/internal/db"
+	"dis-core/internal/ledger"
 )
 
+// buildServer initializes and returns the main HTTP mux for DIS-Core.
 func buildServer() *http.ServeMux {
+	// Initialize the connection pool.
 	store := db.DefaultConn
 	if store == nil {
-		log.Fatal("database not initialized")
+		log.Fatal("database not initialized (db.DefaultConn is nil)")
 	}
 
-	// Create server with database (ledger will be nil for now)
-	s := apiserver.New(store, nil)
+	// Initialize the ledger (may evolve to use store + context)
+	led := &ledger.Ledger{DB: store}
 
-	// The NewServer call already registers all routes and sets up the mux
-	return s.Handler() // Updated method name
+	// Create the main API server instance.
+	s := api.New(store, led)
+
+	// The API server wires routes internally and exposes the mux.
+	return s.Handler()
 }
 
-// RunServer starts the HTTP server and listens until context cancel.
+// RunServer starts the DIS-Core HTTP server and gracefully shuts it down on context cancel.
 func RunServer(ctx context.Context, addr string) {
 	server := &http.Server{
 		Addr:         addr,
@@ -34,14 +41,14 @@ func RunServer(ctx context.Context, addr string) {
 	}
 
 	go func() {
-		log.Printf("🌍 DIS-CORE API listening on %s", addr)
+		log.Printf("🌍 DIS-Core API listening on %s", addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("🛑 shutting down server...")
+	log.Println("🛑 Shutting down DIS-Core server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -11,6 +11,8 @@ import (
 	"dis-core/internal/registry/atlas"
 	"dis-core/internal/registry/receipts"
 	"dis-core/internal/registry/terra"
+
+	authorityapi "dis-core/internal/api/authority"
 )
 
 // RegisterAPIs wires all endpoint groups into the server mux.
@@ -20,9 +22,7 @@ func (s *Server) RegisterAPIs() {
 	// ============================================================
 	// CORE / SYSTEM ROUTES
 	// ============================================================
-	mux.HandleFunc("GET /api/ping", s.handlePing)
 	mux.HandleFunc("GET /api/status", s.HandleStatus)
-	mux.HandleFunc("GET /api/bootstrap/status", s.HandleBootstrapStatus)
 
 	// ============================================================
 	// DOMAIN ROUTES (JSONB MODEL)
@@ -61,6 +61,10 @@ func (s *Server) RegisterAPIs() {
 	mux.HandleFunc("POST /api/jikka", s.handleCreateJikka)
 	mux.HandleFunc("GET /api/jikka/list", s.handleListJikkas)
 
+	authHandler := authorityapi.NewHandler(s.db, s.authoritySchema, s.authorityConsole)
+	s.mux.HandleFunc("/api/authority/schema", authHandler.HandleSchema)
+	s.mux.HandleFunc("/api/authority/console", authHandler.HandleConsole)
+
 	// ============================================================
 	// IDENTITY & REGISTRY MODULES
 	// ============================================================
@@ -83,7 +87,7 @@ func (s *Server) RegisterAPIs() {
 	// s.registerPolicyRoutes() // FIXME: disabled during pgx migration
 	s.registerPolicyFileRoutes()
 	// s.registerSchemaRoutes() // FIXME: disabled during pgx migration
-
+	s.registerReceiptRoutes()
 }
 
 // handleListDomains returns all domains as JSON

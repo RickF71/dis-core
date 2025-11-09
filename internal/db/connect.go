@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ConnectPostgres opens a PostgreSQL connection using pgx.
-func ConnectPostgres(dsn string) (*pgx.Conn, error) {
-	conn, err := pgx.Connect(context.Background(), dsn)
+// ConnectPostgres opens a PostgreSQL connection pool using pgxpool.
+func ConnectPostgres(dsn string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
-	if err := conn.Ping(context.Background()); err != nil {
+	if err := pool.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("ping: %w", err)
 	}
-	return conn, nil
+	return pool, nil
 }
 
 // ConnectFromEnv connects using DATABASE_URL environment variable
-func ConnectFromEnv() (*pgx.Conn, error) {
+func ConnectFromEnv() (*pgxpool.Pool, error) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = os.Getenv("DIS_DB_DSN")

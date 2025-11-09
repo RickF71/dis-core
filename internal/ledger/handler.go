@@ -1,16 +1,17 @@
 package ledger
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"dis-core/internal/db"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Handle returns an http.HandlerFunc bound to the provided DB connection.
-func Handle(store *sql.DB) http.HandlerFunc {
+// Handle returns an http.HandlerFunc bound to the provided pgxpool connection.
+func Handle(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -21,12 +22,10 @@ func Handle(store *sql.DB) http.HandlerFunc {
 				limit = 100
 			}
 
-			list, err := db.ListReceipts(store, db.ListOpts{
-				Limit:  limit,
-				Offset: offset,
-			})
+			ctx := r.Context()
+			list, err := db.ListReceipts(ctx, pool, limit, offset)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, "failed to list receipts: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 

@@ -1,11 +1,12 @@
 package db
 
 import (
-	"database/sql"
+	"context"
 	"log"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Peer represents one network peer (trusted node, council seat, etc.)
 type Peer struct {
 	ID         string
 	Name       string
@@ -15,9 +16,9 @@ type Peer struct {
 	Status     string
 }
 
-// LoadNetworkPeers reads peers directly from the Postgres table.
-func LoadNetworkPeers(conn *sql.DB) ([]Peer, error) {
-	rows, err := conn.Query(`
+func LoadNetworkPeers(conn *pgxpool.Pool) ([]Peer, error) {
+	ctx := context.Background()
+	rows, err := conn.Query(ctx, `
 		SELECT id, COALESCE(name, id) AS name, url, trust_level,
 		       COALESCE(to_char(last_seen, 'YYYY-MM-DD"T"HH24:MI:SSOF'), '') AS last_seen,
 		       COALESCE(status, 'unknown')
@@ -33,7 +34,7 @@ func LoadNetworkPeers(conn *sql.DB) ([]Peer, error) {
 	for rows.Next() {
 		var p Peer
 		if err := rows.Scan(&p.ID, &p.Name, &p.URL, &p.TrustLevel, &p.LastSeen, &p.Status); err != nil {
-			log.Printf("⚠️ failed to scan peer row: %v", err)
+			log.Printf("failed to scan peer row: %v", err)
 			continue
 		}
 		peers = append(peers, p)

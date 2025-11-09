@@ -35,7 +35,7 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("connect postgres: %w", err)
 	}
-	defer database.Close(ctx)
+	defer database.Close()
 	log.Println("✅ Connected to PostgreSQL ledger")
 
 	// ============================================================
@@ -51,7 +51,7 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("open ledger: %w", err)
 	}
-	defer led.Close(ctx)
+	defer led.Close()
 	log.Println("✅ Ledger ready (DB-native)")
 
 	// ============================================================

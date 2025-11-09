@@ -57,6 +57,17 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record domain creation using ci.call.v1
+	if s.ledger != nil {
+		_ = s.ledger.RecordCall(ctx, "api", newID.String(), "domain", "domain.create.v1", map[string]any{
+			"domain_id":  newID.String(),
+			"parent_id":  parentIDStr,
+			"created_by": "api.domain.create",
+			"data_size":  len(input.Data),
+			"name":       input.Name,
+		})
+	}
+
 	var d Domain
 	err = s.DB().QueryRow(ctx, `
 		SELECT id, parent_id, data, created_at, updated_at

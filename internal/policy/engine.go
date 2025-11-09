@@ -3,9 +3,16 @@ package policy
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/open-policy-agent/opa/rego"
 )
+
+// -------------------------------------------------------------
+// Engine Definition
+// -------------------------------------------------------------
 
 type OPAEngine struct {
 	gatesRego  *rego.PreparedEvalQuery
@@ -19,6 +26,32 @@ var _ PolicyEngine = (*OPAEngine)(nil)
 type PolicyEngine interface {
 	EvaluateAction(ctx context.Context, input map[string]interface{}) (*PolicyDecision, error)
 }
+
+// -------------------------------------------------------------
+// Module Loader
+// -------------------------------------------------------------
+
+// LoadLocalModules reads local .rego files under internal/policy/.
+func LoadLocalModules() (map[string]string, error) {
+	base := "internal/policy"
+	files := []string{"gates.rego", "risk.rego", "freeze.rego"}
+	modules := map[string]string{}
+
+	for _, f := range files {
+		path := filepath.Join(base, f)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", path, err)
+		}
+		modules[f] = string(data)
+	}
+
+	return modules, nil
+}
+
+// -------------------------------------------------------------
+// Engine Construction
+// -------------------------------------------------------------
 
 // NewEngine creates a new OPA-based policy engine with the given modules.
 func NewEngine(modules map[string]string) (*OPAEngine, error) {
@@ -58,11 +91,42 @@ func NewEngine(modules map[string]string) (*OPAEngine, error) {
 	}, nil
 }
 
+// -------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------
+
+// evalDetails executes a Rego query returning an object and merges keys into details.
+func evalDetails(ctx context.Context, moduleName, query string, moduleSrc string, input map[string]interface{}, prefix string, details map[string]interface{}) {
+	q, err := rego.New(
+		rego.Query(query),
+		rego.Module(moduleName, moduleSrc),
+	).PrepareForEval(ctx)
+	if err != nil {
+		return
+	}
+
+	rs, err := q.Eval(ctx, rego.EvalInput(input))
+	if err != nil || len(rs) == 0 || len(rs[0].Expressions) == 0 {
+		return
+	}
+
+	if m, ok := rs[0].Expressions[0].Value.(map[string]interface{}); ok {
+		for k, v := range m {
+			details[fmt.Sprintf("%s.%s", prefix, k)] = v
+		}
+	}
+}
+
+// -------------------------------------------------------------
+// Core Evaluation
+// -------------------------------------------------------------
+
 func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interface{}) (*PolicyDecision, error) {
 	if e.gatesRego == nil && e.riskRego == nil && e.freezeRego == nil {
 		return &PolicyDecision{
-			Allow:  true,
-			Reason: "no policies loaded; default allow",
+			Allow:     true,
+			Reason:    "no policies loaded; default allow",
+			Timestamp: time.Now().UTC(),
 		}, nil
 	}
 
@@ -83,6 +147,8 @@ func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interfa
 				}
 			}
 		}
+		// Merge any data.gates.details
+		evalDetails(ctx, "gates.rego", "data.gates.details", e.getModule("gates.rego"), input, "gates", details)
 	}
 
 	// --- RISK
@@ -96,6 +162,7 @@ func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interfa
 				details["risk.score"] = f
 			}
 		}
+		evalDetails(ctx, "risk.rego", "data.risk.details", e.getModule("risk.rego"), input, "risk", details)
 	}
 
 	// --- FREEZE
@@ -112,11 +179,23 @@ func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interfa
 				}
 			}
 		}
+		evalDetails(ctx, "freeze.rego", "data.freeze.details", e.getModule("freeze.rego"), input, "freeze", details)
 	}
 
 	return &PolicyDecision{
-		Allow:   allow,
-		Reason:  "evaluated via gates/risk/freeze",
-		Details: details,
+		Allow:     allow,
+		Reason:    "evaluated via gates/risk/freeze",
+		Details:   details,
+		Timestamp: time.Now().UTC(),
 	}, nil
+}
+
+// getModule retrieves the source code of a module from disk for detail evaluation.
+func (e *OPAEngine) getModule(name string) string {
+	path := filepath.Join("internal", "policy", name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }

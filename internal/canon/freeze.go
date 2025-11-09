@@ -33,9 +33,11 @@ func (f *FreezeController) FreezeImport(ctx context.Context) error {
 		return fmt.Errorf("freeze: failed to save receipt: %w", err)
 	}
 
-	_ = f.Ledger.Record(ctx, "canon.freeze.v1", map[string]any{
-		"key":   "canon.import.enabled",
-		"value": "false",
+	_ = f.Ledger.RecordCall(ctx, "system", "canon.import", "freeze", "domain.freeze.v1", map[string]any{
+		"key":    "canon.import.enabled",
+		"value":  "false",
+		"action": "freeze_import",
+		"reason": "administrative freeze",
 	})
 	fmt.Println("🧊 Canon import frozen — DB is now authoritative.")
 	return nil

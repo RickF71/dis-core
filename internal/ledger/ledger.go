@@ -9,27 +9,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Ledger provides the core persistence layer for DIS-Core.
 // It manages schema creation, config, canon, and event logging.
 type Ledger struct {
-	DB  *pgx.Conn
+	DB  *pgxpool.Pool
 	reg *schema.Registry
 }
 
-// Open initializes the ledger. It can accept either an existing DB handle
-// or a DSN string. If db is nil, it opens a new connection using the DSN.
+// Open initializes the ledger. It can accept either an existing DB pool
+// or a DSN string. If db is nil, it opens a new connection pool using the DSN.
 // Optionally, a schema registry can be attached for validation and linkage.
-func Open(ctx context.Context, dsn string, db *pgx.Conn, reg *schema.Registry) (*Ledger, error) {
-	var conn *pgx.Conn
+func Open(ctx context.Context, dsn string, db *pgxpool.Pool, reg *schema.Registry) (*Ledger, error) {
+	var pool *pgxpool.Pool
 	var err error
 
 	if db != nil {
-		conn = db
+		pool = db
 	} else {
-		conn, err = pgx.Connect(ctx, dsn)
+		pool, err = pgxpool.New(ctx, dsn)
 		if err != nil {
 			return nil, fmt.Errorf("open ledger db: %w", err)
 		}
@@ -63,23 +64,23 @@ func Open(ctx context.Context, dsn string, db *pgx.Conn, reg *schema.Registry) (
 	}
 
 	for _, stmt := range schemaStatements {
-		if _, err := conn.Exec(context.Background(), stmt); err != nil {
+		if _, err := pool.Exec(context.Background(), stmt); err != nil {
 			return nil, fmt.Errorf("create tables: %w", err)
 		}
 	}
 
 	// Build the ledger instance and attach registry
 	l := &Ledger{
-		DB:  conn,
+		DB:  pool,
 		reg: reg, // <— attach live schema registry
 	}
 
 	return l, nil
 }
 
-// Close cleanly shuts down the ledger database connection.
-func (l *Ledger) Close(ctx context.Context) error {
-	return l.DB.Close(ctx)
+// Close cleanly shuts down the ledger database connection pool.
+func (l *Ledger) Close() {
+	l.DB.Close()
 }
 
 // Record inserts a generic event receipt into the ledger.
@@ -91,6 +92,74 @@ func (l *Ledger) Record(ctx context.Context, eventType string, payload map[strin
 	if err != nil {
 		return fmt.Errorf("record event: %w", err)
 	}
+	return nil
+}
+
+// CICallPayload represents the standardized payload for ci.call.v1 receipts
+type CICallPayload struct {
+	Action     string                 `json:"action"`
+	Payload    map[string]interface{} `json:"payload"`
+	Provenance []ProvenanceEntry      `json:"provenance,omitempty"`
+	Redaction  *RedactionInfo         `json:"redaction,omitempty"`
+	Timestamp  string                 `json:"timestamp"`
+}
+
+// ProvenanceEntry tracks the lineage of the action
+type ProvenanceEntry struct {
+	Type   string `json:"type"`   // "domain", "seat", "policy", "schema"
+	Ref    string `json:"ref"`    // ID/reference
+	Status string `json:"status"` // "valid", "frozen", "expired"
+}
+
+// RedactionInfo tracks any redacted fields for privacy
+type RedactionInfo struct {
+	RedactedFields []string `json:"redacted_fields,omitempty"`
+	Reason         string   `json:"reason,omitempty"`
+}
+
+// RecordCall creates a ci.call.v1 receipt for any domain action
+func (l *Ledger) RecordCall(ctx context.Context, actor, target, domain, action string, payload map[string]interface{}) error {
+	if l.DB == nil {
+		return fmt.Errorf("ledger database not initialized")
+	}
+
+	// Build the standardized ci.call.v1 payload
+	ciPayload := CICallPayload{
+		Action:    action,
+		Payload:   payload,
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	// Add provenance from context if available
+	if provenance := extractProvenance(ctx); provenance != nil {
+		ciPayload.Provenance = provenance
+	}
+
+	// Add redaction info from context if available
+	if redaction := extractRedaction(ctx); redaction != nil {
+		ciPayload.Redaction = redaction
+	}
+
+	// Marshal the payload
+	payloadBytes, err := json.Marshal(ciPayload)
+	if err != nil {
+		return fmt.Errorf("marshal ci.call.v1 payload: %w", err)
+	}
+
+	// Generate receipt ID
+	receiptID := uuid.New().String()
+
+	// Insert into receipts table
+	const q = `
+		INSERT INTO receipts (id, type, actor, target, domain, payload, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+	`
+
+	_, err = l.DB.Exec(ctx, q, receiptID, "ci.call.v1", actor, target, domain, payloadBytes)
+	if err != nil {
+		return fmt.Errorf("insert ci.call.v1 receipt: %w", err)
+	}
+
 	return nil
 }
 
@@ -186,10 +255,58 @@ func getMetaString(m map[string]any, key string) string {
 	return ""
 }
 
+// InsertReceipt inserts a structured ci.call.v1-style receipt.
+// This is used by the Authority Console to persist policy decisions.
+func (l *Ledger) InsertReceipt(ctx context.Context, r Receipt) error {
+	if l == nil || l.DB == nil {
+		return fmt.Errorf("ledger or DB not initialized")
+	}
+
+	// fallback timestamp if not set
+	if r.CreatedAt.IsZero() {
+		r.CreatedAt = time.Now().UTC()
+	}
+
+	_, err := l.DB.Exec(ctx, `
+		INSERT INTO receipts (id, type, actor, target, domain, payload, created_at)
+		VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6);
+	`, r.Type, r.Actor, r.Target, r.Domain, r.Payload, r.CreatedAt)
+
+	if err != nil {
+		return fmt.Errorf("insert receipt: %w", err)
+	}
+	return nil
+}
+
 // Registry returns the schema registry associated with this ledger.
 func (l *Ledger) Registry() *schema.Registry {
 	if l == nil {
 		return nil
 	}
 	return l.reg
+}
+
+// Helper functions to extract context values
+func extractProvenance(ctx context.Context) []ProvenanceEntry {
+	if prov, ok := ctx.Value("provenance").([]ProvenanceEntry); ok {
+		return prov
+	}
+	return nil
+}
+
+func extractRedaction(ctx context.Context) *RedactionInfo {
+	if red, ok := ctx.Value("redaction").(*RedactionInfo); ok {
+		return red
+	}
+	return nil
+}
+
+// WithProvenance adds provenance information to context
+func WithProvenance(ctx context.Context, entries []ProvenanceEntry) context.Context {
+	return context.WithValue(ctx, "provenance", entries)
+}
+
+// WithRedaction adds redaction information to context
+func WithRedaction(ctx context.Context, info *RedactionInfo) context.Context {
+	return context.WithValue(ctx, "redaction", info)
 }

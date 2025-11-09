@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -18,15 +19,23 @@ type BootstrapStatus struct {
 	Timestamp    string `json:"timestamp"`
 }
 
+type DBProvider interface {
+	QueryRow(string, ...any) RowScanner
+	Ping(context.Context) error
+}
+type RowScanner interface {
+	Scan(dest ...any) error
+}
+
 // HandleBootstrapStatus responds with DB stats and readiness check.
-func (s *Server) HandleBootstrapStatus(w http.ResponseWriter, r *http.Request) {
+func HandleBootstrapStatus(db DBProvider, w http.ResponseWriter, r *http.Request) {
 	resp := BootstrapStatus{
 		Status:       "ok",
 		Timestamp:    time.Now().UTC().Format(time.RFC3339),
 		Bootstrapped: true,
 	}
 
-	if s.DB == nil {
+	if db == nil {
 		resp.Status = "unavailable"
 		resp.Bootstrapped = false
 		writeJSON(w, resp)
@@ -34,7 +43,7 @@ func (s *Server) HandleBootstrapStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	if err := s.DB.Ping(); err != nil {
+	if err := db.Ping(context.Background()); err != nil {
 		resp.Status = "error"
 		resp.Bootstrapped = false
 		resp.DBLatency = -1
@@ -46,7 +55,7 @@ func (s *Server) HandleBootstrapStatus(w http.ResponseWriter, r *http.Request) {
 	// Count key tables — safe even if empty
 	count := func(q string) int {
 		var c int
-		if err := s.DB.QueryRow(q).Scan(&c); err == nil {
+		if err := db.QueryRow(q).Scan(&c); err == nil {
 			return c
 		}
 		return -1

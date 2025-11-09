@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Receipt represents a ci.call.v1 log entry.
@@ -82,8 +83,8 @@ func (r *Receipt) VerifyHash() string {
 }
 
 // Save convenience wrapper: begins + commits a tx for standalone inserts.
-func (r *Receipt) Save(ctx context.Context, conn *pgx.Conn) error {
-	tx, err := conn.Begin(ctx)
+func (r *Receipt) Save(ctx context.Context, pool *pgxpool.Pool) error {
+	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
 	}

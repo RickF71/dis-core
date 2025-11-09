@@ -8,7 +8,7 @@ import (
 
 	"dis-core/internal/schema"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"gopkg.in/yaml.v2"
 )
@@ -16,7 +16,7 @@ import (
 // BootstrapAuthority is the single entry point for initializing DIS-Core.
 // It seeds canonical data (themes), ensures schema registration,
 // and inserts null-domain policies if missing.
-func BootstrapAuthority(db *pgx.Conn, reg *schema.Registry) error {
+func BootstrapAuthority(db *pgxpool.Pool, reg *schema.Registry) error {
 	log.Println("[bootstrap] Starting DIS-Core initialization...")
 
 	// ---- Step 2: Register core schema ----
@@ -41,7 +41,7 @@ func BootstrapAuthority(db *pgx.Conn, reg *schema.Registry) error {
 	return nil
 }
 
-func RegisterAuthorityLayer(db *pgx.Conn) error {
+func RegisterAuthorityLayer(db *pgxpool.Pool) error {
 	data, err := os.ReadFile("schemas/authority.layer.yaml")
 	if err != nil {
 		return err

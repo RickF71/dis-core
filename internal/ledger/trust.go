@@ -1,8 +1,10 @@
 package ledger
 
 import (
-	"database/sql"
+	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // TrustEntry represents one verification event between peers.
@@ -18,12 +20,13 @@ type TrustEntry struct {
 
 // TrustLedger provides DB-backed persistence for trust events.
 type TrustLedger struct {
-	DB *sql.DB
+	DB *pgxpool.Pool
 }
 
 // OpenTrustLedger ensures the trust_entries table exists and returns a handle.
-func OpenTrustLedger(db *sql.DB) (*TrustLedger, error) {
-	_, err := db.Exec(`
+func OpenTrustLedger(db *pgxpool.Pool) (*TrustLedger, error) {
+	ctx := context.Background()
+	_, err := db.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS trust_entries (
 			id SERIAL PRIMARY KEY,
 			peer TEXT,
@@ -43,7 +46,8 @@ func OpenTrustLedger(db *sql.DB) (*TrustLedger, error) {
 
 // Add inserts a new trust entry.
 func (l *TrustLedger) Add(entry TrustEntry) error {
-	_, err := l.DB.Exec(`
+	ctx := context.Background()
+	_, err := l.DB.Exec(ctx, `
 		INSERT INTO trust_entries (peer, action, status, receipt_id, core_hash, verified_at, notes)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
 	`, entry.Peer, entry.Action, entry.Status, entry.ReceiptID, entry.CoreHash, entry.VerifiedAt, entry.Notes)
@@ -52,7 +56,8 @@ func (l *TrustLedger) Add(entry TrustEntry) error {
 
 // List returns the most recent trust entries.
 func (l *TrustLedger) List(limit int) ([]TrustEntry, error) {
-	rows, err := l.DB.Query(`
+	ctx := context.Background()
+	rows, err := l.DB.Query(ctx, `
 		SELECT peer, action, status, receipt_id, core_hash, verified_at, notes
 		FROM trust_entries
 		ORDER BY verified_at DESC

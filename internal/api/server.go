@@ -5,30 +5,29 @@ import (
 	"log"
 	"net/http"
 
+	"dis-core/internal/authority"
 	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
 	"dis-core/internal/schema"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TODO: Refactor Server struct to idiomatic Go style.
-// - Use lowercase field names for internal-only data (db, ledger, mux, etc).
-// - Keep fields unexported since this package is internal.
-// - Provide exported getter methods only where needed (e.g., Handler()).
-// - Ensure all references in other files match the new lowercase fields.
 // Server is the core API instance for DIS-Core.
 type Server struct {
-	db      *pgx.Conn
+	db      *pgxpool.Pool
 	ledger  *ledger.Ledger
 	mux     *http.ServeMux
 	schemas *schema.Registry
 	logger  *log.Logger
+	policy  policy.PolicyEngine
 
-	policy policy.PolicyEngine
+	authoritySchema  *authority.AuthoritySchema
+	authorityConsole *authority.Console
 }
 
-func New(db *pgx.Conn, led *ledger.Ledger) *Server {
+// New creates a new Server instance and wires all dependencies.
+func New(db *pgxpool.Pool, led *ledger.Ledger) *Server {
 	s := &Server{
 		db:     db,
 		ledger: led,
@@ -36,70 +35,68 @@ func New(db *pgx.Conn, led *ledger.Ledger) *Server {
 		logger: log.Default(),
 	}
 
-	// --- Policy engine wiring ---
-	modules := map[string]string{
-		"gates.rego":  "package dis.gates\n default allow = true", // stub content
-		"risk.rego":   "package dis.risk\n default risk = 0",
-		"freeze.rego": "package dis.freeze\n default frozen = false",
-	}
-	eng, err := policy.NewEngine(modules)
+	authzSchema, err := authority.LoadSchema("./internal/schema/schema.json")
 	if err != nil {
-		s.logger.Printf("policy engine init failed: %v", err)
-	} else {
-		s.policy = eng
-		s.logger.Println("policy engine initialized")
+		s.logger.Printf("failed to load authority schema: %v", err)
 	}
 
-	s.registerRoutes()
+	s.authoritySchema = authzSchema
+	s.authorityConsole = authority.NewConsole(db, led, nil, s.authoritySchema)
+	s.setupRoutes()
+
 	return s
 }
 
-// registerRoutes sets up all the API routes
-func (s *Server) registerRoutes() {
-	s.RegisterAPIs()
+func (s *Server) setupRoutes() {
+	s.mux.HandleFunc("/api/ping", s.handlePing)
+	s.mux.HandleFunc("/api/status", s.handleStatus)
+	s.mux.HandleFunc("/api/domain/", s.handleDomainGet)
 }
 
-// RegisterRoutes is an alias for registerRoutes for backward compatibility
-func (s *Server) RegisterRoutes() {
-	s.registerRoutes()
-}
-
-// HandleBootstrapStatus provides a bootstrap status endpoint
-func (s *Server) HandleBootstrapStatus(w http.ResponseWriter, r *http.Request) {
-	// Basic status response
-	resp := map[string]interface{}{
-		"status":       "ok",
-		"bootstrapped": true,
-		"timestamp":    "2024-11-07T00:00:00Z",
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	status := map[string]interface{}{
+		"status":    "running",
+		"service":   "dis-core",
+		"ledger":    s.ledger != nil,
+		"authority": s.authorityConsole != nil,
+		"schemas":   s.schemas != nil,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(status)
 }
 
-func (s *Server) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	input := map[string]interface{}{
-		"action": "domain.freeze.v1",
-		"user":   "rick",
-	}
-	decision, err := s.policy.EvaluateAction(ctx, input)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+func (s *Server) handleDomainGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	domainID := r.URL.Path[len("/api/domain/"):]
+	if domainID == "" {
+		http.Error(w, "domain ID required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	var domainData string
+	err := s.db.QueryRow(ctx, `
+SELECT content FROM canon
+WHERE type = 'domain' AND content->>'domain_id' = $1
+LIMIT 1
+`, domainID).Scan(&domainData)
+
+	if err != nil {
+		s.logger.Printf("domain query failed: %v", err)
+		http.Error(w, "domain not found", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(decision)
+	w.Write([]byte(domainData))
 }
 
-// Handler returns the underlying HTTP mux for ListenAndServe.
 func (s *Server) Handler() *http.ServeMux { return s.mux }
-
-// DB returns the database connection
-func (s *Server) DB() *pgx.Conn { return s.db }
-
-// Ledger returns the ledger instance
-func (s *Server) Ledger() *ledger.Ledger { return s.ledger }
-
-// Mux returns the HTTP mux (alias for Handler for backward compatibility)
-func (s *Server) Mux() *http.ServeMux { return s.mux }
+func (s *Server) DB() *pgxpool.Pool       { return s.db }
+func (s *Server) Ledger() *ledger.Ledger  { return s.ledger }
+func (s *Server) Mux() *http.ServeMux     { return s.mux }
