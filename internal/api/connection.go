@@ -5,17 +5,73 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"dis-core/internal/api/identity"
+	"dis-core/internal/policy"
 )
 
 // handlePing responds with a simple JSON heartbeat.
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]string{
+	format := DetectFormat(r)
+
+	resp := map[string]any{
 		"status":  "ok",
 		"message": "DIS-Core alive",
 		"time":    time.Now().Format(time.RFC3339),
 	}
+
+	switch format {
+	case FormatJSON:
+		JSON(w, http.StatusOK, resp)
+	case FormatText:
+		ServeAsText(w, resp)
+	default:
+		JSONUnsupportedFormat(w, string(format))
+	}
+}
+
+// handleHealth responds with health check information.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	format := DetectFormat(r)
+
+	resp := map[string]any{
+		"status":    "healthy",
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+
+	switch format {
+	case FormatJSON:
+		JSON(w, http.StatusOK, resp)
+	case FormatText:
+		ServeAsText(w, resp)
+	default:
+		JSONUnsupportedFormat(w, string(format))
+	}
+}
+
+// handleVersion responds with version information.
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	w.Write([]byte(`{"version":"0.9.7","build":"MOAR-VIII-H"}`))
+}
+
+// handleAuthorityStatus delegates to the authority status handler.
+func (s *Server) handleAuthorityStatus(w http.ResponseWriter, r *http.Request) {
+	HandleAuthorityStatus(w, r, s.DB())
+}
+
+// handlePolicyReload handles policy reload requests.
+func (s *Server) handlePolicyReload(w http.ResponseWriter, r *http.Request) {
+	if opaEngine, ok := s.policy.(*policy.OPAEngine); ok {
+		policy.HandlePolicyReload(w, r, s.DB(), opaEngine)
+	} else {
+		http.Error(w, "Policy engine not available", http.StatusServiceUnavailable)
+	}
+}
+
+// handleIdentityBind handles identity binding requests.
+func (s *Server) handleIdentityBind(w http.ResponseWriter, r *http.Request) {
+	identity.HandleCreateIdentityBinding(w, r, s.DB())
 }
 
 // handleOrphanInfo — return canonical orphan domain + schema info.

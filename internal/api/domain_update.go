@@ -21,12 +21,22 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update only the "css" field inside JSONB column "data"
+	// Update CSS in the standardized nested path {meta,data,css}
 	_, err := s.DB().Exec(ctx, `
 		UPDATE domains
 		SET data = jsonb_set(
-			COALESCE(data, '{}'::jsonb),
-			'{css}',
+			jsonb_set(
+				jsonb_set(
+					COALESCE(data, '{}'::jsonb),
+					'{meta}',
+					COALESCE(data->'meta', '{}'::jsonb),
+					true
+				),
+				'{meta,data}',
+				COALESCE(data#>'{meta,data}', '{}'::jsonb),
+				true
+			),
+			'{meta,data,css}',
 			to_jsonb($1::text),
 			true
 		),

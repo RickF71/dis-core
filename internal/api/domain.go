@@ -51,54 +51,67 @@ func (s *Server) resolveDomainInternalID(ctx context.Context, ref string) (strin
 // ---- PUT /api/domain/{id}/css ----
 // Saves CSS for a domain (your editor calls this)
 // POST /api/domain/{id}/css
+// PUT /api/domain/{id}/css
 func (s *Server) handleUpdateDomainCSS(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/")
 	ref = strings.TrimSuffix(ref, "/css")
 
 	if ref == "" {
-		http.Error(w, "missing domain id", http.StatusBadRequest)
+		JSONError(w, http.StatusBadRequest, "missing domain id")
 		return
 	}
 
-	var payload struct {
-		CSS string `json:"css"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	// Read raw text CSS (not JSON)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		JSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if payload.CSS == "" {
-		http.Error(w, "empty CSS not allowed", http.StatusBadRequest)
+	css := strings.TrimSpace(string(body))
+
+	if css == "" {
+		JSONError(w, http.StatusBadRequest, "empty CSS not allowed")
 		return
 	}
 
-	// Resolve UUID if needed (your helper supports both name and id)
 	internalID, err := s.resolveDomainInternalID(ctx, ref)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		JSONError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	//fmt.Printf("DEBUG: updating css for domain %s (internalID=%s)\n", ref, internalID)
-
-	// ✅ Update JSONB field inside "data"
+	// 🔧 Update nested {meta,data,css} path and update domains.updated_at
 	_, err = s.DB().Exec(ctx, `
-		UPDATE domains
-		   SET data = jsonb_set(
-		     COALESCE(data, '{}'::jsonb),
-		     '{css}',
-		     to_jsonb($1::text)
-		   )
-		 WHERE id = $2
-	`, payload.CSS, internalID)
+        UPDATE domains
+        SET data = jsonb_set(
+            jsonb_set(
+                jsonb_set(
+                    COALESCE(data, '{}'::jsonb),
+                    '{meta}',
+                    COALESCE(data->'meta', '{}'::jsonb),
+                    true
+                ),
+                '{meta,data}',
+                COALESCE(data#>'{meta,data}', '{}'::jsonb),
+                true
+            ),
+            '{meta,data,css}',
+            to_jsonb($1::text),
+            true
+        ),
+        updated_at = NOW()
+        WHERE id = $2
+    `, css, internalID)
 	if err != nil {
-		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		JSONError(w, http.StatusInternalServerError, "db error: "+err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, `{"ok":true}`)
+	// TODO: Future canon sync - update canon table when domain CSS changes
+	// This will ensure consistency between runtime domains table and canonical storage
+
+	JSONOk(w, "CSS updated successfully")
 }
 
 // ---- ROUTER ----
@@ -119,7 +132,7 @@ func (s *Server) registerRuntimeDomainRoutes() {
 				s.handleUpdateDomainCSS(w, r)
 				return
 			}
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			JSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 
@@ -129,7 +142,7 @@ func (s *Server) registerRuntimeDomainRoutes() {
 			return
 		}
 
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		JSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 	})
 }
 
@@ -137,7 +150,7 @@ func (s *Server) registerRuntimeDomainRoutes() {
 // This returns the canonical DIS domain object from the canon table, not runtime theme CSS.
 func (s *Server) handleDisDomainGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		JSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -145,7 +158,7 @@ func (s *Server) handleDisDomainGet(w http.ResponseWriter, r *http.Request) {
 	domainID := strings.TrimPrefix(r.URL.Path, "/api/domain/dis/")
 	domainID = strings.TrimSpace(domainID)
 	if domainID == "" {
-		http.Error(w, "missing domain id", http.StatusBadRequest)
+		JSONError(w, http.StatusBadRequest, "missing domain id")
 		return
 	}
 
@@ -160,11 +173,11 @@ func (s *Server) handleDisDomainGet(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case err == pgx.ErrNoRows:
-		http.Error(w, "domain not found", http.StatusNotFound)
+		JSONError(w, http.StatusNotFound, "domain not found")
 		return
 
 	case err != nil:
-		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
+		JSONError(w, http.StatusInternalServerError, "db error: "+err.Error())
 		return
 	}
 
@@ -178,14 +191,14 @@ func (s *Server) handleDomainTheme(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/theme/")
 	if ref == "" {
-		http.Error(w, "missing domain id", 400)
+		JSONError(w, http.StatusBadRequest, "missing domain id")
 		return
 	}
 
 	// Resolve DB row id first
 	internalID, err := s.resolveDomainInternalID(ctx, ref)
 	if err != nil {
-		http.Error(w, err.Error(), 404)
+		JSONError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -193,7 +206,7 @@ func (s *Server) handleDomainTheme(w http.ResponseWriter, r *http.Request) {
 	var css string
 	err = s.DB().QueryRow(ctx, `SELECT COALESCE(css,'') FROM domains WHERE id=$1`, internalID).Scan(&css)
 	if err != nil {
-		http.Error(w, "db error: "+err.Error(), 500)
+		JSONError(w, http.StatusInternalServerError, "db error: "+err.Error())
 		return
 	}
 

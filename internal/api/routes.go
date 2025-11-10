@@ -8,6 +8,7 @@ import (
 
 	"dis-core/internal/api/auth"
 	"dis-core/internal/api/identities"
+	"dis-core/internal/identity"
 	"dis-core/internal/registry/atlas"
 	"dis-core/internal/registry/receipts"
 	"dis-core/internal/registry/terra"
@@ -15,15 +16,29 @@ import (
 	authorityapi "dis-core/internal/api/authority"
 )
 
-// RegisterAPIs wires all endpoint groups into the server mux.
-func (s *Server) RegisterAPIs() {
+// RegisterAllRoutes wires all endpoint groups into the server mux.
+func (s *Server) RegisterAllRoutes() {
 	mux := s.mux
 
 	// ============================================================
 	// CORE / SYSTEM ROUTES
 	// ============================================================
 	mux.HandleFunc("GET /api/ping", s.handlePing)
+	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/status", s.HandleStatus)
+
+	// ============================================================
+	// AUTHORITY & POLICY ROUTES
+	// ============================================================
+	mux.HandleFunc("GET /api/authority/status", s.handleAuthorityStatus)
+	mux.HandleFunc("POST /api/policy/reload", s.handlePolicyReload)
+
+	// ============================================================
+	// IDENTITY ROUTES
+	// ============================================================
+	mux.HandleFunc("POST /api/identity/bind", func(w http.ResponseWriter, r *http.Request) {
+		identity.HandleCreateIdentityBinding(w, r, s.db)
+	})
 
 	// ============================================================
 	// DOMAIN ROUTES (JSONB MODEL)
@@ -53,6 +68,10 @@ func (s *Server) RegisterAPIs() {
 	mux.HandleFunc("GET /api/domain/{id}/css", s.handleDomainCSS)
 	mux.HandleFunc("POST /api/domain/{id}/css", s.handleUpdateDomainCSS)
 	mux.HandleFunc("POST /api/domain/{id}/file/rename", s.handleDomainFileRename)
+
+	// Domain Policy API
+	mux.HandleFunc("GET /api/domain/{id}/policy", s.handleGetDomainPolicy)
+	mux.HandleFunc("POST /api/domain/{id}/policy", s.handleSetDomainPolicy)
 
 	//mux.HandleFunc("POST /api/domain/{id}/file/{filename}/archive", s.handleArchiveDomainFile)
 	//mux.HandleFunc("PUT /api/domain/{id}/file/{filename}", s.handleUpdateDomainFile)

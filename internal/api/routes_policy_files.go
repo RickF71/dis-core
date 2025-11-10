@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -14,7 +15,7 @@ type PolicyRecord struct {
 	DomainID  *uuid.UUID `json:"domain_id,omitempty"`
 	Name      string     `json:"name"`
 	Content   string     `json:"content"`
-	CreatedAt string     `json:"created_at"`
+	CreatedAt *time.Time `json:"created_at"`
 }
 
 // RegisterPolicyFileRoutes adds CRUD endpoints for managing policy files.

@@ -28,11 +28,17 @@ type Server struct {
 
 // New creates a new Server instance and wires all dependencies.
 func New(db *pgxpool.Pool, led *ledger.Ledger) *Server {
+	return NewWithPolicy(db, led, nil)
+}
+
+// NewWithPolicy creates a new Server instance with a policy engine.
+func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.PolicyEngine) *Server {
 	s := &Server{
 		db:     db,
 		ledger: led,
 		mux:    http.NewServeMux(),
 		logger: log.Default(),
+		policy: policyEngine,
 	}
 
 	authzSchema, err := authority.LoadSchema("./internal/schema/schema.json")
@@ -42,7 +48,7 @@ func New(db *pgxpool.Pool, led *ledger.Ledger) *Server {
 
 	s.authoritySchema = authzSchema
 	s.authorityConsole = authority.NewConsole(db, led, nil, s.authoritySchema)
-	s.RegisterAPIs()
+	s.RegisterAllRoutes()
 
 	return s
 }

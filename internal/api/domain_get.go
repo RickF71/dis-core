@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,8 +15,8 @@ type Domain struct {
 	ID        string          `json:"id"` // switched from uuid.UUID
 	ParentID  *string         `json:"parent_id,omitempty"`
 	Data      json.RawMessage `json:"data"`
-	CreatedAt string          `json:"created_at"`
-	UpdatedAt string          `json:"updated_at"`
+	CreatedAt *time.Time      `json:"created_at"`
+	UpdatedAt *time.Time      `json:"updated_at"`
 }
 
 // GET /api/domain/{id}
@@ -26,7 +27,7 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 
 	// Handle missing or invalid IDs early
 	if idParam == "" || idParam == "null" || idParam == "undefined" {
-		http.Error(w, "missing domain id", http.StatusBadRequest)
+		JSONError(w, http.StatusBadRequest, "missing domain id")
 		return
 	}
 
@@ -52,13 +53,12 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case err == pgx.ErrNoRows:
-		http.Error(w, "domain not found", http.StatusNotFound)
+		JSONError(w, http.StatusNotFound, "domain not found")
 		return
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		JSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(d)
+	JSON(w, http.StatusOK, d)
 }
