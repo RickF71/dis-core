@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "rules": [
+    {
+      "id": "ci_rule_1",
+      "name": "Domain Validation",
+      "description": "Validate domain structure and metadata",
+      "condition": {
+        "type": "domain.validate",
+        "schema_version": "v1.0"
+      },
+      "action": "validate"
+    },
+    {
+      "id": "ci_rule_2",
+      "name": "Schema Compliance",
+      "description": "Ensure schema compliance for all canonical entries",
+      "condition": {
+        "type": "schema.compliance",
+        "required_fields": ["meta.schema_id", "meta.schema_version"]
+      },
+      "action": "enforce"
+    },
+    {
+      "id": "ci_rule_3",
+      "name": "Provenance Tracking",
+      "description": "Require provenance information for all operations",
+      "condition": {
+        "type": "provenance.required",
+        "operations": ["create", "update", "delete"]
+      },
+      "action": "require"
+    }
+  ]
+}

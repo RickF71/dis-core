@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "mock_corpus": {
+    "schemas": [
+      {
+        "id": "authority.layer.v1",
+        "version": "v1.0",
+        "type": "authority_schema",
+        "mock": true
+      },
+      {
+        "id": "domain.user.v1",
+        "version": "v1.0",
+        "type": "domain_schema",
+        "mock": true
+      }
+    ],
+    "domains": [
+      {
+        "id": "domain.null",
+        "status": "active",
+        "authority": "system",
+        "mock": true
+      },
+      {
+        "id": "domain.test",
+        "status": "testing",
+        "authority": "console",
+        "mock": true
+      }
+    ],
+    "policies": [
+      {
+        "name": "gates.rego",
+        "type": "authorization",
+        "mock": true
+      },
+      {
+        "name": "risk.rego",
+        "type": "risk_assessment",
+        "mock": true
+      },
+      {
+        "name": "freeze.rego",
+        "type": "state_management",
+        "mock": true
+      }
+    ]
+  }
+}

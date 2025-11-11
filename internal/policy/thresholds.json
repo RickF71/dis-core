@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "thresholds": {
+    "policy_evaluation": {
+      "max_depth": 10,
+      "timeout_ms": 5000,
+      "max_rules": 100
+    },
+    "domain_operations": {
+      "max_domains_per_user": 50,
+      "max_schema_size_kb": 512,
+      "max_policy_size_kb": 256
+    },
+    "authority_console": {
+      "max_concurrent_evaluations": 25,
+      "max_cache_entries": 1000,
+      "cache_ttl_seconds": 300
+    },
+    "resource_limits": {
+      "max_memory_mb": 256,
+      "max_cpu_percent": 80,
+      "max_disk_usage_mb": 1024
+    }
+  }
+}

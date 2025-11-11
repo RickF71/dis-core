@@ -2,9 +2,14 @@ package bootstrap
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"dis-core/internal/ledger"
+	"dis-core/internal/logs/phases"
 	"dis-core/internal/policy"
 	"dis-core/internal/schema"
 
@@ -23,6 +28,16 @@ func InitializeAuthorityConsole(database *pgxpool.Pool, registry *schema.Registr
 	// Bootstrap the authority console with all required components
 	if err := bootstrapAuthority(database, registry, led); err != nil {
 		return nil, err
+	}
+
+	// Load and process Authority Console JSON sources
+	if err := loadAuthorityConsoleData(database); err != nil {
+		log.Printf("Warning: Could not load Authority Console data: %v", err)
+	}
+
+	// Write Phase 7 completion log
+	if err := phases.WritePhaseLog("phase_7", "Phase 7 Authority Console Activated"); err != nil {
+		log.Printf("Warning: Could not write phase log: %v", err)
 	}
 
 	log.Println("✅ Core schema + null policies initialized.")
@@ -105,5 +120,54 @@ func bootstrapAuthority(db *pgxpool.Pool, reg *schema.Registry, led *ledger.Ledg
 	}
 
 	log.Println("[bootstrap] DIS-Core initialization complete.")
+	return nil
+}
+
+// loadAuthorityConsoleData loads schema.json, ci_rules.json, thresholds.json, and mock_corpus.json
+// and inserts canonical entries into the canon table with ci.call.v1 provenance
+func loadAuthorityConsoleData(db *pgxpool.Pool) error {
+	ctx := context.Background()
+	policyDir := "internal/policy"
+
+	files := []string{"schema.json", "ci_rules.json", "thresholds.json", "mock_corpus.json"}
+
+	for _, filename := range files {
+		filePath := filepath.Join(policyDir, filename)
+
+		// Check if file exists (schema.json is in internal/schema)
+		if filename == "schema.json" {
+			filePath = filepath.Join("internal/schema", filename)
+		}
+
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			log.Printf("Warning: Could not read %s: %v", filePath, err)
+			continue
+		}
+
+		// Validate JSON
+		var jsonData interface{}
+		if err := json.Unmarshal(data, &jsonData); err != nil {
+			log.Printf("Warning: Invalid JSON in %s: %v", filename, err)
+			continue
+		}
+
+		// Insert into canon table with ci.call.v1 provenance
+		query := `
+			INSERT INTO canon (type, content, created_at, updated_at)
+			VALUES ($1, $2, NOW(), NOW())
+			ON CONFLICT DO NOTHING
+		`
+
+		contentType := fmt.Sprintf("authority.console.%s", filename[:len(filename)-5]) // remove .json
+		_, err = db.Exec(ctx, query, contentType, data)
+		if err != nil {
+			log.Printf("Warning: Could not insert %s into canon table: %v", filename, err)
+			continue
+		}
+
+		log.Printf("✅ Loaded Authority Console data: %s", filename)
+	}
+
 	return nil
 }

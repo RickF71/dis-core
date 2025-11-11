@@ -38,6 +38,10 @@ func (s *Server) RegisterAllRoutes() {
 	// Additional format-aware routes
 	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/authority/status", s.handleAuthorityStatusChi, []Format{FormatJSON, FormatText})
 
+	// Phase 7 Authority Console routes
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/authority/schema", s.handleAuthoritySchemaPhase7, []Format{FormatJSON})
+	r.Post("/api/policy/evaluate", s.handlePolicyEvaluatePhase7)
+
 	// Domain routes with format support
 	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domain/{id}", s.handleGetDomainChi, []Format{FormatJSON, FormatFile, FormatText})
 	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domains", s.handleDomainListChi, []Format{FormatJSON, FormatFile})

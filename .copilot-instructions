@@ -1,48 +1,49 @@
-/task Implement Phase 6 of DIS-Core: create the universal Chi middleware stack for all /api routes.
+/task Implement Phase 7 of DIS-Core: Authority Console Activation and Phase Logging System.
 
-Goals:
-Establish clean, composable middleware that injects database, provenance, and policy context into every request before it reaches a handler.
+Objectives:
+1. Activate and expose the Authority Console API endpoints.
+2. Integrate schema and policy sources (schema.json, ci_rules.json, thresholds.json, mock_corpus.json).
+3. Implement policy evaluation endpoint (/api/policy/evaluate).
+4. Introduce automatic phase logging under internal/logs/phases/phase_7.log for all subsequent phases.
 
-Steps:
-1. Create folder internal/api/middleware with these files:
-   - db.go          → WithDB(pool *pgxpool.Pool)
-   - provenance.go  → WithProvenance()
-   - policy.go      → WithPolicyEngine(engine *policy.Engine)
-   - chain.go       → Attach(r *chi.Mux, pool *pgxpool.Pool, engine *policy.Engine)
+Implementation:
+- Create directory internal/logs/phases/.
+- Add file internal/logs/phases/logger.go containing:
 
-2. db.go
-   - Store *pgxpool.Pool in request context.
-   - Provide FromDB(ctx context.Context) *pgxpool.Pool helper.
+  package phases
+  import (
+      "fmt"
+      "os"
+      "time"
+  )
+  func WritePhaseLog(phase, summary string) error {
+      path := fmt.Sprintf("internal/logs/phases/%s.log", phase)
+      f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+      if err != nil {
+          return err
+      }
+      defer f.Close()
+      timestamp := time.Now().Format(time.RFC3339)
+      _, err = fmt.Fprintf(f, "# %s\n**Timestamp:** %s\n\n%s\n\n---\n", phase, timestamp, summary)
+      return err
+  }
 
-3. provenance.go
-   - Generate UUID and timestamp on every request.
-   - Attach Provenance{RequestID, Timestamp} to context.
-   - Provide FromProvenance(ctx) (Provenance, bool).
+- Extend internal/bootstrap/InitializeAuthorityConsole():
+  * Load schema.json, ci_rules.json, thresholds.json, mock_corpus.json.
+  * Insert canonical entries into canon table with provenance (ci.call.v1 receipt).
+  * On successful bootstrap, call phases.WritePhaseLog("phase_7", "Phase 7 Authority Console Activated").
 
-4. policy.go
-   - Inject the active *policy.Engine into context.
-   - Provide FromPolicyEngine(ctx) *policy.Engine.
+- Add internal/api/authority.go with:
+  * GET /api/authority/status → returns {"ready":true,"schemas":n,"policies":n,"receipts":n}
+  * GET /api/authority/schema → returns loaded Authority Console schema.
+  * POST /api/policy/evaluate → accepts {"action":"...","context":{...}} and returns {"allow":true|false,"reason":"...","details":{...}}
 
-5. chain.go
-   - Import chi middleware.RequestID, Logger, Recoverer.
-   - Call r.Use() for Logger, Recoverer, RequestID.
-   - Then r.Use(WithDB(pool)), r.Use(WithProvenance()), r.Use(WithPolicyEngine(engine)).
-   - Attach this middleware globally in main router before registering routes.
+- Ensure routes are registered in server.go under chi mux.
 
-6. In cmd/dis-core/main.go (or internal/api/server.go):
-   r := chi.NewRouter()
-   middleware.Attach(r, dbPool, policyEngine)
-   s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/status", FormatAwareHandlerWrapper(handleStatusChi), nil)
+Validation:
+1. curl -s http://localhost:8080/api/authority/status | jq
+2. curl -s http://localhost:8080/api/policy/evaluate -X POST -H "Content-Type: application/json" -d '{"action":"domain.freeze.v1","context":{"domain":"null"}}' | jq
+3. Check that internal/logs/phases/phase_7.log contains a timestamped summary entry.
 
-7. Example handler:
-   db := middleware.FromDB(r.Context())
-   prov, _ := middleware.FromProvenance(r.Context())
-   engine := middleware.FromPolicyEngine(r.Context())
-   Respond(w, map[string]any{"status":"ok","id":prov.RequestID}, format)
-
-8. Verify with:
-   curl http://localhost:8080/api/status/json
-   → Should return a JSON object including a unique request_id and timestamp.
-
-9. Commit with message:
-   "🌐 Phase 6 — Universal Chi middleware stack added (DB, provenance, policy)."
+Commit message:
+🧩 Phase 7 — Authority Console Activated + Phase Log System Introduced
