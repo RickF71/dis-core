@@ -30,7 +30,7 @@ type VersionInfo struct {
 
 // registerVersionRoutes exposes /api/version for Finagler and system introspection.
 func (s *Server) registerVersionRoutes() {
-	mux := s.mux
+	mux := s.router
 
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

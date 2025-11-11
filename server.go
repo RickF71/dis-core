@@ -12,8 +12,8 @@ import (
 	"dis-core/internal/ledger"
 )
 
-// buildServer initializes and returns the main HTTP mux for DIS-Core.
-func buildServer() *http.ServeMux {
+// buildServer initializes and returns the main HTTP handler for DIS-Core.
+func buildServer() http.Handler {
 	// Initialize the connection pool.
 	store := db.DefaultConn
 	if store == nil {

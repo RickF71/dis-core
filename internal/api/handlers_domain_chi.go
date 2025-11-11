@@ -9,8 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// handleGetDomainChiFormatAware handles GET /api/domain/{id} with format support
-func (s *Server) handleGetDomainChiFormatAware(w http.ResponseWriter, r *http.Request) {
+// handleGetDomainChi handles GET /api/domain/{id} with format support
+func (s *Server) handleGetDomainChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	domainID := chi.URLParam(r, "id")
 
@@ -51,8 +51,8 @@ func (s *Server) handleGetDomainChiFormatAware(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// handleDomainListChiFormatAware handles GET /api/domains with format support
-func (s *Server) handleDomainListChiFormatAware(w http.ResponseWriter, r *http.Request) {
+// handleDomainListChi handles GET /api/domains with format support
+func (s *Server) handleDomainListChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	ctx := r.Context()
 
@@ -82,8 +82,8 @@ func (s *Server) handleDomainListChiFormatAware(w http.ResponseWriter, r *http.R
 	}
 }
 
-// handleDomainCSSChiFormatAware handles GET /api/domain/{id}/css with format support
-func (s *Server) handleDomainCSSChiFormatAware(w http.ResponseWriter, r *http.Request) {
+// handleDomainCSSChi handles GET /api/domain/{id}/css with format support
+func (s *Server) handleDomainCSSChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	domainID := chi.URLParam(r, "id")
 
@@ -228,4 +228,55 @@ func (s *Server) updateDomainCSS(ctx context.Context, domainID, css string) erro
 	// This would integrate with existing CSS update logic
 	// For now, just return success
 	return nil
+}
+
+// handleDomainCSSFormatAware handles GET /api/domain/{id}/css with explicit format parameter
+func (s *Server) handleDomainCSSFormatAware(w http.ResponseWriter, r *http.Request, format Format) {
+	domainID := chi.URLParam(r, "id")
+
+	if domainID == "" {
+		switch format {
+		case FormatJSON:
+			JSONError(w, http.StatusBadRequest, "missing domain id")
+		default:
+			JSONUnsupportedFormat(w, string(format))
+		}
+		return
+	}
+
+	ctx := r.Context()
+
+	// Get CSS content using existing logic
+	css, err := s.getDomainCSS(ctx, domainID)
+	if err != nil {
+		switch format {
+		case FormatJSON:
+			JSONError(w, http.StatusNotFound, "domain CSS not found")
+		default:
+			JSONUnsupportedFormat(w, string(format))
+		}
+		return
+	}
+
+	switch format {
+	case FormatFile:
+		// Serve as CSS file download
+		w.Header().Set("Content-Type", "text/css")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"domain-"+domainID+".css\"")
+		io.WriteString(w, css)
+	case FormatJSON:
+		// Serve CSS metadata as JSON
+		JSON(w, http.StatusOK, map[string]any{
+			"domain_id":    domainID,
+			"css_content":  css,
+			"content_type": "text/css",
+			"size":         len(css),
+		})
+	case FormatText:
+		// Serve as plain text
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		io.WriteString(w, css)
+	default:
+		JSONUnsupportedFormat(w, string(format))
+	}
 }

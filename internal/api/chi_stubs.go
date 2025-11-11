@@ -8,54 +8,54 @@ import (
 // These are placeholder implementations that return "not yet implemented" errors
 
 // Domain handlers
-func (s *Server) handleCreateDomainChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateDomainChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "create domain format-aware handler not yet implemented")
 }
 
-func (s *Server) handleUpdateDomainChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateDomainChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "update domain format-aware handler not yet implemented")
 }
 
-func (s *Server) handleUpdateDomainCSSChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateDomainCSSChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "update domain CSS format-aware handler not yet implemented")
 }
 
 // Domain file handlers
-func (s *Server) handleDomainFilesListChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainFilesListChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain files list format-aware handler not yet implemented")
 }
 
-func (s *Server) handleDomainFileGetChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainFileGetChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain file get format-aware handler not yet implemented")
 }
 
-func (s *Server) handleDomainFilePutChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainFilePutChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain file put format-aware handler not yet implemented")
 }
 
-func (s *Server) handleDomainFileDeleteChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainFileDeleteChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain file delete format-aware handler not yet implemented")
 }
 
-func (s *Server) handleDomainFileCreateChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainFileCreateChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain file create format-aware handler not yet implemented")
 }
 
-func (s *Server) handleDomainFileRenameChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainFileRenameChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain file rename format-aware handler not yet implemented")
 }
 
 // Domain policy handlers
-func (s *Server) handleGetDomainPolicyChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDomainPolicyChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "get domain policy format-aware handler not yet implemented")
 }
 
-func (s *Server) handleSetDomainPolicyChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSetDomainPolicyChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "set domain policy format-aware handler not yet implemented")
 }
 
 // Domain announcement handlers
-func (s *Server) handleDomainAnnounceChiFormatAware(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDomainAnnounceChi(w http.ResponseWriter, r *http.Request) {
 	JSONUnsupportedFormat(w, "domain announce format-aware handler not yet implemented")
 }
 

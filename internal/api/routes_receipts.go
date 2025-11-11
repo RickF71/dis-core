@@ -7,7 +7,7 @@ import (
 
 // registerReceiptRoutes registers all /api/receipts endpoints.
 func (s *Server) registerReceiptRoutes() {
-	mux := s.mux
+	mux := s.router
 	mux.HandleFunc("GET /api/receipts/latest", s.handleGetLatestReceipt)
 }
 

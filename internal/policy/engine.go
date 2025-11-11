@@ -190,6 +190,28 @@ func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interfa
 	}, nil
 }
 
+// Reload rebuilds the OPAEngine with domain-specific modules
+func (e *OPAEngine) Reload(ctx context.Context, domainID string) error {
+	// Load domain-specific modules with fallbacks
+	modules, err := LoadDomainModules(domainID)
+	if err != nil {
+		return fmt.Errorf("load domain modules for %s: %w", domainID, err)
+	}
+
+	// Create a new engine with the loaded modules
+	newEngine, err := NewEngine(modules)
+	if err != nil {
+		return fmt.Errorf("create new engine: %w", err)
+	}
+
+	// Replace current engine state with the new one
+	e.gatesRego = newEngine.gatesRego
+	e.riskRego = newEngine.riskRego
+	e.freezeRego = newEngine.freezeRego
+
+	return nil
+}
+
 // getModule retrieves the source code of a module from disk for detail evaluation.
 func (e *OPAEngine) getModule(name string) string {
 	path := filepath.Join("internal", "policy", name)

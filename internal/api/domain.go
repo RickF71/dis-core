@@ -117,7 +117,7 @@ func (s *Server) handleUpdateDomainCSS(w http.ResponseWriter, r *http.Request) {
 // ---- ROUTER ----
 
 func (s *Server) registerRuntimeDomainRoutes() {
-	s.mux.HandleFunc("/api/domain/", func(w http.ResponseWriter, r *http.Request) {
+	s.router.HandleFunc("/api/domain/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
 		// /api/domain/{ref}/cascade

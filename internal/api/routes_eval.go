@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) RegisterEvalRoute(engine policy.PolicyEngine) {
-	s.mux.HandleFunc("/api/eval", func(w http.ResponseWriter, r *http.Request) {
+	s.router.HandleFunc("/api/eval", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

@@ -1,164 +1,48 @@
 package api
 
 import (
-	"database/sql"
-	"encoding/json"
 	"net/http"
-	"time"
-
-	"dis-core/internal/api/auth"
-	"dis-core/internal/api/identities"
-	"dis-core/internal/identity"
-	"dis-core/internal/registry/atlas"
-	"dis-core/internal/registry/receipts"
-	"dis-core/internal/registry/terra"
-
-	authorityapi "dis-core/internal/api/authority"
 )
 
-// RegisterAllRoutes wires all endpoint groups into the server mux.
+// RegisterAllRoutes wires all endpoint groups into the server router with format-aware support.
+// Phase 5 implementation using Chi router exclusively.
 func (s *Server) RegisterAllRoutes() {
-	mux := s.mux
+	r := s.router
 
-	// ============================================================
-	// CORE / SYSTEM ROUTES
-	// ============================================================
-	mux.HandleFunc("GET /api/ping", s.handlePing)
-	mux.HandleFunc("GET /api/health", s.handleHealth)
-	mux.HandleFunc("GET /api/status", s.HandleStatus)
+	// Phase 5.5 requirement: Use WithFormatGuard for format-restricted endpoints
+	// Domain CSS with format guard (File, Text, JSON only)
+	allowedFormats := []Format{FormatFile, FormatText, FormatJSON}
+	r.Get("/api/domain/{id}/css",
+		WithFormatGuard(s.handleDomainCSSFormatAware, allowedFormats))
 
-	// ============================================================
-	// AUTHORITY & POLICY ROUTES
-	// ============================================================
-	mux.HandleFunc("GET /api/authority/status", s.handleAuthorityStatus)
-	mux.HandleFunc("POST /api/policy/reload", s.handlePolicyReload)
-
-	// ============================================================
-	// IDENTITY ROUTES
-	// ============================================================
-	mux.HandleFunc("POST /api/identity/bind", func(w http.ResponseWriter, r *http.Request) {
-		identity.HandleCreateIdentityBinding(w, r, s.db)
-	})
-
-	// ============================================================
-	// DOMAIN ROUTES (JSONB MODEL)
-	// ============================================================
-
-	// Create new domain (strict UUID model)
-	mux.HandleFunc("POST /api/domain", s.handleCreateDomain)
-
-	// Single domain fetch (returns full JSONB domain object)
-	mux.HandleFunc("GET /api/domain/{id}", s.handleGetDomain)
-
-	// Domain collection (list all domains)
-	mux.HandleFunc("GET /api/domains", s.handleDomainList)
-
-	// List all domains
-	mux.HandleFunc("GET /api/domain", s.handleListDomains)
-	mux.HandleFunc("PUT /api/domain/{id}", s.handleUpdateDomain)
-	mux.HandleFunc("GET /api/domain/default", s.handleGetDefaultDomain)
-	// Domain Files API
-	// Domain-scoped Files API (separate from bootstrap /api/files)
-	mux.HandleFunc("GET /api/domain/{id}/files", s.handleDomainFilesList)
-	mux.HandleFunc("GET /api/domain/{id}/file/{filename}", s.handleDomainFileGet)
-	mux.HandleFunc("PUT /api/domain/{id}/file/{filename}", s.handleDomainFilePut)
-	mux.HandleFunc("DELETE /api/domain/{id}/file/{filename}", s.handleDomainFileDelete)
-	mux.HandleFunc("POST /api/domain/{id}/file/{filename}", s.handleDomainFileCreate)
-	mux.HandleFunc("GET /api/domain/{id}/announce", s.handleDomainAnnounce)
-	mux.HandleFunc("GET /api/domain/{id}/css", s.handleDomainCSS)
-	mux.HandleFunc("POST /api/domain/{id}/css", s.handleUpdateDomainCSS)
-	mux.HandleFunc("POST /api/domain/{id}/file/rename", s.handleDomainFileRename)
-
-	// Domain Policy API
-	mux.HandleFunc("GET /api/domain/{id}/policy", s.handleGetDomainPolicy)
-	mux.HandleFunc("POST /api/domain/{id}/policy", s.handleSetDomainPolicy)
-
-	//mux.HandleFunc("POST /api/domain/{id}/file/{filename}/archive", s.handleArchiveDomainFile)
-	//mux.HandleFunc("PUT /api/domain/{id}/file/{filename}", s.handleUpdateDomainFile)
-
-	// jikka routes
-	mux.HandleFunc("GET /api/jikka/{id}", s.handleGetJikka)
-	mux.HandleFunc("POST /api/jikka", s.handleCreateJikka)
-	mux.HandleFunc("GET /api/jikka/list", s.handleListJikkas)
-
-	authHandler := authorityapi.NewHandler(s.db, s.authoritySchema, s.authorityConsole)
-	s.mux.HandleFunc("/api/authority/schema", authHandler.HandleSchema)
-	s.mux.HandleFunc("/api/authority/console", authHandler.HandleConsole)
-
-	// ============================================================
-	// IDENTITY & REGISTRY MODULES
-	// ============================================================
-	auth.Register(mux, s.DB())
-	identities.Register(mux, s.DB())
-	atlas.Register(mux, s.DB())
-	receipts.Register(mux, s.DB())
-	terra.Register(mux, s.DB())
-
-	// ============================================================
-	// AUXILIARY ROUTE GROUPS
-	// ============================================================
-	registerFlowAPI(s)
-	s.registerImportListRoute()
-	s.registerNetworkRoutes()
-	s.registerDBRoutes()
-	s.registerVersionRoutes()
-	s.registerMirrorSpinRoutes()
-	s.registerFileRoutes()
-	// s.registerPolicyRoutes() // FIXME: disabled during pgx migration
-	s.registerPolicyFileRoutes()
-	// s.registerSchemaRoutes() // FIXME: disabled during pgx migration
-	s.registerReceiptRoutes()
-
-	// Register admin routes for authority console integration
-	s.registerAdminRoutes()
-}
-
-// handleListDomains returns all domains as JSON
-func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+	// Register format-specific routes for CSS endpoint
+	for _, format := range allowedFormats {
+		formatPattern := "/api/domain/{id}/css/" + string(format)
+		r.Get(formatPattern,
+			WithFormatGuard(s.handleDomainCSSFormatAware, allowedFormats))
 	}
 
-	ctx := r.Context()
-	rows, err := s.DB().Query(ctx, `SELECT id, parent_id, name, data, created_at, updated_at FROM domains ORDER BY created_at ASC`)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	type Domain struct {
-		ID        string          `json:"id"`
-		ParentID  sql.NullString  `json:"parent_id"`
-		Name      string          `json:"name"`
-		Data      json.RawMessage `json:"data"`
-		CreatedAt time.Time       `json:"created_at"`
-		UpdatedAt time.Time       `json:"updated_at"`
+	// Also register unsupported formats to test the guard
+	unsupportedFormats := []Format{FormatCBOR, FormatEncrypted}
+	for _, format := range unsupportedFormats {
+		formatPattern := "/api/domain/{id}/css/" + string(format)
+		r.Get(formatPattern,
+			WithFormatGuard(s.handleDomainCSSFormatAware, allowedFormats))
 	}
 
-	var result []map[string]any
-	for rows.Next() {
-		var d Domain
-		if err := rows.Scan(&d.ID, &d.ParentID, &d.Name, &d.Data, &d.CreatedAt, &d.UpdatedAt); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	// Phase 5 requirement: Core routes with format support (including CBOR and Encrypted for proper error handling)
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/ping", s.handlePingChi, []Format{FormatJSON, FormatText, FormatFile, FormatCBOR, FormatEncrypted})
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/health", s.handleHealthChi, []Format{FormatJSON, FormatText, FormatCBOR, FormatEncrypted})
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/status", s.handleStatusChi, []Format{FormatJSON, FormatText, FormatCBOR, FormatEncrypted})
 
-		// decode data JSONB
-		var payload map[string]any
-		_ = json.Unmarshal(d.Data, &payload)
+	// Additional format-aware routes
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/authority/status", s.handleAuthorityStatusChi, []Format{FormatJSON, FormatText})
 
-		result = append(result, map[string]any{
-			"id":         d.ID,
-			"parent_id":  d.ParentID.String, // safe even if NULL
-			"name":       d.Name,
-			"data":       payload,
-			"created_at": d.CreatedAt,
-			"updated_at": d.UpdatedAt,
-		})
-	}
+	// Domain routes with format support
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domain/{id}", s.handleGetDomainChi, []Format{FormatJSON, FormatFile, FormatText})
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domains", s.handleDomainListChi, []Format{FormatJSON, FormatFile})
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	// Basic CRUD operations (non-format-aware for now)
+	r.Post("/api/domain", s.handleCreateDomainChi)
+	r.Put("/api/domain/{id}", s.handleUpdateDomainChi)
 }

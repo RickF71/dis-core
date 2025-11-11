@@ -9,7 +9,7 @@ import (
 
 // registerMirrorSpinRoutes exposes diagnostic endpoints for the MirrorSpin engine.
 func (s *Server) registerMirrorSpinRoutes() {
-	mux := s.mux
+	mux := s.router
 
 	// GET /api/mirrorspin/status
 	mux.HandleFunc("/api/mirrorspin/status", func(w http.ResponseWriter, r *http.Request) {

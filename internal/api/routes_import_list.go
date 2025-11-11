@@ -6,7 +6,7 @@ import (
 )
 
 func (s *Server) registerImportListRoute() {
-	s.mux.HandleFunc("/api/import/list", func(w http.ResponseWriter, r *http.Request) {
+	s.router.HandleFunc("/api/import/list", func(w http.ResponseWriter, r *http.Request) {
 		recs, err := s.Ledger().ListImports(10)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

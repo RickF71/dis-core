@@ -11,7 +11,7 @@ import (
 
 // registerFlowAPI adds all /api/flow/* routes to the server mux.
 func registerFlowAPI(s *Server) {
-	m := s.Mux()
+	m := s.Handler()
 	m.HandleFunc("/api/flow/rule", s.handleGetFlowRule)
 	m.HandleFunc("/api/flow/rule/update", s.handleUpdateFlowRule)
 	m.HandleFunc("/api/flow/status", s.handleFlowStatus)

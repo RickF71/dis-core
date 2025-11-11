@@ -51,7 +51,7 @@ func TestVerifySeatRole(t *testing.T) {
 // TestAdminRoutes_Authorization tests the admin token verification
 func TestAdminRoutes_Authorization(t *testing.T) {
 	server := &Server{
-		mux: http.NewServeMux(),
+		router: NewFormatAwareRouter(),
 	}
 	server.registerAdminRoutes()
 
@@ -76,7 +76,7 @@ func TestAdminRoutes_Authorization(t *testing.T) {
 			}
 
 			rr := httptest.NewRecorder()
-			server.mux.ServeHTTP(rr, req)
+			server.Handler().ServeHTTP(rr, req)
 
 			if rr.Code != tt.expectedCode {
 				t.Errorf("%s: Expected status %d, got %d. %s", tt.name, tt.expectedCode, rr.Code, tt.description)
@@ -88,7 +88,7 @@ func TestAdminRoutes_Authorization(t *testing.T) {
 // TestAdminRoutes_FreezeRequest tests the freeze endpoint request handling
 func TestAdminRoutes_FreezeRequest(t *testing.T) {
 	server := &Server{
-		mux:    http.NewServeMux(),
+		router: NewFormatAwareRouter(),
 		ledger: nil, // Will succeed up to ledger recording
 	}
 	server.registerAdminRoutes()
@@ -105,7 +105,7 @@ func TestAdminRoutes_FreezeRequest(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	rr := httptest.NewRecorder()
-	server.mux.ServeHTTP(rr, req)
+	server.Handler().ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d. Response: %s", rr.Code, rr.Body.String())
@@ -129,7 +129,7 @@ func TestAdminRoutes_FreezeRequest(t *testing.T) {
 // TestAdminRoutes_InvalidFreezeRequest tests invalid freeze requests
 func TestAdminRoutes_InvalidFreezeRequest(t *testing.T) {
 	server := &Server{
-		mux:    http.NewServeMux(),
+		router: NewFormatAwareRouter(),
 		ledger: nil,
 	}
 	server.registerAdminRoutes()
@@ -143,7 +143,7 @@ func TestAdminRoutes_InvalidFreezeRequest(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	rr := httptest.NewRecorder()
-	server.mux.ServeHTTP(rr, req)
+	server.Handler().ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("Expected status 400 for empty target, got %d", rr.Code)

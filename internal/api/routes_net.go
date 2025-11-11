@@ -6,7 +6,7 @@ import (
 )
 
 func (s *Server) registerNetworkRoutes() {
-	mux := s.mux
+	mux := s.router
 
 	mux.HandleFunc("/api/net/peers", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {

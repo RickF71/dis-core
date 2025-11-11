@@ -20,7 +20,7 @@ type PolicyRecord struct {
 
 // RegisterPolicyFileRoutes adds CRUD endpoints for managing policy files.
 func (s *Server) registerPolicyFileRoutes() {
-	mux := s.mux
+	mux := s.router
 	mux.HandleFunc("GET /api/policy/list", s.handleListPolicies)
 	mux.HandleFunc("GET /api/policy/{name}", s.handleGetPolicy)
 	mux.HandleFunc("PUT /api/policy/{name}", s.handlePutPolicy)

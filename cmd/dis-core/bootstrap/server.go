@@ -22,8 +22,23 @@ type ServerComponents struct {
 func InitializeHTTPServer(database *pgxpool.Pool, ledger *ledger.Ledger, config *Config) (*ServerComponents, error) {
 	log.Printf("🚀 DIS-Core %s starting on http://%s", config.Version, config.Address())
 
-	// Create API server
-	srv := api.New(database, ledger)
+	// Initialize policy engine
+	policyComponents, err := InitializePolicyEngine()
+	if err != nil {
+		log.Printf("⚠️  Warning: Could not initialize policy engine: %v", err)
+		// Continue without policy engine - use nil
+		policyComponents = nil
+	}
+
+	// Create API server with policy engine
+	var srv *api.Server
+	if policyComponents != nil {
+		srv = api.NewWithPolicy(database, ledger, policyComponents.Engine)
+		log.Println("✅ API server initialized with policy engine")
+	} else {
+		srv = api.New(database, ledger)
+		log.Println("✅ API server initialized without policy engine")
+	}
 
 	// Wrap with CORS middleware
 	handler := server.WithCORS(srv.Handler())

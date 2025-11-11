@@ -15,7 +15,7 @@ import (
 )
 
 func (s *Server) registerFileRoutes() {
-	mux := s.mux
+	mux := s.router
 
 	// Specific routes first
 	mux.HandleFunc("/api/files/search", s.handleFileSearch)

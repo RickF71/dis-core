@@ -32,7 +32,7 @@ type AdminPolicyReloadRequest struct {
 
 // registerAdminRoutes registers all admin routes with the server mux
 func (s *Server) registerAdminRoutes() {
-	mux := s.mux
+	mux := s.router
 
 	// Admin routes - all require admin privileges
 	mux.HandleFunc("GET /api/admin/receipts/recent", s.handleRecentReceipts)

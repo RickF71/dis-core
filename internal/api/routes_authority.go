@@ -7,7 +7,7 @@ import (
 
 // registerAuthorityRoutes wires all authority endpoints.
 func (s *Server) registerAuthorityRoutes() {
-	mux := s.mux
+	mux := s.router
 	mux.HandleFunc("POST /api/authority/console/evaluate", s.handleAuthorityEvaluate)
 	mux.HandleFunc("GET /api/authority/console/schema", s.handleAuthoritySchema)
 }

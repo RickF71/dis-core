@@ -7,7 +7,7 @@ import (
 
 // registerDBRoutes registers routes related to database health and introspection.
 func (s *Server) registerDBRoutes() {
-	mux := s.mux
+	mux := s.router
 
 	mux.HandleFunc("/api/db/status", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

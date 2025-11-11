@@ -7,7 +7,7 @@ import (
 
 // RegisterSchemaRoutes registers all schema-related API routes.
 func (s *Server) registerSchemaRoutes() {
-	mux := s.mux
+	mux := s.router
 	mux.HandleFunc("GET /api/schema/active", s.handleGetActiveSchema)
 	mux.HandleFunc("GET /api/schema/list", s.handleListSchemas)
 }

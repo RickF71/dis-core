@@ -4,69 +4,52 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"dis-core/internal/api/middleware"
 )
 
-// handlePingFormatAware handles GET /api/ping with format support
-func (s *Server) handlePingFormatAware(w http.ResponseWriter, r *http.Request) {
-	format := DetectFormat(r)
-
+// handlePingChi handles GET /api/ping with format support
+func (s *Server) handlePingChi(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"status":  "ok",
 		"message": "DIS-Core alive",
 		"time":    time.Now().Format(time.RFC3339),
 	}
 
-	switch format {
-	case FormatJSON:
-		JSON(w, http.StatusOK, resp)
-	case FormatText:
-		ServeAsText(w, resp)
-	default:
-		JSONUnsupportedFormat(w, string(format))
-	}
+	Respond(w, r, resp)
 }
 
-// handleHealthFormatAware handles GET /api/health with format support
-func (s *Server) handleHealthFormatAware(w http.ResponseWriter, r *http.Request) {
-	format := DetectFormat(r)
-
+// handleHealthChi handles GET /api/health with format support
+func (s *Server) handleHealthChi(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 
-	switch format {
-	case FormatJSON:
-		JSON(w, http.StatusOK, resp)
-	case FormatText:
-		ServeAsText(w, resp)
-	default:
-		JSONUnsupportedFormat(w, string(format))
-	}
+	Respond(w, r, resp)
 }
 
-// handleStatusFormatAware handles GET /api/status with format support
-func (s *Server) handleStatusFormatAware(w http.ResponseWriter, r *http.Request) {
-	format := DetectFormat(r)
+// handleStatusChi handles GET /api/status with format support
+func (s *Server) handleStatusChi(w http.ResponseWriter, r *http.Request) {
+	// Phase 6: Use middleware context helpers
+	db := middleware.FromDB(r.Context())
+	prov, _ := middleware.FromProvenance(r.Context())
+	engine := middleware.FromPolicyEngine(r.Context())
 
 	// Get status data using existing logic
 	statusData := s.getSystemStatus()
 
-	switch format {
-	case FormatJSON:
-		JSON(w, http.StatusOK, statusData)
-	case FormatText:
-		// Convert status to human-readable text format
-		textStatus := s.formatStatusAsText(statusData)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte(textStatus))
-	default:
-		JSONUnsupportedFormat(w, string(format))
-	}
+	// Add middleware-provided data to status
+	statusData["request_id"] = prov.RequestID
+	statusData["timestamp"] = prov.Timestamp
+	statusData["has_database"] = db != nil
+	statusData["has_policy_engine"] = engine != nil
+
+	Respond(w, r, statusData)
 }
 
-// handleAuthorityStatusFormatAware handles GET /api/authority/status with format support
-func (s *Server) handleAuthorityStatusFormatAware(w http.ResponseWriter, r *http.Request) {
+// handleAuthorityStatusChi handles GET /api/authority/status with format support
+func (s *Server) handleAuthorityStatusChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 
 	// Get authority status using existing logic

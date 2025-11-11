@@ -61,8 +61,8 @@ func JSONOk(w http.ResponseWriter, message string) {
 	})
 }
 
-// RespondWithFormat handles format-specific responses
-func RespondWithFormat(w http.ResponseWriter, r *http.Request, data any) {
+// Respond handles format-specific responses with proper error codes
+func Respond(w http.ResponseWriter, r *http.Request, data any) {
 	format := DetectFormat(r)
 
 	switch format {
@@ -73,12 +73,20 @@ func RespondWithFormat(w http.ResponseWriter, r *http.Request, data any) {
 	case FormatText:
 		ServeAsText(w, data)
 	case FormatCBOR:
-		ServeCBOR(w, data)
+		// Return 501 for CBOR format (placeholder for later)
+		JSONError(w, http.StatusNotImplemented, "CBOR format not yet implemented")
 	case FormatEncrypted:
-		ServeEncrypted(w, data)
+		// Return 501 for Encrypted format (placeholder for later)
+		JSONError(w, http.StatusNotImplemented, "Encrypted format not yet implemented")
 	default:
-		JSONUnsupportedFormat(w, string(format))
+		// Return 400 for unsupported formats
+		JSONError(w, http.StatusBadRequest, "unsupported format: "+string(format))
 	}
+}
+
+// RespondWithFormat handles format-specific responses (legacy - use Respond instead)
+func RespondWithFormat(w http.ResponseWriter, r *http.Request, data any) {
+	Respond(w, r, data)
 }
 
 // ServeAsFile serves data as downloadable file
@@ -102,16 +110,4 @@ func ServeAsText(w http.ResponseWriter, data any) {
 	} else {
 		io.WriteString(w, string(jsonData))
 	}
-}
-
-// ServeCBOR serves data in CBOR format (placeholder)
-func ServeCBOR(w http.ResponseWriter, data any) {
-	// CBOR implementation would go here
-	JSONUnsupportedFormat(w, "cbor")
-}
-
-// ServeEncrypted serves encrypted data (placeholder)
-func ServeEncrypted(w http.ResponseWriter, data any) {
-	// Encryption implementation would go here
-	JSONUnsupportedFormat(w, "encrypted")
 }

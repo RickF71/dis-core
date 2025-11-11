@@ -1,0 +1,48 @@
+/task Implement Phase 6 of DIS-Core: create the universal Chi middleware stack for all /api routes.
+
+Goals:
+Establish clean, composable middleware that injects database, provenance, and policy context into every request before it reaches a handler.
+
+Steps:
+1. Create folder internal/api/middleware with these files:
+   - db.go          → WithDB(pool *pgxpool.Pool)
+   - provenance.go  → WithProvenance()
+   - policy.go      → WithPolicyEngine(engine *policy.Engine)
+   - chain.go       → Attach(r *chi.Mux, pool *pgxpool.Pool, engine *policy.Engine)
+
+2. db.go
+   - Store *pgxpool.Pool in request context.
+   - Provide FromDB(ctx context.Context) *pgxpool.Pool helper.
+
+3. provenance.go
+   - Generate UUID and timestamp on every request.
+   - Attach Provenance{RequestID, Timestamp} to context.
+   - Provide FromProvenance(ctx) (Provenance, bool).
+
+4. policy.go
+   - Inject the active *policy.Engine into context.
+   - Provide FromPolicyEngine(ctx) *policy.Engine.
+
+5. chain.go
+   - Import chi middleware.RequestID, Logger, Recoverer.
+   - Call r.Use() for Logger, Recoverer, RequestID.
+   - Then r.Use(WithDB(pool)), r.Use(WithProvenance()), r.Use(WithPolicyEngine(engine)).
+   - Attach this middleware globally in main router before registering routes.
+
+6. In cmd/dis-core/main.go (or internal/api/server.go):
+   r := chi.NewRouter()
+   middleware.Attach(r, dbPool, policyEngine)
+   s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/status", FormatAwareHandlerWrapper(handleStatusChi), nil)
+
+7. Example handler:
+   db := middleware.FromDB(r.Context())
+   prov, _ := middleware.FromProvenance(r.Context())
+   engine := middleware.FromPolicyEngine(r.Context())
+   Respond(w, map[string]any{"status":"ok","id":prov.RequestID}, format)
+
+8. Verify with:
+   curl http://localhost:8080/api/status/json
+   → Should return a JSON object including a unique request_id and timestamp.
+
+9. Commit with message:
+   "🌐 Phase 6 — Universal Chi middleware stack added (DB, provenance, policy)."

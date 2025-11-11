@@ -5,11 +5,13 @@ import (
 	"log"
 	"net/http"
 
+	"dis-core/internal/api/middleware"
 	"dis-core/internal/authority"
 	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
 	"dis-core/internal/schema"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,7 +19,7 @@ import (
 type Server struct {
 	db      *pgxpool.Pool
 	ledger  *ledger.Ledger
-	mux     *http.ServeMux
+	router  *chi.Mux
 	schemas *schema.Registry
 	logger  *log.Logger
 	policy  policy.PolicyEngine
@@ -36,7 +38,7 @@ func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.Pol
 	s := &Server{
 		db:     db,
 		ledger: led,
-		mux:    http.NewServeMux(),
+		router: NewFormatAwareRouter(),
 		logger: log.Default(),
 		policy: policyEngine,
 	}
@@ -48,6 +50,10 @@ func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.Pol
 
 	s.authoritySchema = authzSchema
 	s.authorityConsole = authority.NewConsole(db, led, nil, s.authoritySchema)
+
+	// Phase 6: Attach universal middleware stack before registering routes
+	middleware.Attach(s.router, s.db, s.policy)
+
 	s.RegisterAllRoutes()
 
 	return s
@@ -96,7 +102,7 @@ LIMIT 1
 	w.Write([]byte(domainData))
 }
 
-func (s *Server) Handler() *http.ServeMux { return s.mux }
-func (s *Server) DB() *pgxpool.Pool       { return s.db }
-func (s *Server) Ledger() *ledger.Ledger  { return s.ledger }
-func (s *Server) Mux() *http.ServeMux     { return s.mux }
+func (s *Server) Handler() *chi.Mux      { return s.router }
+func (s *Server) DB() *pgxpool.Pool      { return s.db }
+func (s *Server) Ledger() *ledger.Ledger { return s.ledger }
+func (s *Server) Router() *chi.Mux       { return s.router }
