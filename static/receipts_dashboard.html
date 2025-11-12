@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIS Receipt Continuity Dashboard - Phase 9D</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .receipts-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .receipts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .receipts-table th,
+        .receipts-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .receipts-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .status-verified {
+            background: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        .status-unverified {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        .status-orphan {
+            background: #fff3cd;
+            color: #856404;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination button {
+            margin: 0 5px;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .pagination button:hover {
+            background: #f8f9fa;
+        }
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>📊 DIS Receipt Continuity Dashboard</h1>
+            <p>Phase 9D - Real-time receipt verification and provenance continuity monitoring</p>
+            <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh</button>
+            <div style="clear: both;"></div>
+        </div>
+
+        <div id="stats-container" class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="total-receipts">-</div>
+                <div class="stat-label">Total Receipts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="verified-receipts">-</div>
+                <div class="stat-label">Verified Receipts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="orphan-receipts">-</div>
+                <div class="stat-label">Orphan Receipts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="receipt-types">-</div>
+                <div class="stat-label">Receipt Types</div>
+            </div>
+        </div>
+
+        <div class="receipts-section">
+            <h2>📋 Receipt Listing</h2>
+            <div id="loading-receipts" class="loading">Loading receipts...</div>
+            <div id="error-container"></div>
+            <table id="receipts-table" class="receipts-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Event ID</th>
+                        <th>Policy Ref</th>
+                        <th>Redaction Ref</th>
+                        <th>Issued By</th>
+                        <th>Issued At</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="receipts-tbody">
+                </tbody>
+            </table>
+            <div class="pagination" id="pagination">
+                <button id="prev-btn" onclick="previousPage()" disabled>← Previous</button>
+                <span id="page-info">Page 1</span>
+                <button id="next-btn" onclick="nextPage()">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 0;
+        const pageSize = 20;
+        let totalReceipts = 0;
+
+        async function loadDashboard() {
+            await loadStats();
+            await loadReceipts(currentPage);
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/receipts/dashboard');
+                if (!response.ok) throw new Error('Failed to load stats');
+
+                const stats = await response.json();
+
+                document.getElementById('total-receipts').textContent = stats.total || 0;
+                document.getElementById('verified-receipts').textContent = stats.verified || 0;
+                document.getElementById('orphan-receipts').textContent = stats.orphans || 0;
+                document.getElementById('receipt-types').textContent = Object.keys(stats.by_type || {}).length;
+
+                totalReceipts = stats.total || 0;
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                showError('Failed to load dashboard statistics');
+            }
+        }
+
+        async function loadReceipts(page) {
+            document.getElementById('loading-receipts').style.display = 'block';
+            document.getElementById('receipts-table').style.display = 'none';
+
+            try {
+                const offset = page * pageSize;
+                const response = await fetch(`/api/receipts/list?limit=${pageSize}&offset=${offset}`);
+                if (!response.ok) throw new Error('Failed to load receipts');
+
+                const data = await response.json();
+                displayReceipts(data.receipts || []);
+                updatePagination(page, data.count);
+
+            } catch (error) {
+                console.error('Failed to load receipts:', error);
+                showError('Failed to load receipts list');
+            }
+        }
+
+        function displayReceipts(receipts) {
+            const tbody = document.getElementById('receipts-tbody');
+            tbody.innerHTML = '';
+
+            receipts.forEach(receipt => {
+                const row = tbody.insertRow();
+
+                // Determine status
+                let status = '';
+                let statusClass = '';
+                if (!receipt.policy_ref || !receipt.redaction_ref) {
+                    status = 'Orphan';
+                    statusClass = 'status-orphan';
+                } else if (receipt.verified) {
+                    status = 'Verified';
+                    statusClass = 'status-verified';
+                } else {
+                    status = 'Unverified';
+                    statusClass = 'status-unverified';
+                }
+
+                row.innerHTML = `
+                    <td title="${receipt.id}">${receipt.id.substring(0, 8)}...</td>
+                    <td>${receipt.receipt_type || '-'}</td>
+                    <td>${receipt.event_id || '-'}</td>
+                    <td>${receipt.policy_ref || '-'}</td>
+                    <td>${receipt.redaction_ref || '-'}</td>
+                    <td>${receipt.issued_by || '-'}</td>
+                    <td>${receipt.issued_at ? new Date(receipt.issued_at).toLocaleString() : '-'}</td>
+                    <td><span class="${statusClass}">${status}</span></td>
+                `;
+            });
+
+            document.getElementById('loading-receipts').style.display = 'none';
+            document.getElementById('receipts-table').style.display = 'table';
+        }
+
+        function updatePagination(page, count) {
+            document.getElementById('page-info').textContent = `Page ${page + 1}`;
+            document.getElementById('prev-btn').disabled = page === 0;
+            document.getElementById('next-btn').disabled = count < pageSize;
+        }
+
+        function previousPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                loadReceipts(currentPage);
+            }
+        }
+
+        function nextPage() {
+            currentPage++;
+            loadReceipts(currentPage);
+        }
+
+        function showError(message) {
+            document.getElementById('error-container').innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Load dashboard on page load
+        window.onload = () => {
+            loadDashboard();
+            // Auto-refresh every 30 seconds
+            setInterval(loadDashboard, 30000);
+        };
+    </script>
+</body>
+</html>

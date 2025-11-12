@@ -1,0 +1,8 @@
+type: seat.definition.v1
+name: enforcer
+permissions:
+  - audit_structure
+  - enforce_consistency
+  - report_anomaly
+description: >
+  Seat responsible for enforcing structure integrity over time (void state auditor).

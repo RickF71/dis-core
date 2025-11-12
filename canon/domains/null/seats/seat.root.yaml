@@ -1,0 +1,10 @@
+type: seat.definition.v1
+name: root
+permissions:
+  - define_contract
+  - approve_policy
+  - manage_structure
+auto_authorize:
+  - define_contract
+description: >
+  The absolute root seat; authority of structure itself.

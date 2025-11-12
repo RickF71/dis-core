@@ -1,0 +1,15 @@
+type: contract.v1
+domain: domain.void
+version: v1
+description: >
+  Defines the behavior of structure enforcement in time.
+fields:
+  - name: structure_hash
+    type: string
+  - name: integrity
+    type: float
+  - name: entropy
+    type: float
+rules:
+  - on deviation > 0.8: emit domain.void.anomaly.v1
+  - on integrity < 0.2: trigger domain.freeze.v1

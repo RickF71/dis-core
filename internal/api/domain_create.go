@@ -70,10 +70,10 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 
 	var d Domain
 	err = s.DB().QueryRow(ctx, `
-		SELECT id, parent_id, data, created_at, updated_at
+		SELECT id, parent_id, payload, created_at, updated_at
 		FROM domains
 		WHERE id = $1
-	`, newID.String()).Scan(&d.ID, &d.ParentID, &d.Data, &d.CreatedAt, &d.UpdatedAt)
+	`, newID.String()).Scan(&d.ID, &d.ParentID, &d.Payload, &d.CreatedAt, &d.UpdatedAt)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

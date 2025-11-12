@@ -21,23 +21,18 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update CSS in the standardized nested path {meta,data,css}
+	// Phase 10J.4: Update flattened payload->css->content
 	_, err := s.DB().Exec(ctx, `
 		UPDATE domains
-		SET data = jsonb_set(
-			jsonb_set(
-				jsonb_set(
-					COALESCE(data, '{}'::jsonb),
-					'{meta}',
-					COALESCE(data->'meta', '{}'::jsonb),
-					true
-				),
-				'{meta,data}',
-				COALESCE(data#>'{meta,data}', '{}'::jsonb),
-				true
+		SET payload = jsonb_set(
+			payload,
+			'{css}',
+			jsonb_build_object(
+				'content', $1::text,
+				'hash', '',
+				'verified', true,
+				'updated_at', now()::text
 			),
-			'{meta,data,css}',
-			to_jsonb($1::text),
 			true
 		),
 		updated_at = NOW()

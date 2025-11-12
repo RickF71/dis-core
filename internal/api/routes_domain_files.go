@@ -12,12 +12,25 @@ import (
 // Domain Files API (JSONB-backed, atomic writes per file)
 // --------------------------------------------------------
 
-// GET /api/domain/{id}/files  →  list file names
+// GET /api/domain/{id}/files  →  list files with metadata
 func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	ctx := r.Context()
 
-	q := `SELECT jsonb_object_keys(files) FROM domains WHERE id = $1`
+	fmt.Printf("[DEBUG] handleDomainFilesList called for domain: %s\n", id)
+
+	// Query directly extracts filename and metadata in one go
+	q := `
+		SELECT
+			key AS name,
+			value->>'author' AS author,
+			value->>'content' AS content,
+			value->>'updated_at' AS updated_at
+		FROM domains, jsonb_each(COALESCE(files, '{}'::jsonb))
+		WHERE id = $1
+		ORDER BY key
+	`
+
 	rows, err := s.DB().Query(ctx, q, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -25,21 +38,43 @@ func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var files []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err == nil {
-			files = append(files, name)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	type FileInfo struct {
+		Name      string `json:"name"`
+		Author    string `json:"author,omitempty"`
+		UpdatedAt string `json:"updated_at,omitempty"`
+		Preview   string `json:"preview,omitempty"`
+		Size      int    `json:"size"`
 	}
 
-	resp := map[string]any{"files": files}
+	var files []FileInfo
+	for rows.Next() {
+		var name, author, content, updatedAt sql.NullString
+		if err := rows.Scan(&name, &author, &content, &updatedAt); err != nil {
+			continue
+		}
+
+		info := FileInfo{Name: name.String}
+		if author.Valid {
+			info.Author = author.String
+		}
+		if updatedAt.Valid {
+			info.UpdatedAt = updatedAt.String
+		}
+		if content.Valid {
+			info.Size = len(content.String)
+			// Generate preview (first 200 chars)
+			if len(content.String) > 200 {
+				info.Preview = content.String[:200] + "…"
+			} else {
+				info.Preview = content.String
+			}
+		}
+
+		files = append(files, info)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(files)
 }
 
 // GET /api/domain/{id}/file/{filename}  →  return file content as text

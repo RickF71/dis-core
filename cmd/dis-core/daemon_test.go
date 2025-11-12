@@ -26,7 +26,7 @@ func TestDaemonStartupShutdown(t *testing.T) {
 	// Use test DSN or default
 	testDSN := os.Getenv("DIS_TEST_DB_DSN")
 	if testDSN == "" {
-		testDSN = "postgres://dis_user:card567@localhost:5432/dis_core?sslmode=disable"
+		testDSN = "postgres://dis_user:card567@localhost:5432/dis_test?sslmode=disable"
 	}
 
 	// Load configuration with test port

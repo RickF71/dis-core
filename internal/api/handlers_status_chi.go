@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"dis-core/internal/api/middleware"
+	"dis-core/internal/receipts"
 )
 
 // handlePingChi handles GET /api/ping with format support
@@ -87,12 +89,40 @@ func (s *Server) getSystemStatus() map[string]any {
 
 // getAuthorityStatus retrieves authority status information
 func (s *Server) getAuthorityStatus() map[string]any {
-	return map[string]any{
+	status := map[string]any{
 		"authority": "active",
 		"policies":  []string{"gates.rego", "risk.rego"},
 		"status":    "ready",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
+
+	// Phase 10E: Add policy continuity status and risk assessment
+	if s.db != nil {
+		ctx := context.Background()
+		if globalStats, err := s.getGlobalPolicyContinuityStats(ctx); err == nil {
+			thresholds := receipts.DefaultContinuityThresholds()
+			riskLevel := receipts.GetContinuityRiskLevel(globalStats.ContinuityRate)
+
+			status["continuity"] = map[string]interface{}{
+				"rate":              globalStats.ContinuityRate,
+				"risk_level":        riskLevel,
+				"total_receipts":    globalStats.TotalReceipts,
+				"orphan_receipts":   globalStats.OrphanRefs,
+				"remediation_ready": globalStats.OrphanRefs > 0,
+				"thresholds":        thresholds,
+			}
+
+			// Adjust overall status based on continuity risk
+			if riskLevel == "critical" {
+				status["status"] = "degraded"
+				status["alert"] = "Critical policy continuity issues detected"
+			} else if riskLevel == "warning" {
+				status["alert"] = "Policy continuity warnings detected"
+			}
+		}
+	}
+
+	return status
 }
 
 // formatStatusAsText converts status data to human-readable text
@@ -130,7 +160,7 @@ func (s *Server) formatAuthorityStatusAsText(authStatus map[string]any) string {
 		policyList += fmt.Sprintf("- %s\n", policy)
 	}
 
-	return fmt.Sprintf(`Authority Status Report
+	result := fmt.Sprintf(`Authority Status Report
 =======================
 Authority: %v
 Status: %v
@@ -142,4 +172,21 @@ Active Policies:
 		authStatus["status"],
 		authStatus["timestamp"],
 		policyList)
+
+	// Phase 10E: Add continuity information to text output
+	if continuity, ok := authStatus["continuity"].(map[string]interface{}); ok {
+		result += "\nPolicy Continuity:\n"
+		result += fmt.Sprintf("- Rate: %.1f%%\n", continuity["rate"])
+		result += fmt.Sprintf("- Risk Level: %v\n", continuity["risk_level"])
+		result += fmt.Sprintf("- Total Receipts: %v\n", continuity["total_receipts"])
+		result += fmt.Sprintf("- Orphan Receipts: %v\n", continuity["orphan_receipts"])
+		result += fmt.Sprintf("- Remediation Ready: %v\n", continuity["remediation_ready"])
+	}
+
+	// Add any alerts
+	if alert, ok := authStatus["alert"].(string); ok {
+		result += fmt.Sprintf("\nALERT: %s\n", alert)
+	}
+
+	return result
 }

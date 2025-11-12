@@ -1,0 +1,8 @@
+type: domain.definition.v1
+id: domain.terra
+parent: domain.void
+description: >
+  The first physical layer domain, where structure and consequence converge.
+inherits_from: domain.void
+contracts:
+  - domain.void.contracts.contract.enforcement.v1.yaml

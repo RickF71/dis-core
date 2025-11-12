@@ -1,4 +1,4 @@
-package ledger
+package receipts
 
 import (
 	"crypto/rand"
@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-// Receipt defines the DIS ci.call.v1 structure
-type Receipt struct {
+// LegacyReceipt defines the DIS ci.call.v1 structure (legacy format)
+type LegacyReceipt struct {
 	ReceiptID      string       `json:"receipt_id"`
 	By             string       `json:"by"`
 	Action         string       `json:"action"`
@@ -42,7 +42,7 @@ type Metadata struct {
 }
 
 // NewReceipt creates a signed ci.call.v1 receipt for an action.
-func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Receipt {
+func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *LegacyReceipt {
 	createdAt := time.Now().Format(time.RFC3339Nano)
 
 	// Payload to hash/sign (stable ordering!)
@@ -57,7 +57,7 @@ func NewReceipt(by, action, frozenCoreHash, consoleID, issuerSeat string) *Recei
 	signer, _ := crypto.EnsureDomainKeys(by) // domain-scoped keys (e.g., "domain.terra")
 	sigB64 := signer.Sign([]byte(hashHex))
 
-	return &Receipt{
+	return &LegacyReceipt{
 		ReceiptID:      generateReceiptID(),
 		By:             by,
 		Action:         action,
@@ -87,7 +87,7 @@ func generateReceiptID() string {
 }
 
 // ToJSON returns the receipt as formatted JSON for saving or transmission.
-func (r *Receipt) ToJSON() (string, error) {
+func (r *LegacyReceipt) ToJSON() (string, error) {
 	bytes, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return "", err
@@ -97,7 +97,7 @@ func (r *Receipt) ToJSON() (string, error) {
 
 // Save writes the receipt JSON to a specified folder.
 // It names the file automatically using the receipt_id.
-func (r *Receipt) Save(dir string) error {
+func (r *LegacyReceipt) Save(dir string) error {
 	jsonOut, err := r.ToJSON()
 	if err != nil {
 		return err

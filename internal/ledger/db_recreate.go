@@ -12,7 +12,7 @@ import (
 // RecreateDatabase drops the target DB (if exists), ensures the app role exists with the
 // given password, creates the DB owned by that role, and sets sane default privileges.
 // adminDSN: superuser/createdb role DSN (e.g. postgres://postgres:admin@localhost/postgres?sslmode=disable)
-// dbName:   e.g. "dis_core"
+// dbName:   e.g. "dis"
 // appUser:  e.g. "dis_user"
 // appPass:  password for appUser
 func RecreateDatabase(adminDSN, dbName, appUser, appPass string) error {

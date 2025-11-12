@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIS Authority Console Schema Viewer - Phase 10D</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.8;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        input, select, button {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input, select {
+            width: 200px;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            border: none;
+            margin-left: 10px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        button.validate-btn {
+            background: #e74c3c;
+            margin-left: 0;
+            margin-top: 10px;
+        }
+        button.validate-btn:hover {
+            background: #c0392b;
+        }
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .panel-header {
+            background: #34495e;
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+        .status-valid {
+            background: #2ecc71;
+        }
+        .status-invalid {
+            background: #e74c3c;
+        }
+        .status-pending {
+            background: #f39c12;
+        }
+        .panel-content {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .collapsible {
+            cursor: pointer;
+        }
+        .collapsible.collapsed + .panel-content {
+            display: none;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.4;
+            margin: 0;
+            white-space: pre-wrap;
+        }
+        .validation-panel {
+            grid-column: span 2;
+            margin-top: 20px;
+        }
+        .validation-results {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+        .error-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0 0 0;
+        }
+        .error-list li {
+            background: #ffe6e6;
+            padding: 8px 12px;
+            margin-bottom: 5px;
+            border-left: 4px solid #e74c3c;
+            border-radius: 0 4px 4px 0;
+            font-size: 14px;
+        }
+        .success-message {
+            background: #e8f6f3;
+            padding: 12px;
+            border-left: 4px solid #2ecc71;
+            border-radius: 0 4px 4px 0;
+            color: #2c3e50;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .metadata {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .metadata-item {
+            margin: 5px 0;
+        }
+        .metadata-label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🔍 Authority Console Schema Viewer</h1>
+            <p>Phase 10D: Live schema inspection, policy introspection, and validation workflow</p>
+        </div>
+
+        <div class="controls">
+            <div class="form-group">
+                <label for="domain-select">Select Domain:</label>
+                <select id="domain-select">
+                    <option value="">-- Choose Domain --</option>
+                    <option value="terra">Terra</option>
+                    <option value="null">Null Domain</option>
+                    <option value="test">Test Domain</option>
+                </select>
+                <button onclick="loadDomainData()">Load Schema & Policies</button>
+            </div>
+
+            <div class="form-group">
+                <label for="custom-domain">Or enter custom domain ID:</label>
+                <input type="text" id="custom-domain" placeholder="domain.example.com">
+                <button onclick="loadCustomDomainData()">Load Custom Domain</button>
+            </div>
+        </div>
+
+        <div class="content-grid" id="content-grid" style="display: none;">
+            <!-- Schema Panel -->
+            <div class="panel">
+                <div class="panel-header collapsible" onclick="togglePanel(this)">
+                    <span>📄 Domain Schema</span>
+                    <div>
+                        <span id="schema-status" class="status-indicator status-pending"></span>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="metadata" id="schema-metadata"></div>
+                    <pre id="schema-content">Loading...</pre>
+                </div>
+            </div>
+
+            <!-- Policies Panel -->
+            <div class="panel">
+                <div class="panel-header collapsible" onclick="togglePanel(this)">
+                    <span>⚖️ Domain Policies</span>
+                    <div>
+                        <span id="policy-count">0</span> policies
+                        <span id="policy-status" class="status-indicator status-pending"></span>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <pre id="policy-content">Loading...</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Panel -->
+        <div class="panel validation-panel" id="validation-panel" style="display: none;">
+            <div class="panel-header">
+                <span>✅ Schema Validation</span>
+                <button class="validate-btn" onclick="validateCurrentSchema()">Re-validate Schema</button>
+            </div>
+            <div class="panel-content">
+                <div id="validation-content">
+                    <div class="loading">Click "Re-validate Schema" to check schema validity</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDomainId = '';
+        let currentSchemaData = null;
+
+        async function loadDomainData() {
+            const domainSelect = document.getElementById('domain-select');
+            const domainId = domainSelect.value;
+
+            if (!domainId) {
+                alert('Please select a domain');
+                return;
+            }
+
+            currentDomainId = domainId;
+            await fetchDomainSchemaAggregate(domainId);
+        }
+
+        async function loadCustomDomainData() {
+            const customInput = document.getElementById('custom-domain');
+            const domainId = customInput.value.trim();
+
+            if (!domainId) {
+                alert('Please enter a domain ID');
+                return;
+            }
+
+            currentDomainId = domainId;
+            await fetchDomainSchemaAggregate(domainId);
+        }
+
+        async function fetchDomainSchemaAggregate(domainId) {
+            try {
+                // Show content grid
+                document.getElementById('content-grid').style.display = 'grid';
+                document.getElementById('validation-panel').style.display = 'block';
+
+                // Reset status indicators
+                setStatusIndicator('schema-status', 'pending');
+                setStatusIndicator('policy-status', 'pending');
+
+                // Fetch aggregated data from Phase 10D endpoint
+                const response = await fetch(`/api/authority/schema/domain/${domainId}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch domain data');
+                }
+
+                // Update schema panel
+                updateSchemaPanel(data);
+
+                // Update policies panel
+                updatePoliciesPanel(data);
+
+                // Store current schema data for validation
+                currentSchemaData = data.schema;
+
+            } catch (error) {
+                console.error('Error fetching domain data:', error);
+                showError(`Failed to load domain data: ${error.message}`);
+                setStatusIndicator('schema-status', 'invalid');
+                setStatusIndicator('policy-status', 'invalid');
+            }
+        }
+
+        function updateSchemaPanel(data) {
+            // Update metadata
+            const metadata = document.getElementById('schema-metadata');
+            metadata.innerHTML = `
+                <div class="metadata-item"><span class="metadata-label">Domain:</span> ${data.domain_ref}</div>
+                <div class="metadata-item"><span class="metadata-label">Timestamp:</span> ${new Date(data.timestamp).toLocaleString()}</div>
+                <div class="metadata-item"><span class="metadata-label">Policy Count:</span> ${data.policy_count}</div>
+            `;
+
+            // Update schema content
+            const schemaContent = document.getElementById('schema-content');
+            if (data.schema && Object.keys(data.schema).length > 0) {
+                schemaContent.textContent = JSON.stringify(data.schema, null, 2);
+                setStatusIndicator('schema-status', 'valid');
+            } else {
+                schemaContent.textContent = '{}  // No schema defined for this domain';
+                setStatusIndicator('schema-status', 'invalid');
+            }
+        }
+
+        function updatePoliciesPanel(data) {
+            // Update policy count
+            document.getElementById('policy-count').textContent = data.policy_count;
+
+            // Update policies content
+            const policyContent = document.getElementById('policy-content');
+            if (data.policies && Array.isArray(data.policies) && data.policies.length > 0) {
+                policyContent.textContent = JSON.stringify(data.policies, null, 2);
+                setStatusIndicator('policy-status', 'valid');
+            } else {
+                policyContent.textContent = '[]  // No policies defined for this domain';
+                setStatusIndicator('policy-status', data.policy_count > 0 ? 'valid' : 'pending');
+            }
+        }
+
+        async function validateCurrentSchema() {
+            if (!currentSchemaData) {
+                alert('No schema loaded to validate');
+                return;
+            }
+
+            const validationContent = document.getElementById('validation-content');
+            validationContent.innerHTML = '<div class="loading">Validating schema...</div>';
+
+            try {
+                const response = await fetch('/api/authority/schema/validate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ schema: currentSchemaData })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Validation failed');
+                }
+
+                // Display validation results
+                displayValidationResults(result);
+
+            } catch (error) {
+                console.error('Validation error:', error);
+                validationContent.innerHTML = `
+                    <div class="error-list">
+                        <li>Validation request failed: ${error.message}</li>
+                    </div>
+                `;
+            }
+        }
+
+        function displayValidationResults(result) {
+            const validationContent = document.getElementById('validation-content');
+
+            if (result.valid) {
+                validationContent.innerHTML = `
+                    <div class="success-message">
+                        ✅ Schema is valid!
+                        <div style="margin-top: 10px; font-size: 12px;">
+                            Validated by: ${result.validated_by}<br>
+                            Timestamp: ${new Date(result.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                `;
+            } else {
+                validationContent.innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>❌ Schema validation failed</strong>
+                        <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                            Validated by: ${result.validated_by} | ${new Date(result.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                    <ul class="error-list">
+                        ${result.errors.map(error => `<li>${error}</li>`).join('')}
+                    </ul>
+                `;
+            }
+        }
+
+        function setStatusIndicator(elementId, status) {
+            const indicator = document.getElementById(elementId);
+            indicator.className = `status-indicator status-${status}`;
+        }
+
+        function togglePanel(header) {
+            header.classList.toggle('collapsed');
+        }
+
+        function showError(message) {
+            document.getElementById('schema-content').textContent = `Error: ${message}`;
+            document.getElementById('policy-content').textContent = `Error: ${message}`;
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 DIS Authority Console Schema Viewer initialized (Phase 10D)');
+        });
+    </script>
+</body>
+</html>

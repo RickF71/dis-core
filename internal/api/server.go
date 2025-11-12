@@ -56,6 +56,9 @@ func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.Pol
 
 	s.RegisterAllRoutes()
 
+	// Install format consistency checker
+	s.InstallFormatConsistencyCheck()
+
 	return s
 }
 

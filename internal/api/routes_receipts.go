@@ -9,6 +9,7 @@ import (
 func (s *Server) registerReceiptRoutes() {
 	mux := s.router
 	mux.HandleFunc("GET /api/receipts/latest", s.handleGetLatestReceipt)
+	mux.HandleFunc("GET /api/receipts/verify/{id}", s.handleVerifyReceipt)
 }
 
 // GET /api/receipts/latest

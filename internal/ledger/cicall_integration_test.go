@@ -11,7 +11,7 @@ import (
 func TestCICallV1_Integration(t *testing.T) {
 	// Skip if no test database is available
 	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis_core_test?sslmode=disable"
+	dsn := "postgres://dis_user:card567@localhost:5432/dis_test?sslmode=disable"
 
 	ledger, err := Open(ctx, dsn, nil, nil)
 	if err != nil {
@@ -122,7 +122,7 @@ func TestCICallV1_Integration(t *testing.T) {
 // TestCICallV1_MultipleActions tests multiple actions create separate receipts
 func TestCICallV1_MultipleActions(t *testing.T) {
 	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis_core_test?sslmode=disable"
+	dsn := "postgres://dis_user:card567@localhost:5432/dis_test?sslmode=disable"
 
 	ledger, err := Open(ctx, dsn, nil, nil)
 	if err != nil {

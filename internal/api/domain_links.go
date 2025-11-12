@@ -17,11 +17,11 @@ func (s *Server) handleDomainLinks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	rows, err := s.DB().Query(ctx, `
 		SELECT
-			data->>'domain_id' AS child,
-			data->>'parent_name' AS parent
+			payload->>'domain_id' AS child,
+			payload->>'parent_name' AS parent
 		FROM domains
-		WHERE (data->>'parent_name') IS NOT NULL
-		      AND (data->>'parent_name') <> ''
+		WHERE (payload->>'parent_name') IS NOT NULL
+		      AND (payload->>'parent_name') <> ''
 	`)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)

@@ -1,4 +1,4 @@
-package ledger
+package receipts
 
 import (
 	"encoding/json"
@@ -33,7 +33,7 @@ func SaveReceipt(r *Receipt) error {
 	}
 
 	// --- 1️⃣ Save individual file ---
-	filename := filepath.Join(dir, fmt.Sprintf("%s.json", r.ReceiptID))
+	filename := filepath.Join(dir, fmt.Sprintf("%s.json", r.ID))
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return err
 	}

@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Terra Domain Schema",
+  "type": "object",
+  "properties": {
+    "geography": {
+      "type": "object",
+      "properties": {
+        "coordinates": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "regions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "natural": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "artificial": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "properties": {
+        "policies": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "authorities": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "required": ["geography", "resources"]
+}

@@ -13,9 +13,9 @@ func (s *Server) handleDomainCSS(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var css sql.NullString
-	// 🔧 Fetch from nested path {meta,data,css}
+	// Phase 10J.4: Fetch from flattened payload->css->content
 	err := s.DB().QueryRow(ctx,
-		`SELECT data#>'{meta,data,css}' FROM domains WHERE id = $1`, id,
+		`SELECT payload->'css'->>'content' FROM domains WHERE id = $1`, id,
 	).Scan(&css)
 
 	if err == sql.ErrNoRows {

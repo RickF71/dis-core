@@ -1,0 +1,13 @@
+type: domain.definition.v1
+id: domain.null
+parent: null
+description: >
+  The pure structural origin of all domains.
+  Contains immutable canonical forms, contracts, and seat definitions.
+contains:
+  - seats/seat.root.yaml
+  - contracts/contract.structure.v1.yaml
+  - policies/gates.rego
+  - policies/risk.rego
+  - policies/freeze.rego
+  - meta/readme.md

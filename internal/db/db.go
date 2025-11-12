@@ -22,7 +22,10 @@ func Connect(cfg ConfigProvider) (*pgxpool.Pool, error) {
 }
 
 func SetupDatabase() (*pgxpool.Pool, error) {
-	dsn := os.Getenv("DIS_DB_DSN")
+	dsn := os.Getenv("DISCORE_DSN")
+	if dsn == "" {
+		dsn = os.Getenv("DIS_DB_DSN")
+	}
 	if dsn == "" {
 		dsn = "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
 		fmt.Println("⚠️ Using default Postgres DSN:", dsn)
@@ -53,7 +56,10 @@ func CloseDatabase() {
 func ConnectDSN(dsn string) (*pgxpool.Pool, error) {
 	if dsn == "" {
 		// fallback to env or default
-		dsn = os.Getenv("DIS_DB_DSN")
+		dsn = os.Getenv("DISCORE_DSN")
+		if dsn == "" {
+			dsn = os.Getenv("DIS_DB_DSN")
+		}
 		if dsn == "" {
 			dsn = "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
 		}

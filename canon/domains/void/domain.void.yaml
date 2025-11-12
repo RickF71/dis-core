@@ -1,0 +1,10 @@
+type: domain.definition.v1
+id: domain.void
+parent: domain.null
+description: >
+  The enforcer of canonical structure in time.
+  Applies and validates the laws of domain.null through temporal activity.
+contracts:
+  - contracts/contract.enforcement.v1.yaml
+seats:
+  - seats/seat.enforcer.yaml

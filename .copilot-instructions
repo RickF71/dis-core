@@ -1,49 +1,133 @@
-/task Implement Phase 7 of DIS-Core: Authority Console Activation and Phase Logging System.
+# /task Implement Phase 9D: Receipt Listing & Continuity Dashboard
+# Objective: Add receipts_status_view + GET /api/receipts/list + phase_9d.log bootstrap continuity check.
 
-Objectives:
-1. Activate and expose the Authority Console API endpoints.
-2. Integrate schema and policy sources (schema.json, ci_rules.json, thresholds.json, mock_corpus.json).
-3. Implement policy evaluation endpoint (/api/policy/evaluate).
-4. Introduce automatic phase logging under internal/logs/phases/phase_7.log for all subsequent phases.
+Create the following files and apply migrations exactly as shown.
 
-Implementation:
-- Create directory internal/logs/phases/.
-- Add file internal/logs/phases/logger.go containing:
+=== migrations/20251111_add_receipts_list_view.sql ===
+-- Phase 9D: receipts_status_view for continuity dashboard
+CREATE OR REPLACE VIEW receipts_status_view AS
+SELECT
+  r.id,
+  r.receipt_type,
+  r.event_id,
+  (r.policy_ref IS NOT NULL)  AS policy_linked,
+  (r.redaction_ref IS NOT NULL) AS redacted,
+  (o.receipt_id IS NOT NULL) AS orphaned
+FROM receipts r
+LEFT JOIN receipts_orphan_view o ON r.id = o.receipt_id;
 
-  package phases
-  import (
-      "fmt"
-      "os"
-      "time"
-  )
-  func WritePhaseLog(phase, summary string) error {
-      path := fmt.Sprintf("internal/logs/phases/%s.log", phase)
-      f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-      if err != nil {
-          return err
-      }
-      defer f.Close()
-      timestamp := time.Now().Format(time.RFC3339)
-      _, err = fmt.Fprintf(f, "# %s\n**Timestamp:** %s\n\n%s\n\n---\n", phase, timestamp, summary)
-      return err
-  }
+COMMENT ON VIEW receipts_status_view IS
+'Phase 9D continuity dashboard: summarizes linkage and orphan status for receipts.';
 
-- Extend internal/bootstrap/InitializeAuthorityConsole():
-  * Load schema.json, ci_rules.json, thresholds.json, mock_corpus.json.
-  * Insert canonical entries into canon table with provenance (ci.call.v1 receipt).
-  * On successful bootstrap, call phases.WritePhaseLog("phase_7", "Phase 7 Authority Console Activated").
+=== internal/model/receipts.go ===
+package model
 
-- Add internal/api/authority.go with:
-  * GET /api/authority/status → returns {"ready":true,"schemas":n,"policies":n,"receipts":n}
-  * GET /api/authority/schema → returns loaded Authority Console schema.
-  * POST /api/policy/evaluate → accepts {"action":"...","context":{...}} and returns {"allow":true|false,"reason":"...","details":{...}}
+type ReceiptSummary struct {
+	ID           string `json:"id"`
+	Type         string `json:"receipt_type"`
+	EventID      string `json:"event_id"`
+	PolicyLinked bool   `json:"policy_linked"`
+	Redacted     bool   `json:"redacted"`
+	Orphaned     bool   `json:"orphaned"`
+}
 
-- Ensure routes are registered in server.go under chi mux.
+=== internal/api/receipts_list.go ===
+package api
 
-Validation:
-1. curl -s http://localhost:8080/api/authority/status | jq
-2. curl -s http://localhost:8080/api/policy/evaluate -X POST -H "Content-Type: application/json" -d '{"action":"domain.freeze.v1","context":{"domain":"null"}}' | jq
-3. Check that internal/logs/phases/phase_7.log contains a timestamped summary entry.
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"strconv"
 
-Commit message:
-🧩 Phase 7 — Authority Console Activated + Phase Log System Introduced
+	"dis-core/internal/model"
+)
+
+func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	offset, _ := strconv.Atoi(q.Get("offset"))
+	orphanOnly := q.Get("orphaned") == "true"
+	if limit <= 0 { limit = 50 }
+
+	query := `
+	SELECT id, receipt_type, event_id, policy_linked, redacted, orphaned
+	FROM receipts_status_view`
+	if orphanOnly {
+		query += " WHERE orphaned = true"
+	}
+	query += " ORDER BY id LIMIT $1 OFFSET $2"
+
+	rows, err := s.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type Response struct {
+		Receipts []model.ReceiptSummary `json:"receipts"`
+		Page     int                    `json:"page"`
+		Limit    int                    `json:"limit"`
+	}
+	var result Response
+	for rows.Next() {
+		var rec model.ReceiptSummary
+		if err := rows.Scan(&rec.ID, &rec.Type, &rec.EventID, &rec.PolicyLinked, &rec.Redacted, &rec.Orphaned); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		result.Receipts = append(result.Receipts, rec)
+	}
+	result.Page = offset/limit + 1
+	result.Limit = limit
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+=== internal/api/routes.go (append) ===
+mux.HandleFunc("GET /api/receipts/list", s.handleListReceipts)
+
+=== internal/bootstrap/console.go (append) ===
+package bootstrap
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func performPhase9DCheck(db *pgxpool.Pool) error {
+	ctx := context.Background()
+	row := db.QueryRow(ctx, `
+		SELECT COUNT(*),
+		       COUNT(*) FILTER (WHERE orphaned)
+		FROM receipts_status_view;
+	`)
+	var total, orphaned int
+	if err := row.Scan(&total, &orphaned); err != nil {
+		return err
+	}
+	log.Printf("[phase_9d] receipts total=%d orphaned=%d", total, orphaned)
+	appendPhaseLog("phase_9d.log",
+		fmt.Sprintf("Phase 9D: %d total, %d orphaned", total, orphaned))
+	return nil
+}
+
+=== internal/api/authority_schema.go (append) ===
+"receipts_api": {
+  "list": "/api/receipts/list",
+  "verify": "/api/receipts/verify/{id}"
+}
+
+=== Validation ===
+- Compile with no errors.
+- Bootstrap must produce phase_9d.log containing:
+  [phase_9d] receipts total=<N> orphaned=<M>
+- curl -s http://localhost:8080/api/receipts/list | jq  returns JSON array.
+
+# end of Phase 9D

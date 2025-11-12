@@ -31,7 +31,7 @@ func (s *Server) handleDomainAnnounce(w http.ResponseWriter, r *http.Request) {
 		name, description sql.NullString
 	)
 
-	q := `SELECT name, COALESCE(data->>'description','') FROM domains WHERE id = $1`
+	q := `SELECT name, COALESCE(payload->>'description','') FROM domains WHERE id = $1`
 	ctx := r.Context()
 	err := s.DB().QueryRow(ctx, q, id).Scan(&name, &description)
 	if err == sql.ErrNoRows {

@@ -1,0 +1,16 @@
+type: contract.v1
+domain: domain.null
+version: v1
+description: >
+  Canonical structure contract defining how all domains must represent themselves.
+fields:
+  - name: structure_integrity
+    type: float
+    description: Measure of canonical consistency
+  - name: inheritance_rules
+    type: list
+    description: Defines how child domains inherit from parent definitions.
+policies:
+  - gates.rego
+  - risk.rego
+  - freeze.rego

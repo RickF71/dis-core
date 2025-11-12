@@ -1,95 +1,213 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
+	"strings"
 
-	"dis-core/internal/policy"
+	"github.com/go-chi/chi/v5"
 )
 
-// GET /api/domain/{id}/policy
-func (s *Server) handleGetDomainPolicy(w http.ResponseWriter, r *http.Request) {
-	domainID := r.PathValue("id")
+// DomainPolicy represents a policy associated with a domain
+type DomainPolicy struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	DomainID   string `json:"domain_id"`
+	PolicyType string `json:"policy_type"`
+	Content    string `json:"content,omitempty"`
+	Active     bool   `json:"active"`
+}
+
+// GetDomainPolicy handles GET /api/domain/{id}/policy with format support
+func (s *Server) GetDomainPolicy(w http.ResponseWriter, r *http.Request) {
+	format := DetectFormat(r)
+	domainID := chi.URLParam(r, "id")
+
 	if domainID == "" {
-		http.Error(w, "missing domain ID", http.StatusBadRequest)
-		return
-	}
-
-	// Try to read domain-specific policy first
-	domainPolicyPath := filepath.Join("domains", domainID, "policy", "gates.rego")
-	content, err := os.ReadFile(domainPolicyPath)
-
-	if err != nil {
-		// Fall back to internal default policy
-		internalPolicyPath := filepath.Join("internal", "policy", "gates.rego")
-		content, err = os.ReadFile(internalPolicyPath)
-		if err != nil {
-			http.Error(w, "policy not found", http.StatusNotFound)
-			return
+		switch format {
+		case FormatJSON:
+			JSONError(w, http.StatusBadRequest, "Domain ID required")
+		case FormatText:
+			http.Error(w, "Domain ID required", http.StatusBadRequest)
+		default:
+			JSONUnsupportedFormat(w, string(format))
 		}
-	}
-
-	response := map[string]string{
-		"content": string(content),
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
+	}
+
+	ctx := r.Context()
+
+	// Query policies for the domain (only if database is available)
+	var policies []DomainPolicy
+	var err error
+
+	if s.db != nil {
+		policies, err = s.getDomainPolicies(ctx, domainID)
+	}
+
+	if s.db == nil || err != nil {
+		// Return empty array for testing or if no database
+		policies = []DomainPolicy{}
+	} // Format-specific response
+	switch format {
+	case FormatJSON:
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(policies)
+	case FormatText:
+		w.Header().Set("Content-Type", "text/plain")
+		if len(policies) > 0 {
+			var textLines []string
+			for _, policy := range policies {
+				status := "inactive"
+				if policy.Active {
+					status = "active"
+				}
+				line := fmt.Sprintf("%s v%s (%s) - %s",
+					policy.Name, policy.Version, policy.PolicyType, status)
+				textLines = append(textLines, line)
+			}
+			response := strings.Join(textLines, "\n")
+			w.Write([]byte(response))
+		} else {
+			w.Write([]byte("No policies found for domain"))
+		}
+	default:
+		JSONUnsupportedFormat(w, string(format))
 	}
 }
 
-// POST /api/domain/{id}/policy
-func (s *Server) handleSetDomainPolicy(w http.ResponseWriter, r *http.Request) {
-	domainID := r.PathValue("id")
+// getDomainPolicies queries the policies table filtered by domain_id
+func (s *Server) getDomainPolicies(ctx context.Context, domainID string) ([]DomainPolicy, error) {
+	query := `
+		SELECT id, name, COALESCE(version, '1.0') as version,
+		       domain_id, COALESCE(policy_type, 'unknown') as policy_type,
+		       COALESCE(active, true) as active
+		FROM policies
+		WHERE domain_id = $1
+		ORDER BY name, version
+	`
+
+	rows, err := s.db.Query(ctx, query, domainID)
+	if err != nil {
+		// If policies table doesn't exist or query fails, return empty array
+		return []DomainPolicy{}, nil
+	}
+	defer rows.Close()
+
+	var policies []DomainPolicy
+	for rows.Next() {
+		var p DomainPolicy
+		err := rows.Scan(&p.ID, &p.Name, &p.Version, &p.DomainID, &p.PolicyType, &p.Active)
+		if err != nil {
+			continue // Skip invalid rows
+		}
+		policies = append(policies, p)
+	}
+
+	return policies, nil
+}
+
+// GetDomainPolicyInherited handles GET /api/domain/{id}/policy/inherited
+// Returns the concatenated Rego policies from parent domains up to null
+func (s *Server) GetDomainPolicyInherited(w http.ResponseWriter, r *http.Request) {
+	domainID := chi.URLParam(r, "id")
+
 	if domainID == "" {
-		http.Error(w, "missing domain ID", http.StatusBadRequest)
+		JSONError(w, http.StatusBadRequest, "Domain ID required")
 		return
 	}
 
-	var req struct {
-		Content string `json:"content"`
-	}
+	ctx := r.Context()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	// Get domain lineage
+	lineage, err := s.getDomainLineage(ctx, domainID)
+	if err != nil {
+		JSONError(w, http.StatusInternalServerError, "Failed to get domain lineage")
 		return
 	}
 
-	// Ensure the domain policy directory exists
-	policyDir := filepath.Join("domains", domainID, "policy")
-	if err := os.MkdirAll(policyDir, 0755); err != nil {
-		http.Error(w, "failed to create policy directory", http.StatusInternalServerError)
-		return
-	}
-
-	// Write the policy content to gates.rego
-	policyPath := filepath.Join(policyDir, "gates.rego")
-	if err := os.WriteFile(policyPath, []byte(req.Content), 0644); err != nil {
-		http.Error(w, "failed to write policy file", http.StatusInternalServerError)
-		return
-	}
-
-	// Reload the policy engine if available
-	if s.policy != nil {
-		if opaEngine, ok := s.policy.(*policy.OPAEngine); ok {
-			if err := opaEngine.Reload(r.Context(), domainID); err != nil {
-				http.Error(w, "failed to reload policy engine", http.StatusInternalServerError)
-				return
-			}
+	// Collect policies from all parent domains (excluding current domain)
+	var inheritedPolicies []string
+	for i := len(lineage) - 1; i > 0; i-- { // Start from root, skip current domain
+		parentID := lineage[i]
+		policy, err := s.getDomainRegoPolicy(ctx, parentID)
+		if err == nil && policy != "" {
+			inheritedPolicies = append(inheritedPolicies, fmt.Sprintf("# Policy from domain: %s\n%s", parentID, policy))
 		}
 	}
 
-	response := map[string]string{
-		"status": "ok",
+	inherited := strings.Join(inheritedPolicies, "\n\n")
+	if inherited == "" {
+		inherited = "# No inherited policies"
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(inherited))
+}
+
+// GetDomainPolicyCurrent handles GET /api/domain/{id}/policy/current
+// Returns only the current domain's Rego policy
+func (s *Server) GetDomainPolicyCurrent(w http.ResponseWriter, r *http.Request) {
+	domainID := chi.URLParam(r, "id")
+
+	if domainID == "" {
+		JSONError(w, http.StatusBadRequest, "Domain ID required")
 		return
 	}
+
+	ctx := r.Context()
+	policy, err := s.getDomainRegoPolicy(ctx, domainID)
+	if err != nil {
+		JSONError(w, http.StatusNotFound, "Policy not found")
+		return
+	}
+
+	if policy == "" {
+		policy = "# No policy defined for this domain\npackage dis.policy\n\ndefault allow := false\n"
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(policy))
+}
+
+// getDomainLineage returns the chain of domain IDs from current up to null
+func (s *Server) getDomainLineage(ctx context.Context, domainID string) ([]string, error) {
+	if s.db == nil {
+		return []string{domainID}, nil
+	}
+
+	var lineage []string
+	currentID := domainID
+
+	for currentID != "" && len(lineage) < 20 { // Safety limit
+		lineage = append(lineage, currentID)
+
+		var parentID *string
+		err := s.db.QueryRow(ctx, "SELECT parent_id FROM domains WHERE id = $1", currentID).Scan(&parentID)
+		if err != nil || parentID == nil {
+			break
+		}
+		currentID = *parentID
+	}
+
+	return lineage, nil
+}
+
+// getDomainRegoPolicy fetches the Rego policy content for a specific domain
+func (s *Server) getDomainRegoPolicy(ctx context.Context, domainID string) (string, error) {
+	if s.db == nil {
+		return "", fmt.Errorf("database not available")
+	}
+
+	var policy string
+	err := s.db.QueryRow(ctx, `
+		SELECT COALESCE(payload->'policy'->>'content', '')
+		FROM domains
+		WHERE id = $1
+	`, domainID).Scan(&policy)
+
+	return policy, err
 }

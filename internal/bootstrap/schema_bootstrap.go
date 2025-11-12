@@ -199,6 +199,11 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 		return fmt.Errorf("Phase 10J.1 setup failed: %w", err)
 	}
 
+	// Phase 10J.2b: Normalize Domain Data Structure
+	if err := performPhase10J2bNormalization(ctx, dbConn); err != nil {
+		return fmt.Errorf("Phase 10J.2b normalization failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -437,39 +442,95 @@ func performPhase10I2Setup(dbConn *pgxpool.Pool) error {
 	return nil
 }
 
-// performPhase10J1Setup ensures all domains have greedy JSON data slots
+// performPhase10J1Setup ensures all domains have greedy JSON payload slots (Phase 10J.4: updated for flattened structure)
 func performPhase10J1Setup(ctx context.Context, db *pgxpool.Pool) error {
 	fmt.Println("🧱 Phase 10J.1 — Greedy JSON slot migration starting")
 
-	// The domains table has a 'data' column (not 'content')
-	// We need to restructure it to have nested data.css, data.policy, etc.
-	// Current structure: {css: "...", description: "..."}
-	// Target structure: {data: {css: {...}, policy: {...}, receipts: [], overlay: {...}, variables: {...}}, meta: {...}, authority: {...}}
+	// Phase 10J.4 update: payload column now has flattened structure
+	// Target structure: {css: {...}, policy: {...}, receipts: [], overlay: {...}, variables: {...}, meta: {...}, authority: {...}}
 
 	_, err := db.Exec(ctx, `
 		UPDATE domains
-		SET data = jsonb_build_object(
-			'meta', COALESCE(data->'meta', '{}'::jsonb),
-			'data', jsonb_build_object(
-				'css', COALESCE(
-					data->'data'->'css',
-					CASE
-						WHEN data ? 'css' THEN jsonb_build_object('content', data->>'css', 'hash', '', 'verified', false)
-						ELSE '{"content":"","hash":"","verified":false}'::jsonb
-					END
-				),
-				'policy', COALESCE(data->'data'->'policy', '{}'::jsonb),
-				'receipts', COALESCE(data->'data'->'receipts', '[]'::jsonb),
-				'overlay', COALESCE(data->'data'->'overlay', '{}'::jsonb),
-				'variables', COALESCE(data->'data'->'variables', '{}'::jsonb)
+		SET payload = jsonb_build_object(
+			'css', COALESCE(
+				payload->'css',
+				CASE
+					WHEN payload ? 'css' AND jsonb_typeof(payload->'css') = 'string'
+					THEN jsonb_build_object('content', payload->>'css', 'hash', '', 'verified', false)
+					ELSE jsonb_build_object('content', '', 'hash', '', 'verified', false)
+				END
 			),
-			'authority', COALESCE(data->'authority', '{}'::jsonb)
+			'policy', COALESCE(payload->'policy', '{}'::jsonb),
+			'receipts', COALESCE(payload->'receipts', '[]'::jsonb),
+			'overlay', COALESCE(payload->'overlay', '{}'::jsonb),
+			'variables', COALESCE(payload->'variables', '{}'::jsonb),
+			'meta', COALESCE(payload->'meta', '{}'::jsonb),
+			'authority', COALESCE(payload->'authority', '{}'::jsonb)
 		)
-		WHERE NOT (data ? 'data' AND data->'data' ? 'css' AND data->'data' ? 'policy' AND data->'data' ? 'receipts' AND data->'data' ? 'overlay' AND data->'data' ? 'variables');
+		WHERE NOT (payload ? 'css' AND payload ? 'policy' AND payload ? 'receipts' AND payload ? 'overlay' AND payload ? 'variables');
 	`)
 	if err != nil {
 		return fmt.Errorf("phase10J1 slot migration failed: %w", err)
 	}
 	fmt.Println("✅ Phase 10J.1 — Greedy slots ensured for all domains")
+	return nil
+}
+
+// performPhase10J2bNormalization ensures all domains have normalized greedy-slot structure
+// with schema_version for forward compatibility (Phase 10J.4: updated for flattened payload)
+func performPhase10J2bNormalization(ctx context.Context, db *pgxpool.Pool) error {
+	fmt.Println("🧱 Phase 10J.2b — Domain Payload Normalization starting")
+
+	_, err := db.Exec(ctx, `
+		UPDATE domains
+		SET payload = jsonb_build_object(
+			'css', COALESCE(
+				payload->'css',
+				jsonb_build_object(
+					'content', 'body { background-color: #0f172a; color: #f1f5f9; }',
+					'hash', '',
+					'verified', true
+				)
+			),
+			'overlay', COALESCE(payload->'overlay', '{}'::jsonb),
+			'policy', COALESCE(payload->'policy', '{}'::jsonb),
+			'receipts', COALESCE(payload->'receipts', '[]'::jsonb),
+			'variables', COALESCE(payload->'variables', '{}'::jsonb),
+			'meta', jsonb_set(
+				COALESCE(payload->'meta', '{}'::jsonb),
+				'{schema_version}',
+				'"v1"'::jsonb
+			),
+			'authority', COALESCE(payload->'authority', '{}'::jsonb)
+		)
+		WHERE (
+			NOT (payload ? 'css') OR
+			NOT (payload ? 'meta') OR
+			NOT (payload ? 'authority') OR
+			NOT (payload ? 'overlay') OR
+			NOT (payload ? 'policy') OR
+			NOT (payload ? 'receipts') OR
+			NOT (payload ? 'variables') OR
+			NOT (payload->'meta' ? 'schema_version')
+		);
+	`)
+
+	if err != nil {
+		return fmt.Errorf("phase10J2b normalization failed: %w", err)
+	}
+
+	// Count normalized domains
+	var normalizedCount int
+	err = db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM domains
+		WHERE payload->'meta'->>'schema_version' = 'v1'
+	`).Scan(&normalizedCount)
+
+	if err == nil {
+		fmt.Printf("✅ Phase 10J.2b — Domain Data Normalization complete (%d domains normalized)\n", normalizedCount)
+	} else {
+		fmt.Println("✅ Phase 10J.2b — Domain Data Normalization complete")
+	}
+
 	return nil
 }

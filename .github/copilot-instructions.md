@@ -1,58 +1,119 @@
-## Quick orientation for AI coding agents
+/task Implement Phase 9C: Receipt Verification & Provenance Continuity
 
-This repository is a Go-based implementation of the DIS core (Direct Individual Sovereignty). Use the notes below to be productive quickly — reference the files called out when making changes.
+Objectives:
 
-Key directories and entrypoints
-- `cmd/dis-core/main.go` → `internal/app/run.go` — primary service entrypoint. Connects to Postgres (env `DIS_DB_DSN`), initializes schema registry, ledger, policy engine, and HTTP API server.
-- `internal/api/server.go` + `internal/api/routes.go` — REST API server with endpoints like `/api/ping`, `/api/domain/*`, `/api/status`. Uses `http.ServeMux` for routing.
-- `internal/schema/registry.go` — schema registry: `NewRegistry()`, `LoadDir(dir)`, `Verify(id,version)`, and `HashAll()` (deterministic sha256 of all registered schema hashes). Loads from `disyaml/schemas/`.
-- `internal/ledger/ledger.go` + `postgres_store.go` — ledger with PostgreSQL persistence. Main methods: `Open()`, `StoreCanon()`, `BootstrapDomains()`, receipt management.
-- `internal/bootstrap/` — table creation and YAML import logic. `BootstrapAllTables()` creates database schema, `ImportYAML()` loads initial data.
-- `internal/domain/loader.go` — domain YAML parsing and validation against schema registry.
+1. Create migration file: db/migrations/20251110_add_receipts_table.sql
+   SQL:
+   CREATE TABLE IF NOT EXISTS receipts (
+       id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+       receipt_type    TEXT NOT NULL,
+       event_id        TEXT NOT NULL,
+       policy_ref      TEXT,
+       redaction_ref   TEXT,
+       issued_by       TEXT,
+       issued_at       TIMESTAMPTZ DEFAULT now(),
+       verified        BOOLEAN DEFAULT FALSE,
+       metadata        JSONB DEFAULT '{}'::jsonb
+   );
+   CREATE INDEX IF NOT EXISTS idx_receipts_event_id ON receipts(event_id);
+   CREATE INDEX IF NOT EXISTS idx_receipts_policy_ref ON receipts(policy_ref);
+   CREATE INDEX IF NOT EXISTS idx_receipts_redaction_ref ON receipts(redaction_ref);
+   CREATE OR REPLACE VIEW receipts_orphan_view AS
+   SELECT id, receipt_type, event_id, issued_at
+   FROM receipts
+   WHERE policy_ref IS NULL OR redaction_ref IS NULL;
+   COMMENT ON TABLE receipts IS 'Stores all DIS receipts for provenance and redaction continuity verification (Phase 9C).';
 
-Multiple executable entrypoints
-- `cmd/dis-core/` — main HTTP API server (port 8080 by default)
-- `cmd/dis-webd/` — web server with freeze/receipt CLI flags + API server
-- `cmd/console_server/` — console management server with action logging
-- `cmd/dis-netd/` — peer-to-peer network daemon
-- `dis-core` root executable (`main_legacy2.go`) — runs `cmd/dis-core` by default
+2. Add new Go model: internal/receipts/model.go
+   package receipts
 
-Concrete workflows you can run or emulate
-- Build and run main server:
-  - `go run ./cmd/dis-core` (reads `DIS_DB_DSN` or uses default postgres://dis_user:card567@localhost:5432/dis_core)
-- Run web server with CLI features:
-  - `go run ./cmd/dis-webd --schemas=disyaml/schemas --domains=disyaml/domains --freeze=v0.9.7`
-- List/verify receipts:
-  - `go run ./cmd/dis-webd --list-receipts --verify-receipt=r-xxxxxxxx`
-- Test API endpoints:
-  - `curl http://localhost:8080/api/ping`, `curl http://localhost:8080/api/status`
+   import "time"
 
-Important code patterns & conventions (do not change without checking callers)
-- Schemas are YAML files in `disyaml/schemas/` that must include `meta.schema_id` and `meta.schema_version` in their frontmatter. `LoadDir` skips YAMLs missing those fields.
-- Domains are YAML files in `disyaml/domains/` following the pattern `domain.<subject>.yaml` with schema references and validation.
-- Schema versions must begin with `v` and include a dot (example: `v0.1`). The loader enforces this and will return an error for invalid versions.
-- `Registry.HashAll()` sorts keys and hashes ID+version+hash bytes to produce a deterministic fingerprint used in freeze receipts.
-- Canon table stores JSON documents with `type` and `content` columns. API queries use PostgreSQL JSON operators like `content->'meta'->>'domain_id'`.
-- Bootstrap process: tables → schema loading → domain loading → policy engine → API server startup (see `internal/app/run.go`).
-- HTTP API uses `http.ServeMux` with function-based handlers. Routes are registered in `internal/api/routes.go`, handlers in separate files like `domain_get.go`.
+   type Receipt struct {
+       ID           string         `json:"id"`
+       ReceiptType  string         `json:"receipt_type"`
+       EventID      string         `json:"event_id"`
+       PolicyRef    string         `json:"policy_ref"`
+       RedactionRef string         `json:"redaction_ref"`
+       IssuedBy     string         `json:"issued_by"`
+       IssuedAt     time.Time      `json:"issued_at"`
+       Verified     bool           `json:"verified"`
+       Metadata     map[string]any `json:"metadata"`
+   }
 
-Integration & external dependencies to be mindful of
-- PostgreSQL: All commands expect a Postgres server. Use `DIS_DB_DSN` env var or fallback DSN `postgres://dis_user:card567@localhost:5432/dis_core?sslmode=disable`.
-- Database schema: Bootstrap creates tables for `canon`, `domains`, `schemas`, `policies`, `mirror_events`, `peers`, etc. See `internal/bootstrap/schema_bootstrap.go`.
-- Multiple servers: `dis-netd` (peer networking), `console_server` (management), `dis-webd` (web+CLI), `dis-core` (main API) can run simultaneously on different ports.
-- Policy engine: Uses Open Policy Agent (OPA) for authorization. Policies loaded from `./policies` directory.
-- File structure: `disyaml/` contains schemas and domains; `versions/` contains release receipts; config in `config.yaml`.
+   type VerificationResult struct {
+       ReceiptID     string   `json:"receipt_id"`
+       Verified       bool     `json:"verified"`
+       PolicyRef      string   `json:"policy_ref"`
+       RedactionRef   string   `json:"redaction_ref"`
+       Timestamp      string   `json:"timestamp"`
+       Issues         []string `json:"issues"`
+   }
 
-Where to look for examples when editing or adding features
-- Adding new API endpoints: follow pattern in `internal/api/routes.go` for registration, create handler files like `domain_get.go`.
-- Database operations: see patterns in `internal/ledger/postgres_store.go` and bootstrap table creation in `internal/bootstrap/`.
-- Schema/domain processing: see `internal/schema/registry.go` and `internal/domain/loader.go` for YAML parsing and validation patterns.
-- Config management: extend `internal/config/config.go` for new settings, used throughout via dependency injection.
+3. Implement verification logic: internal/receipts/verify.go
+   package receipts
 
-Small safety notes for automated edits
-- The bootstrap sequence in `internal/app/run.go` has dependencies: config → DB → schemas → ledger → domains → policy → API. Don't reorder.
-- Canon table stores raw JSON - preserve exact JSON structure when writing queries with PostgreSQL JSON operators.
-- Multiple commands share the same database schema but have different entrypoints - changes to table structure affect all commands.
-- Schema version format checks are enforced in multiple places - keep `vX.Y` format consistent across the codebase.
+   import (
+       "context"
+       "fmt"
+       "time"
+       "github.com/jackc/pgx/v5/pgxpool"
+   )
 
-If anything above is unclear, tell me which section or file you want expanded and I will iterate on this guidance.
+   func VerifyReceipt(ctx context.Context, pool *pgxpool.Pool, id string) (VerificationResult, error) {
+       var r Receipt
+       var result VerificationResult
+       err := pool.QueryRow(ctx, `
+           SELECT id, receipt_type, event_id, policy_ref, redaction_ref, issued_by, issued_at, verified
+           FROM receipts WHERE id = $1
+       `, id).Scan(&r.ID, &r.ReceiptType, &r.EventID, &r.PolicyRef, &r.RedactionRef, &r.IssuedBy, &r.IssuedAt, &r.Verified)
+       if err != nil {
+           return result, fmt.Errorf("receipt not found: %w", err)
+       }
+
+       result.ReceiptID = r.ID
+       result.PolicyRef = r.PolicyRef
+       result.RedactionRef = r.RedactionRef
+       result.Timestamp = time.Now().UTC().Format(time.RFC3339)
+
+       if r.PolicyRef == "" {
+           result.Issues = append(result.Issues, "missing policy_ref")
+       }
+       if r.RedactionRef == "" {
+           result.Issues = append(result.Issues, "missing redaction_ref")
+       }
+       result.Verified = len(result.Issues) == 0
+       return result, nil
+   }
+
+4. Add API handler in internal/api/receipts_verify.go
+   func (s *Server) handleVerifyReceipt(w http.ResponseWriter, r *http.Request) {
+       ctx := r.Context()
+       id := chi.URLParam(r, "id")
+       result, err := receipts.VerifyReceipt(ctx, s.db, id)
+       if err != nil {
+           http.Error(w, err.Error(), http.StatusNotFound)
+           return
+       }
+       json.NewEncoder(w).Encode(result)
+   }
+
+5. Register route in internal/api/router.chi.go
+   mux.Get("/api/receipts/verify/{id}", s.handleVerifyReceipt)
+
+6. During bootstrap, after authority console initialization:
+   - Run continuity check:
+     SELECT COUNT(*) FROM receipts WHERE policy_ref IS NULL OR redaction_ref IS NULL;
+   - Log output to phases/phase_9c.log:
+     "✅ Phase 9C — Verified {count} receipts, {orphans} orphan entries (timestamp)"
+
+7. Extend /api/authority/schema response:
+   Add field:
+     "receipts": ["ci.call.v1", "ci.import.v1"]
+
+Expected Outcome:
+- Receipts table exists with indexes and continuity view.
+- /api/receipts/verify/{id} endpoint returns full verification details.
+- Provenance continuity checked at bootstrap.
+- Authority Console schema includes receipt mappings.
+- phase_9c.log created with verification summary.

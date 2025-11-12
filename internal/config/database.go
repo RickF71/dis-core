@@ -8,7 +8,10 @@ import (
 // DatabaseURL builds the Postgres DSN using environment variables,
 // with sensible local defaults for development.
 func DatabaseURL() string {
-	// 1) Single env var override
+	// 1) Single env var override - check both old and new names
+	if env := os.Getenv("DISCORE_DSN"); env != "" {
+		return env
+	}
 	if env := os.Getenv("DIS_DB_DSN"); env != "" {
 		return env
 	}

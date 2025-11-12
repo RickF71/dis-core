@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -71,10 +73,7 @@ func (s *Server) handleDomainListChi(w http.ResponseWriter, r *http.Request) {
 	// Format-specific response
 	switch format {
 	case FormatJSON:
-		JSON(w, http.StatusOK, map[string]any{
-			"domains": domains,
-			"total":   len(domains),
-		})
+		JSON(w, http.StatusOK, domains)
 	case FormatFile:
 		ServeAsFile(w, domains)
 	default:
@@ -197,30 +196,97 @@ func (s *Server) handleUpdateDomainCSSFormatAware(w http.ResponseWriter, r *http
 
 // getDomainByID retrieves domain data by ID
 func (s *Server) getDomainByID(ctx context.Context, domainID string) (map[string]any, error) {
-	// This would integrate with existing domain retrieval logic
-	// For now, return placeholder data
-	return map[string]any{
-		"id":     domainID,
-		"name":   "Example Domain",
-		"status": "active",
-	}, nil
+	var id, name string
+	var parentID *string
+	var createdAt, updatedAt time.Time
+	var payload, policy, act, files interface{}
+
+	err := s.db.QueryRow(ctx, `
+		SELECT id, name, parent_id, created_at, updated_at, payload, policy, act, files
+		FROM domains
+		WHERE id = $1
+	`, domainID).Scan(&id, &name, &parentID, &createdAt, &updatedAt, &payload, &policy, &act, &files)
+
+	if err != nil {
+		return nil, err
+	}
+
+	domain := map[string]any{
+		"id":         id,
+		"name":       name,
+		"created_at": createdAt,
+		"updated_at": updatedAt,
+	}
+
+	if parentID != nil {
+		domain["parent_id"] = *parentID
+	}
+	if payload != nil {
+		domain["payload"] = payload
+	}
+	if policy != nil {
+		domain["policy"] = policy
+	}
+	if act != nil {
+		domain["act"] = act
+	}
+	if files != nil {
+		domain["files"] = files
+	}
+
+	return domain, nil
 }
 
 // getAllDomains retrieves all domains
 func (s *Server) getAllDomains(ctx context.Context) ([]map[string]any, error) {
-	// This would integrate with existing domain list logic
-	// For now, return placeholder data
-	return []map[string]any{
-		{"id": "1", "name": "Domain 1"},
-		{"id": "2", "name": "Domain 2"},
-	}, nil
+	rows, err := s.db.Query(ctx, `
+		SELECT id, name, created_at
+		FROM domains
+		ORDER BY name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var domains []map[string]any
+	for rows.Next() {
+		var id, name string
+		var createdAt time.Time
+
+		if err := rows.Scan(&id, &name, &createdAt); err != nil {
+			return nil, err
+		}
+
+		domains = append(domains, map[string]any{
+			"id":         id,
+			"name":       name,
+			"created_at": createdAt,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return domains, nil
 }
 
 // getDomainCSS retrieves CSS for a domain
 func (s *Server) getDomainCSS(ctx context.Context, domainID string) (string, error) {
-	// This would integrate with existing CSS retrieval logic
-	// For now, return placeholder CSS
-	return "body { color: #fff; background: #000; }", nil
+	// Phase 10J.4: Query payload->css->content from unified structure
+	var cssContent string
+	err := s.db.QueryRow(ctx, `
+		SELECT COALESCE(payload->'css'->>'content', '')
+		FROM domains
+		WHERE id = $1::uuid
+	`, domainID).Scan(&cssContent)
+
+	if err != nil {
+		return "", fmt.Errorf("CSS not found for domain %s: %w", domainID, err)
+	}
+
+	return cssContent, nil
 }
 
 // updateDomainCSS updates CSS for a domain

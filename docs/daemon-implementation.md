@@ -82,7 +82,7 @@ ok      dis-core/cmd/dis-core   1.085s
 sudo ./scripts/install-service.sh
 
 # 2. Configure environment (create /etc/environment or modify service file)
-DIS_DB_DSN=postgres://dis_user:password@localhost:5432/dis_core
+DISCORE_DSN=postgres://dis_user:password@localhost:5432/dis
 
 # 3. Start the service
 sudo systemctl start dis-core

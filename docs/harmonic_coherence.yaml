@@ -1,0 +1,50 @@
+# dis/notes/harmonic_coherence.yaml
+# ---------------------------------------------------------
+# Harmonic Coherence Model — Terra / Numen Bridge
+# Captures the concept that inter-domain coherence in DIS
+# can be represented as harmonic resonance between oscillators.
+# ---------------------------------------------------------
+
+version: 0.1
+title: Harmonic Coherence Model
+summary: >
+  Every domain behaves as an oscillator with its own base
+  frequency (identity), amplitude (influence), and phase
+  (temporal or moral alignment).  Coherence between domains
+  is measured by the stability of their interference pattern.
+
+domain_oscillator:
+  frequency: f_i # identity rhythm
+  amplitude: A_i # strength or vitality
+  phase: φ_i # alignment with other domains
+  damping: γ_i # resistance to change (freeze)
+  layer:
+    terra: amplitude_field # material resonance
+    numen: phase_field # moral / semantic resonance
+
+coupling_matrix:
+  κ_ij: float # coupling strength (consent / policy link)
+
+coherence_equation: |
+  # Aggregate harmonic coherence between all domains:
+  C = Σ_i Σ_j κ_ij * cos(φ_i - φ_j)
+  # 0 ≤ C ≤ 1  → full decoherence to perfect resonance
+
+interpretation:
+  high: resonant alignment; stable authority flow
+  medium: beating tension; negotiation and adaptation
+  low: decoherence; policy conflict or isolation
+
+implementation_hint: >
+  Use domain update rhythm, transaction rate, or consent cadence
+  to derive f_i.  Compute phase drift Δφ from asynchronous events.
+  Damping γ_i grows during freeze or risk escalation.
+  The resulting field C(t) can be visualized or rendered as sound.
+
+relation_to_DIS:
+  - Terra supplies amplitude (existence, energy).
+  - Numen adjusts phase (meaning, intent).
+  - Harmony between them defines living coherence.
+  - Disharmony is tolerated; it drives adaptation.
+
+tags: [harmonics, coherence, dis, terra, numen, resonance, physics, moral_field]

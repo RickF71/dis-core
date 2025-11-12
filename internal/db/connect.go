@@ -24,10 +24,13 @@ func ConnectPostgres(dsn string) (*pgxpool.Pool, error) {
 func ConnectFromEnv() (*pgxpool.Pool, error) {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
+		dsn = os.Getenv("DISCORE_DSN")
+	}
+	if dsn == "" {
 		dsn = os.Getenv("DIS_DB_DSN")
 	}
 	if dsn == "" {
-		dsn = "postgres://dis_user:card567@localhost:5432/dis_core?sslmode=disable"
+		dsn = "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
 	}
 	return ConnectPostgres(dsn)
 }
