@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DIS Domain Data Schema v1",
+  "type": "object",
+  "properties": {
+    "meta": { "type": "object" },
+    "data": {
+      "type": "object",
+      "properties": {
+        "css": { "type": "object" },
+        "policy": { "type": "object" },
+        "receipts": { "type": "array" },
+        "overlay": { "type": "object" },
+        "variables": { "type": "object" }
+      },
+      "required": ["css","policy","receipts","overlay","variables"]
+    },
+    "authority": { "type": "object" }
+  },
+  "required": ["meta","data","authority"]
+}
