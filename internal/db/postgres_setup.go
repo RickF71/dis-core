@@ -32,29 +32,16 @@ func CreateSchema(db *sql.DB) error {
 				signature TEXT
 			);`,
 
-		// Updated domains table schema with JSONB 'data' column and new structure
+		// Updated domains table schema (Phase 10J.4: uses 'payload' instead of 'data')
 		`CREATE TABLE IF NOT EXISTS domains (
-				-- internal row identity
 				id TEXT PRIMARY KEY,
-
-				-- sovereign identity (FDN)
-				long_path_name TEXT UNIQUE NOT NULL,
-
-				-- parent via sovereign lineage
-				parent_long_path TEXT NOT NULL,
-
-				-- leaf name only (can collide)
 				name TEXT NOT NULL,
-
-				-- domain schema linkage
-				schema_long_path TEXT NOT NULL,
-
-				data JSONB DEFAULT '{}'::jsonb,
-				is_notech BOOLEAN NOT NULL DEFAULT FALSE,
-				requires_inside_domain BOOLEAN NOT NULL DEFAULT TRUE,
-
-				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-				FOREIGN KEY (parent_long_path) REFERENCES domains(long_path_name)
+				parent_id TEXT,
+				payload JSONB DEFAULT '{}'::jsonb,  -- Phase 10J.4: renamed from 'data'
+				created_at TIMESTAMPTZ DEFAULT now(),
+				updated_at TIMESTAMPTZ,
+				CONSTRAINT fk_domains_parent
+					FOREIGN KEY (parent_id) REFERENCES domains(id) ON DELETE SET NULL
 		);`,
 
 		`CREATE TABLE IF NOT EXISTS handshakes (
@@ -110,12 +97,12 @@ func CreateSchema(db *sql.DB) error {
 // SeedDefaults inserts baseline domains for the DIS network.
 func SeedDefaults(db *sql.DB) error {
 	_, err := db.Exec(`
-	INSERT INTO domains (name, data, is_notech, requires_inside_domain, created_at)
+	INSERT INTO domains (id, name, parent_id, payload, created_at)
 	VALUES
-		('domain.null', '{}'::jsonb, FALSE, TRUE, now()),
-		('domain.terra', '{}'::jsonb, FALSE, TRUE, now()),
-		('domain.virtual.usa', '{}'::jsonb, FALSE, TRUE, now())
-	ON CONFLICT (name) DO NOTHING;
+		('domain.null', 'domain.null', NULL, '{}'::jsonb, now()),
+		('domain.terra', 'domain.terra', NULL, '{}'::jsonb, now()),
+		('domain.virtual.usa', 'domain.virtual.usa', NULL, '{}'::jsonb, now())
+	ON CONFLICT (id) DO NOTHING;
 	`)
 	if err == nil {
 		fmt.Println("🌱 Seeded baseline domains: domain.null, domain.terra, domain.virtual.usa")

@@ -19,6 +19,8 @@ type DomainResponse struct {
 }
 
 // ---- Domain ID Resolver (minimal tactical version) ----
+// DEPRECATED: GOV-8 violation - uses name-based lookup
+// TODO: Remove after all callers migrated to UUID-only
 // Accepts either:
 //   - internal DB id (uuid/int) OR
 //   - DIS domain longname (domain.user.rick)
@@ -27,7 +29,7 @@ type DomainResponse struct {
 func (s *Server) resolveDomainInternalID(ctx context.Context, ref string) (string, error) {
 	var id string
 
-	// Try DB internal ID first
+	// Try DB internal ID first (UUID-based - acceptable)
 	err := s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE id=$1`, ref).Scan(&id)
 	if err == nil {
 		return id, nil
@@ -39,13 +41,32 @@ func (s *Server) resolveDomainInternalID(ctx context.Context, ref string) (strin
 		return id, nil
 	}
 
-	// Try the "name" column as last fallback
+	// GOV-8: WARNING - Name-based lookup violates DIS-Invariant-001
+	// This fallback path should be removed once all callers use UUID
 	err = s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE name=$1`, ref).Scan(&id)
 	if err == nil {
+		s.logger.Printf("⚠️  GOV-8 WARNING: Name-based domain lookup used for '%s'. Migrate to UUID.", ref)
 		return id, nil
 	}
 
 	return "", fmt.Errorf("domain not found: %s", ref)
+}
+
+// GOV-8: resolveDomainByUUID enforces UUID-only domain resolution
+// This is the ONLY acceptable method for domain lookups in authority operations
+func (s *Server) resolveDomainByUUID(ctx context.Context, domainID string) (string, error) {
+	var id string
+
+	// Validate UUID format first
+	err := s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE id = $1`, domainID).Scan(&id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", fmt.Errorf("GOV-8: domain UUID not found: %s", domainID)
+		}
+		return "", fmt.Errorf("GOV-8: domain validation failed: %w", err)
+	}
+
+	return id, nil
 }
 
 // ---- PUT /api/domain/{id}/css ----

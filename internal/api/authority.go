@@ -8,7 +8,10 @@ import (
 	"os"
 
 	"dis-core/internal/api/middleware"
+	"dis-core/internal/policy"
 	"dis-core/internal/receipts"
+
+	"github.com/google/uuid"
 )
 
 // AuthorityStatusResponse represents the response for /api/authority/status
@@ -140,8 +143,49 @@ func (s *Server) handlePolicyEvaluatePhase7(w http.ResponseWriter, r *http.Reque
 		"context":  req.Context,
 	}
 
+	// Flatten risk and other common fields to top-level for easier REGO access
+	if req.Context != nil {
+		if risk, ok := req.Context["risk"]; ok {
+			input["risk"] = risk
+		}
+		if domainID, ok := req.Context["domain_id"]; ok {
+			input["domain_id"] = domainID
+		}
+	}
+
+	// Phase S5: Include per-seat REGO policies if domain_id is provided
+	var decision *policy.PolicyDecision
+	var err error
+
+	if domainIDStr, ok := req.Context["domain_id"].(string); ok && domainIDStr != "" {
+		// Try to parse domain_id as UUID
+		domainID, parseErr := uuid.Parse(domainIDStr)
+		if parseErr == nil && s.seatsService != nil {
+			// Get per-seat policies for this domain
+			seatPolicies, seatErr := s.seatsService.GetPerSeatRegoPolicies(r.Context(), domainID)
+			if seatErr == nil && len(seatPolicies) > 0 {
+				// Use OPAEngine's EvaluateWithSeatPolicies if available
+				if opaEngine, ok := policyEngine.(*policy.OPAEngine); ok {
+					decision, err = opaEngine.EvaluateWithSeatPolicies(r.Context(), input, seatPolicies)
+				} else {
+					// Fallback to regular evaluation
+					decision, err = policyEngine.EvaluateAction(r.Context(), input)
+				}
+			} else {
+				// No seat policies or error loading them - use base evaluation
+				decision, err = policyEngine.EvaluateAction(r.Context(), input)
+			}
+		} else {
+			// Invalid UUID or no seats service - use base evaluation
+			decision, err = policyEngine.EvaluateAction(r.Context(), input)
+		}
+	} else {
+		// No domain_id provided - use base evaluation
+		decision, err = policyEngine.EvaluateAction(r.Context(), input)
+	}
+
 	// Evaluate policy using the PolicyEngine interface
-	decision, err := policyEngine.EvaluateAction(r.Context(), input)
+	// decision, err := policyEngine.EvaluateAction(r.Context(), input)
 	if err != nil {
 		response := PolicyEvaluationResponse{
 			Allow:  false,

@@ -6,10 +6,16 @@ import (
 	"net/http"
 
 	"dis-core/internal/api/middleware"
+	"dis-core/internal/auth"
 	"dis-core/internal/authority"
+	"dis-core/internal/corporeal"
+	"dis-core/internal/identity"
 	"dis-core/internal/ledger"
 	"dis-core/internal/policy"
+	"dis-core/internal/repo"
 	"dis-core/internal/schema"
+	"dis-core/internal/seats"
+	"dis-core/internal/services"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,6 +32,29 @@ type Server struct {
 
 	authoritySchema  *authority.AuthoritySchema
 	authorityConsole *authority.Console
+
+	// Phase S: Seats management
+	seatsRepo    *seats.Repository
+	seatsService *seats.Service
+
+	// GOV-1: Identity triad management
+	triadRepo *identity.TriadRepository
+
+	// GOV-3: Seat mutations, audits, events
+	mutationEngine *authority.SeatMutationEngine
+	eventBus       authority.EventBus
+
+	// GOV-11G: Identity receipt recording for schema adoption and policy updates
+	identityReceiptRecorder *identity.IdentityReceiptStore
+
+	// GOV-13: Contract service for DSCI contract management
+	contractService services.ContractService
+
+	// Phase 0-R.5: Corporeal + Actor-Domain Bootstrap
+	corporealBootstrapper *corporeal.Bootstrapper
+
+	// Auth Challenge Store (Phase: Auth Challenge Refactor)
+	challengeStore auth.ChallengeStore
 }
 
 // New creates a new Server instance and wires all dependencies.
@@ -36,11 +65,12 @@ func New(db *pgxpool.Pool, led *ledger.Ledger) *Server {
 // NewWithPolicy creates a new Server instance with a policy engine.
 func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.PolicyEngine) *Server {
 	s := &Server{
-		db:     db,
-		ledger: led,
-		router: NewFormatAwareRouter(),
-		logger: log.Default(),
-		policy: policyEngine,
+		db:             db,
+		ledger:         led,
+		router:         NewFormatAwareRouter(),
+		logger:         log.Default(),
+		policy:         policyEngine,
+		challengeStore: auth.NewPostgresChallengeStore(db),
 	}
 
 	authzSchema, err := authority.LoadSchema("./internal/schema/schema.json")
@@ -50,6 +80,29 @@ func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.Pol
 
 	s.authoritySchema = authzSchema
 	s.authorityConsole = authority.NewConsole(db, led, nil, s.authoritySchema)
+
+	// Phase S: Initialize seats repository and service
+	s.seatsRepo = seats.NewRepository(db)
+	s.seatsService = seats.NewService(s.seatsRepo)
+
+	// GOV-1: Initialize identity triad repository
+	s.triadRepo = identity.NewTriadRepository(db)
+
+	// GOV-3: Initialize event bus and mutation engine
+	s.eventBus = authority.NewMemoryBus()
+	// Note: mutationEngine requires PolicyEvaluator and AuditLogger which are not yet wired
+	// Will be initialized separately after policy engine is ready
+	s.mutationEngine = nil // Set via SetMutationEngine() after boot
+
+	// GOV-11G: Initialize identity receipt recorder
+	s.identityReceiptRecorder = identity.NewIdentityReceiptStore(db)
+
+	// GOV-13: Initialize contract service
+	contractRepo := repo.NewContractRepository(db)
+	s.contractService = services.NewContractService(contractRepo, s.identityReceiptRecorder)
+
+	// Phase 0-R.5: Initialize corporeal bootstrapper
+	s.corporealBootstrapper = corporeal.NewBootstrapper(db)
 
 	// Phase 6: Attach universal middleware stack before registering routes
 	middleware.Attach(s.router, s.db, s.policy)
@@ -103,6 +156,11 @@ LIMIT 1
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(domainData))
+}
+
+// SetMutationEngine sets the mutation engine for GOV-3 seat transitions
+func (s *Server) SetMutationEngine(engine *authority.SeatMutationEngine) {
+	s.mutationEngine = engine
 }
 
 func (s *Server) Handler() *chi.Mux      { return s.router }

@@ -1,0 +1,571 @@
+{
+  "phase_id": "GOV-12",
+  "phase_name": "Alias Canon & DSCI Integration",
+  "repository": "dis-core",
+  "status": "complete",
+  "completion_percentage": 100,
+  "completion_date": "2025-11-14",
+  "summary": "Canonical alias taxonomy (AUTO/RELATIONSHIP/MASK) fully implemented with database schema, domain model, repository layer, service layer, public API endpoints, receipt integration, and comprehensive tests.",
+
+  "objectives": {
+    "primary": [
+      "Define canonical three-tier alias taxonomy",
+      "Implement database schema with constraints and views",
+      "Create Go domain model with validation helpers",
+      "Build repository layer with full CRUD operations",
+      "Implement service layer with semantic enforcement for each alias type"
+    ],
+    "completed": [
+      "Database migration with aliases table, indexes, constraints",
+      "Domain model (AliasType, AliasStatus, Alias struct, AliasMetadata)",
+      "AliasRepository with 10+ query methods",
+      "AliasService with AUTO/RELATIONSHIP/MASK creation flows",
+      "API endpoints (GET /aliases, POST /alias/relationship, POST /alias/mask)",
+      "Receipt integration (identity.alias.add.v1, identity.alias.remove.v1)",
+      "Comprehensive documentation (GOV12_ALIAS_CANON.md)",
+      "Unit tests (domain, repository, service, API layers)",
+      "Integration tests for constraint enforcement",
+      "API tests for endpoint validation"
+    ],
+    "pending": []
+  },
+
+  "taxonomy": {
+    "AUTO": {
+      "description": "Structural, non-volitional graph bindings",
+      "creation_triggers": [
+        "Corporeal domain initialization",
+        "Seat instantiation (structural membership)",
+        "Domain branching (inherited relationships)"
+      ],
+      "semantics": {
+        "volitional": false,
+        "user_selectable": false,
+        "authority_source": "system/structural",
+        "special_case": "is_corporeal_auto = true for corporeal root seat"
+      }
+    },
+    "RELATIONSHIP": {
+      "description": "Volitional, domain-scoped identities with consent",
+      "creation_triggers": [
+        "User joins domain and chooses handle",
+        "Domain issues identifier with user consent"
+      ],
+      "semantics": {
+        "volitional": true,
+        "user_selectable": true,
+        "authority_source": "DSCI contract",
+        "scope": "target_domain_id",
+        "consent_required": true
+      }
+    },
+    "MASK": {
+      "description": "Ephemeral browsing personas with minimal authority",
+      "creation_triggers": [
+        "User requests exploration/browsing mode",
+        "Temporary participation without full identity revelation"
+      ],
+      "semantics": {
+        "volitional": true,
+        "user_selectable": true,
+        "authority_source": "default-deny, explicit whitelist only",
+        "scope": "self-targeting (owner = target)",
+        "ephemeral": true,
+        "ttl_supported": true
+      }
+    }
+  },
+
+  "database": {
+    "migration_file": "db/migrations/20251113_gov12_alias_canon.sql",
+    "tables_created": ["aliases"],
+    "columns": [
+      "id UUID PRIMARY KEY",
+      "owner_domain_id UUID NOT NULL REFERENCES domains(id)",
+      "target_domain_id UUID NOT NULL REFERENCES domains(id)",
+      "alias_name TEXT NOT NULL",
+      "alias_type TEXT CHECK (alias_type IN ('AUTO', 'RELATIONSHIP', 'MASK'))",
+      "is_corporeal_auto BOOLEAN DEFAULT FALSE",
+      "dsci_contract_id UUID NULL",
+      "created_at TIMESTAMPTZ DEFAULT NOW()",
+      "retired_at TIMESTAMPTZ NULL",
+      "metadata JSONB DEFAULT '{}'::jsonb"
+    ],
+    "constraints": [
+      {
+        "name": "check_corporeal_auto_must_be_auto",
+        "type": "CHECK",
+        "rule": "is_corporeal_auto = FALSE OR alias_type = 'AUTO'"
+      },
+      {
+        "name": "unique_active_alias",
+        "type": "EXCLUDE",
+        "rule": "One active alias per (owner_domain_id, target_domain_id, alias_name)"
+      }
+    ],
+    "indexes": [
+      "idx_aliases_owner_domain (owner_domain_id, alias_type)",
+      "idx_aliases_target_domain (target_domain_id, alias_type)",
+      "idx_aliases_dsci_contract (dsci_contract_id) WHERE NOT NULL",
+      "idx_aliases_created_at (created_at DESC)",
+      "idx_aliases_active (owner_domain_id, alias_type) WHERE retired_at IS NULL"
+    ],
+    "views": [
+      {
+        "name": "active_aliases_by_type",
+        "description": "Summary statistics by alias type"
+      },
+      {
+        "name": "alias_lineage",
+        "description": "Aliases with resolved domain names"
+      }
+    ]
+  },
+
+  "backend_implementation": {
+    "domain_model": {
+      "file": "internal/domain/alias.go",
+      "lines": 243,
+      "exports": [
+        "AliasType (enum: AUTO, RELATIONSHIP, MASK)",
+        "AliasStatus (enum: ACTIVE, RETIRED)",
+        "AliasMetadata (JSONB map[string]interface{})",
+        "Alias (struct with validation)",
+        "AliasListResponse"
+      ],
+      "helper_methods": [
+        "Status() AliasStatus",
+        "IsActive() bool",
+        "IsMask(), IsAuto(), IsRelationship() bool",
+        "GetTTLDays(), SetTTLDays() for MASK",
+        "GetDisplayName(), SetDisplayName() for metadata"
+      ]
+    },
+    "repository_layer": {
+      "file": "internal/repo/alias_repo.go",
+      "lines": 292,
+      "struct": "AliasRepository",
+      "methods": [
+        "CreateAlias(ctx, *Alias) error",
+        "RetireAlias(ctx, id, reason) error",
+        "GetAliasesForOwner(ctx, ownerID, includeRetired) ([]Alias, error)",
+        "GetAliasesForTarget(ctx, targetID, includeRetired) ([]Alias, error)",
+        "GetAliasesByType(ctx, ownerID, type, includeRetired) ([]Alias, error)",
+        "GetActiveMaskAliasesForOwner(ctx, ownerID) ([]Alias, error)",
+        "GetCorporealAutoAlias(ctx, ownerID) (*Alias, error)",
+        "GetAliasByID(ctx, id) (*Alias, error)",
+        "FindActiveAliasByName(ctx, owner, target, name) (*Alias, error)"
+      ],
+      "helpers": [
+        "GenerateMaskName() string - generates 'mask-<8hex>'"
+      ]
+    },
+    "service_layer": {
+      "file": "internal/services/alias_service.go",
+      "lines": 208,
+      "struct": "AliasService",
+      "methods": [
+        {
+          "name": "EnsureCorporealRootAlias",
+          "signature": "(ctx, corporealDomainID) (*Alias, error)",
+          "description": "Idempotent AUTO alias for corporeal domains",
+          "semantics": [
+            "Checks existing via GetCorporealAutoAlias()",
+            "Creates self-referential alias (owner=target)",
+            "Sets is_corporeal_auto=true",
+            "Returns existing if present"
+          ]
+        },
+        {
+          "name": "EnsureStructuralAlias",
+          "signature": "(ctx, ownerID, targetID) (*Alias, error)",
+          "description": "AUTO alias for structural membership",
+          "semantics": [
+            "Non-corporeal AUTO aliases",
+            "Used during seat instantiation",
+            "Owner=person's domain, Target=membership domain",
+            "Idempotent"
+          ]
+        },
+        {
+          "name": "CreateRelationshipAlias",
+          "signature": "(ctx, ownerID, targetID, name, contractID, metadata) (*Alias, error)",
+          "description": "Volitional domain-scoped identity",
+          "semantics": [
+            "Requires alias_name (user-chosen)",
+            "Checks conflicts via FindActiveAliasByName()",
+            "Links dsci_contract_id if provided",
+            "Owner and target specify scope"
+          ]
+        },
+        {
+          "name": "CreateMaskAlias",
+          "signature": "(ctx, ownerID, requestedName, ttlDays, metadata) (*Alias, error)",
+          "description": "Ephemeral browsing persona",
+          "semantics": [
+            "Auto-generates name if empty (via GenerateMaskName())",
+            "Self-targeting: owner=target=ownerDomainID",
+            "Optional TTL in metadata",
+            "Minimal authority by design"
+          ]
+        },
+        {
+          "name": "RetireAlias",
+          "signature": "(ctx, id, reason) error",
+          "description": "Marks alias as retired with reason"
+        },
+        {
+          "name": "GetAliasesForDomain",
+          "signature": "(ctx, domainID, includeRetired) ([]Alias, error)",
+          "description": "Merges owner + target aliases, deduplicates"
+        }
+      ]
+    }
+  },
+
+  "api_endpoints": {
+    "implemented": true,
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/api/domain/:id/aliases",
+        "handler": "HandleGetDomainAliases",
+        "description": "Retrieve all aliases for a domain (as owner or target)",
+        "query_params": [
+          "includeRetired (bool)",
+          "type (AUTO|RELATIONSHIP|MASK)"
+        ],
+        "response": "AliasListResponse with grouped aliases",
+        "status_codes": [200, 400, 500]
+      },
+      {
+        "method": "POST",
+        "path": "/api/domain/:id/alias/relationship",
+        "handler": "HandleCreateRelationshipAlias",
+        "description": "Create RELATIONSHIP alias",
+        "body": {
+          "target_domain_id": "uuid",
+          "alias_name": "string",
+          "dsci_contract_id": "uuid (optional)",
+          "metadata": "object"
+        },
+        "response": "Created Alias object",
+        "status_codes": [201, 400, 409, 500]
+      },
+      {
+        "method": "POST",
+        "path": "/api/domain/:id/alias/mask",
+        "handler": "HandleCreateMaskAlias",
+        "description": "Create MASK alias",
+        "body": {
+          "requested_name": "string (optional)",
+          "ttl_days": "int (optional)",
+          "metadata": "object"
+        },
+        "response": "Created Alias object",
+        "status_codes": [201, 400, 500]
+      }
+    ],
+    "file": "internal/api/alias_handlers.go",
+    "routes_registered_in": "internal/api/routes.go",
+    "status": "complete"
+  },
+
+  "receipt_integration": {
+    "receipt_types": [
+      {
+        "action": "identity.alias.add.v1",
+        "description": "Alias creation receipt",
+        "payload": {
+          "alias_id": "uuid",
+          "owner_domain_id": "uuid",
+          "target_domain_id": "uuid",
+          "alias_type": "string",
+          "alias_name": "string",
+          "dsci_contract_id": "uuid (optional)",
+          "created_at": "ISO8601",
+          "by": "identity/seat"
+        }
+      },
+      {
+        "action": "identity.alias.retire.v1",
+        "description": "Alias retirement receipt",
+        "payload": {
+          "alias_id": "uuid",
+          "retired_at": "ISO8601",
+          "reason": "string",
+          "by": "identity/seat"
+        }
+      }
+    ],
+    "helper_file": "internal/receipts/alias_receipts.go",
+    "functions": [
+      "RecordAliasAddReceipt",
+      "RecordAliasRetireReceipt"
+    ],
+    "integration": "Wired into API handlers using existing GOV-10 identity receipt system",
+    "status": "complete"
+  },
+
+  "testing": {
+    "unit_tests": {
+      "status": "complete",
+      "files": [
+        "internal/domain/alias_test.go",
+        "internal/repo/alias_repo_test.go",
+        "internal/services/alias_service_test.go"
+      ],
+      "coverage": [
+        "Alias model validation (IsValid, Status, type checkers)",
+        "Helper methods (GetTTLDays, SetTTLDays, GetDisplayName, SetDisplayName)",
+        "Repository CRUD operations (CreateAlias, RetireAlias, GetAliasesForOwner, GetAliasesByType)",
+        "Constraint enforcement (unique active alias, corporeal auto validation)",
+        "Service semantic flows (EnsureCorporealRootAlias idempotency, CreateRelationshipAlias conflict detection, CreateMaskAlias name generation)",
+        "Name reuse after retirement",
+        "Metadata JSONB handling"
+      ]
+    },
+    "integration_tests": {
+      "status": "complete",
+      "coverage": [
+        "Migration round-trip (aliases table creation and queries)",
+        "EXCLUDE constraint enforcement (duplicate active aliases rejected)",
+        "Foreign key constraints (owner_domain_id, target_domain_id references)",
+        "View queries (active_aliases_by_type, alias_lineage)"
+      ]
+    },
+    "api_tests": {
+      "status": "complete",
+      "file": "internal/api/alias_handlers_test.go",
+      "coverage": [
+        "GET /aliases success with multiple aliases",
+        "GET /aliases with type filter (MASK, RELATIONSHIP)",
+        "GET /aliases with invalid domain ID (400)",
+        "POST /alias/relationship success (201)",
+        "POST /alias/relationship missing name (400)",
+        "POST /alias/relationship conflict (409)",
+        "POST /alias/mask success with custom name",
+        "POST /alias/mask auto-generate name",
+        "POST /alias/mask invalid JSON (400)"
+      ]
+    }
+  },
+
+  "rego_policy_hooks": {
+    "description": "Future REGO policy enforcement patterns",
+    "AUTO": {
+      "policy": "Treat as structural edges, not user-selectable personas",
+      "authority": "Flows through seat, not alias directly",
+      "use_case": "Lineage/provenance queries"
+    },
+    "RELATIONSHIP": {
+      "policy": "Grant domain-specific capabilities based on alias scope",
+      "authority": "Must reference DSCI contract",
+      "revocation": "Can be revoked if contract is terminated"
+    },
+    "MASK": {
+      "policy": "Default: DENY ALL privileged operations",
+      "allowed": [
+        "Read-only discovery",
+        "Public content access",
+        "Explicitly whitelisted low-risk actions"
+      ],
+      "denied": [
+        "Write operations",
+        "Admin actions",
+        "Grant/revoke authority",
+        "Persistent state changes"
+      ],
+      "requirement": "Explicit DSCI authorization for any privileged action"
+    }
+  },
+
+  "dsci_integration": {
+    "current_status": "prepared_not_enforced",
+    "dsci_contract_field": {
+      "column": "dsci_contract_id UUID NULL",
+      "status": "foreign_key_pending_contracts_table"
+    },
+    "next_phase": "GOV-13 will create contracts table and wire FK constraint",
+    "enforcement_plan": [
+      "Create contracts table with branch_inheritance field",
+      "Add FK constraint: aliases.dsci_contract_id -> contracts.id",
+      "Require DSCI contract for RELATIONSHIP alias creation",
+      "Implement contract-based seat instantiation",
+      "Link contract termination to alias retirement"
+    ]
+  },
+
+  "migration_path": {
+    "phase_1_foundation": {
+      "phase": "GOV-12 (current)",
+      "status": "backend_complete",
+      "deliverables": [
+        "Database schema with canonical taxonomy",
+        "Go domain model and repository",
+        "Service layer with semantic enforcement"
+      ]
+    },
+    "phase_2_dsci_wiring": {
+      "phase": "GOV-13 (next)",
+      "status": "not_started",
+      "deliverables": [
+        "contracts table creation",
+        "dsci_contract_id foreign key enforcement",
+        "Contract-based seat instantiation",
+        "RELATIONSHIP alias consent tracking"
+      ]
+    },
+    "phase_3_rego_enforcement": {
+      "phase": "GOV-14",
+      "status": "not_started",
+      "deliverables": [
+        "Inject alias context into policy evaluation",
+        "Default-deny for MASK aliases",
+        "RELATIONSHIP alias scoping enforcement",
+        "Lineage-based permission inheritance"
+      ]
+    },
+    "phase_4_ui_visualization": {
+      "phase": "GOV-15",
+      "status": "not_started",
+      "deliverables": [
+        "Finagler alias management interface",
+        "Alias type indicators (badges/icons)",
+        "RELATIONSHIP alias creation flow",
+        "MASK alias ephemeral session UI"
+      ]
+    }
+  },
+
+  "security_considerations": {
+    "invariants": [
+      "AUTO aliases are system-created only (no public API endpoint)",
+      "Corporeal AUTO is unique (one per corporeal domain, enforced by constraint)",
+      "Active aliases are unique per scope (EXCLUDE constraint)",
+      "Retired aliases are immutable (retired_at is append-only)"
+    ],
+    "risks": {
+      "MASK_aliases": [
+        "Default-deny must be enforced via REGO (not yet implemented)",
+        "TTL metadata is advisory, not enforced (future: cron job)",
+        "No automatic cleanup mechanism yet"
+      ],
+      "RELATIONSHIP_aliases": [
+        "DSCI contract linkage is optional during grace period",
+        "Must eventually require DSCI contract for creation",
+        "Revocation flow not yet implemented"
+      ]
+    }
+  },
+
+  "files_created": [
+    {
+      "path": "db/migrations/20251113_gov12_alias_canon.sql",
+      "type": "migration",
+      "lines": 108,
+      "status": "executed"
+    },
+    {
+      "path": "internal/domain/alias.go",
+      "type": "domain_model",
+      "lines": 243,
+      "status": "complete"
+    },
+    {
+      "path": "internal/repo/alias_repo.go",
+      "type": "repository",
+      "lines": 292,
+      "status": "complete"
+    },
+    {
+      "path": "internal/services/alias_service.go",
+      "type": "service",
+      "lines": 208,
+      "status": "complete"
+    },
+    {
+      "path": "internal/api/alias_handlers.go",
+      "type": "api_handlers",
+      "lines": 316,
+      "status": "complete"
+    },
+    {
+      "path": "internal/receipts/alias_receipts.go",
+      "type": "receipt_helpers",
+      "lines": 161,
+      "status": "complete"
+    },
+    {
+      "path": "internal/domain/alias_test.go",
+      "type": "unit_tests",
+      "lines": 364,
+      "status": "complete"
+    },
+    {
+      "path": "internal/repo/alias_repo_test.go",
+      "type": "integration_tests",
+      "lines": 515,
+      "status": "complete"
+    },
+    {
+      "path": "internal/services/alias_service_test.go",
+      "type": "unit_tests",
+      "lines": 443,
+      "status": "complete"
+    },
+    {
+      "path": "internal/api/alias_handlers_test.go",
+      "type": "api_tests",
+      "lines": 504,
+      "status": "complete"
+    },
+    {
+      "path": "docs/GOV12_ALIAS_CANON.md",
+      "type": "documentation",
+      "lines": 650,
+      "status": "complete"
+    },
+    {
+      "path": "phases/GOV12_HANDOFF.json",
+      "type": "phase_handoff",
+      "lines": 565,
+      "status": "complete"
+    }
+  ],
+
+  "dependencies": {
+    "upstream": [
+      "GOV-11H: Domain Branching & DSCI Canonization (provides DSCI foundation)"
+    ],
+    "downstream": [
+      "GOV-13: Contracts table and DSCI wiring",
+      "GOV-14: REGO policy enforcement",
+      "GOV-15: Finagler UI integration"
+    ]
+  },
+
+  "next_phase_recommendation": {
+    "phase_id": "GOV-13",
+    "phase_name": "Contracts Table & DSCI Contract Wiring",
+    "description": "Create contracts table with branch_inheritance field, wire dsci_contract_id as foreign key, enforce DSCI-backed RELATIONSHIP aliases",
+    "estimated_effort": "8-12 hours",
+    "key_deliverables": [
+      "contracts table migration",
+      "Contract domain model and repository",
+      "Wire aliases.dsci_contract_id FK constraint",
+      "Require DSCI contract for RELATIONSHIP alias creation",
+      "Contract termination triggers alias retirement",
+      "Seat instantiation contract validation"
+    ]
+  },
+
+  "commit_message": "GOV-12: Alias Canon & DSCI Integration - Complete\n\n✅ Database & Backend (GOV-12 Phase 1):\n- Created canonical aliases table with AUTO/RELATIONSHIP/MASK taxonomy\n- Added alias_type constraint and corporeal_auto enforcement\n- Implemented Alias domain model with helper methods\n- Created AliasRepository with full CRUD operations\n- Implemented AliasService with semantic enforcement:\n  - EnsureCorporealRootAlias for corporeal domains (idempotent)\n  - EnsureStructuralAlias for seat instantiation (idempotent)\n  - CreateRelationshipAlias for volitional identity (conflict detection)\n  - CreateMaskAlias for ephemeral browsing (name auto-generation)\n- Added database views for alias analytics\n- Prepared DSCI contract linkage (pending contracts table)\n\n✅ API & Receipt Integration (GOV-12 Phase 2):\n- Implemented 3 REST endpoints:\n  - GET /api/domain/:id/aliases (with type filter)\n  - POST /api/domain/:id/alias/relationship\n  - POST /api/domain/:id/alias/mask\n- Wired receipt integration using GOV-10 identity receipt system\n- Created alias receipt helpers (RecordAliasAddReceipt, RecordAliasRetireReceipt)\n\n✅ Comprehensive Testing (GOV-12 Phase 3):\n- Domain model tests: validation, type checkers, metadata helpers\n- Repository tests: CRUD, constraint enforcement, name reuse after retirement\n- Service tests: idempotency, conflict detection, name generation\n- API tests: success paths, validation errors, conflict handling\n\n✅ Documentation:\n- docs/GOV12_ALIAS_CANON.md (650 lines)\n- phases/GOV12_HANDOFF.json (complete)\n- Documented REGO policy hooks for future enforcement\n\nAll GOV-12 objectives complete. Ready for GOV-13 (Contracts & DSCI Wiring).",
+
+  "approvals": {
+    "technical_review": "complete",
+    "security_review": "pending_gov13_contract_enforcement",
+    "documentation_review": "complete",
+    "testing_review": "complete"
+  }
+}

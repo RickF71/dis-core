@@ -4,16 +4,18 @@ import (
 	"database/sql"
 	"net/http"
 
+	"dis-core/internal/identity"
 	"dis-core/internal/ledger"
 	"dis-core/internal/schema"
 )
 
 // Server represents a minimal server structure for the server package
 type Server struct {
-	DB      *sql.DB
-	Ledger  *ledger.Ledger
-	Mux     *http.ServeMux
-	Schemas *schema.Registry
+	DB        *sql.DB
+	Ledger    *ledger.Ledger
+	Mux       *http.ServeMux
+	Schemas   *schema.Registry
+	TriadRepo *identity.TriadRepository
 }
 
 // New creates a new server instance

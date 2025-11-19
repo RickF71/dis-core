@@ -53,7 +53,8 @@ func (s *Server) handleGetDomainChi(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleDomainListChi handles GET /api/domains with format support
+// handleDomainListChi handles GET /api/domains and /api/domain/list with format support
+// GOV-6: Unified domain listing endpoint with detailed manifest
 func (s *Server) handleDomainListChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	ctx := r.Context()
@@ -70,12 +71,19 @@ func (s *Server) handleDomainListChi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GOV-6: Return structured response with status and count
+	response := map[string]any{
+		"status":  "ok",
+		"count":   len(domains),
+		"domains": domains,
+	}
+
 	// Format-specific response
 	switch format {
 	case FormatJSON:
-		JSON(w, http.StatusOK, domains)
+		JSON(w, http.StatusOK, response)
 	case FormatFile:
-		ServeAsFile(w, domains)
+		ServeAsFile(w, response)
 	default:
 		JSONUnsupportedFormat(w, string(format))
 	}
@@ -237,12 +245,13 @@ func (s *Server) getDomainByID(ctx context.Context, domainID string) (map[string
 	return domain, nil
 }
 
-// getAllDomains retrieves all domains
+// getAllDomains retrieves all domains with detailed information
+// GOV-6: Enhanced to return full domain manifest for unified listing endpoints
 func (s *Server) getAllDomains(ctx context.Context) ([]map[string]any, error) {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, name, created_at
+		SELECT id, name, parent_id, created_at, updated_at, payload
 		FROM domains
-		ORDER BY name
+		ORDER BY name ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -252,17 +261,32 @@ func (s *Server) getAllDomains(ctx context.Context) ([]map[string]any, error) {
 	var domains []map[string]any
 	for rows.Next() {
 		var id, name string
-		var createdAt time.Time
+		var parentID *string
+		var createdAt, updatedAt time.Time
+		var payload interface{}
 
-		if err := rows.Scan(&id, &name, &createdAt); err != nil {
+		if err := rows.Scan(&id, &name, &parentID, &createdAt, &updatedAt, &payload); err != nil {
 			return nil, err
 		}
 
-		domains = append(domains, map[string]any{
+		domain := map[string]any{
 			"id":         id,
 			"name":       name,
 			"created_at": createdAt,
-		})
+			"updated_at": updatedAt,
+		}
+
+		// Add parent_id if present
+		if parentID != nil {
+			domain["parent_id"] = *parentID
+		}
+
+		// Add payload if present
+		if payload != nil {
+			domain["payload"] = payload
+		}
+
+		domains = append(domains, domain)
 	}
 
 	if err := rows.Err(); err != nil {

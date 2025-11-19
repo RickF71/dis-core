@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	authorityapi "dis-core/internal/api/authority"
+	"dis-core/internal/api/handlers"
+	"dis-core/internal/auth"
 )
 
 // RegisterAllRoutes wires all endpoint groups into the server router with format-aware support.
@@ -11,8 +13,24 @@ import (
 func (s *Server) RegisterAllRoutes() {
 	r := s.router
 
-	// Phase 10I: Apply CSS validation middleware to all routes
+	// Phase 10I: Apply CSS validation middleware to all routes (MUST be before routes)
 	r.Use(CSSValidationMiddleware)
+
+	// External Authentication endpoints (sovereign identity)
+	r.Get("/api/whoami", auth.HandleWhoAmI)
+	r.Get("/api/whoami/external", auth.HandleWhoAmIExternal) // DEV ONLY
+	r.Get("/api/me", s.handleMe)                             // Sprint Step 1: Read-only identity surface
+	r.Get("/api/me/actors", s.handleMeActors)                // List all actors/seats for authenticated user
+	r.Post("/api/me/active-actor", s.handleSetActiveActor)   // Set active actor/seat
+	r.Get("/api/me/active-actor", s.handleGetActiveActor)    // Get current active actor/seat
+
+	// Dev Auth endpoints (None Space identity selection)
+	r.Get("/api/auth/dev-users", auth.HandleDevUsers(s.DB()))  // DEV ONLY: List available dev users
+	r.Post("/api/auth/dev-login", auth.HandleDevLogin(s.DB())) // DEV ONLY: Validate dev login
+
+	// Auth challenge endpoints (new canonical handlers)
+	r.Post("/api/auth/challenge", auth.NewChallengeCreateHandler(s.challengeStore).ServeHTTP)
+	r.Get("/api/auth/challenge/{id}/status", auth.NewChallengeStatusHandler(s.challengeStore).ServeHTTP)
 
 	// Phase 5.5 requirement: Use WithFormatGuard for format-restricted endpoints
 	// Domain CSS with format guard (File, Text, JSON only)
@@ -75,9 +93,79 @@ func (s *Server) RegisterAllRoutes() {
 	r.Get("/api/receipts/dashboard", s.handleReceiptsDashboard)
 	r.Get("/dashboard/receipts", s.handleReceiptsDashboardHTML)
 
-	// Domain routes with format support
-	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domain/{id}", s.handleGetDomainChi, []Format{FormatJSON, FormatFile, FormatText})
+	// GOV-9: Authority Continuity & Receipt Lineage
+	r.Get("/api/authority/lineage/{domain_id}", s.handleAuthorityLineage)
+	r.Get("/api/authority/lineage/{domain_id}/verify", s.handleAuthorityLineageVerify)
+
+	// GOV-10: Identity Provenance & Alias Receipt Integration
+	r.Get("/api/identity/lineage/{actor_id}", s.handleGetIdentityLineage)
+	r.Get("/api/identity/lineage/{actor_id}/verify", s.handleGetIdentityLineageVerify)
+
+	// GOV-11: Domain-Scoped Identity Projection & Corporeal Authentication
+	r.Get("/api/identity/projections/{actor_id}", s.handleGetIdentityProjections)
+	r.Get("/api/domain/{domain_id}/member/{actor_id}/identity", s.handleGetDomainMemberIdentity)
+
+	// GOV-11F: Identity Policy Viewer Integration
+	r.Get("/api/policy/identity/{domainId}", s.handleGetIdentityPolicy)
+
+	// GOV-11G: Schema-Aware Identity Policy Editing
+	r.Get("/api/identity/schema/{domainId}", s.handleGetIdentitySchema)
+	r.Post("/api/identity/schema/{domainId}/adopt", s.handleAdoptSchema)
+	r.Post("/api/identity/policy/{domainId}", s.handleSaveIdentityPolicy)
+
+	// GOV-11H: Domain Branching & DSCI
+	r.Post("/api/domain/{id}/branch", s.handleBranchDomain)
+	r.Post("/api/domain/{id}/seat/instantiate", s.handleInstantiateSeat)
+	r.Get("/api/domain/{id}/branch/info", s.handleGetBranchInfo)
+
+	// GOV-12: Alias Canon & DSCI Integration
+	r.Get("/api/domain/{id}/aliases", s.HandleGetDomainAliases)
+	r.Post("/api/domain/{id}/alias/relationship", s.HandleCreateRelationshipAlias)
+	r.Post("/api/domain/{id}/alias/mask", s.HandleCreateMaskAlias)
+
+	// GOV-13: Contracts Table & DSCI Contract Wiring
+	r.Post("/api/domain/{id}/contracts", s.HandleCreateContract)
+	r.Get("/api/domain/{id}/contracts", s.HandleGetDomainContracts)
+	r.Get("/api/domain/{id}/contracts/{contractId}", s.HandleGetContract)
+	r.Post("/api/domain/{id}/contracts/{contractId}/revoke", s.HandleRevokeContract)
+
+	// CSS Inheritance: Resolved CSS with ancestor chain applied
+	r.Get("/api/domain/{id}/resolved-css", s.HandleGetResolvedCSS)
+
+	// GOV-2: Authority Console triad endpoints (read-only)
+	// GOV-3: Seat mutation endpoints (write)
+	if s.triadRepo != nil {
+		triadHandler := authorityapi.NewTriadHandler(s.triadRepo)
+
+		// GOV-3: Wire mutation engine if available
+		if s.mutationEngine != nil {
+			triadHandler.SetMutationEngine(s.mutationEngine)
+		}
+
+		// GOV-2: Read-only endpoints
+		r.Get("/api/authority/triad/{identityId}", triadHandler.GetTriadByIdentity)
+		r.Get("/api/authority/flow/preview", triadHandler.PreviewFlow)
+		r.Post("/api/authority/flow/eval", triadHandler.EvaluateFlow)
+
+		// GOV-3: Write endpoints
+		r.Post("/api/authority/seat/transition", triadHandler.TransitionSeat)
+		r.Post("/api/authority/seat/transition/batch", triadHandler.TransitionSeatBatch)
+
+		// GOV-3: SSE event stream
+		if s.eventBus != nil {
+			r.Get("/api/authority/events", s.eventBus.SSEHandler)
+		}
+	}
+
+	// GOV-6: Unified domain listing - Register specific paths FIRST before wildcard routes
+	// Direct registration without RegisterFormatAwareRoute to avoid Chi routing conflicts
+	r.Get("/api/domain/list", s.handleDomainListChi)
+	r.Get("/api/domain/list/json", s.handleDomainListChi)
+	r.Get("/api/domain/list/file", s.handleDomainListChi)
 	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domains", s.handleDomainListChi, []Format{FormatJSON, FormatFile})
+
+	// Domain routes with format support (wildcard pattern must come AFTER specific paths)
+	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domain/{id}", s.handleGetDomainChi, []Format{FormatJSON, FormatFile, FormatText})
 
 	// Domain files endpoint with format support
 	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domain/{id}/files", s.handleDomainFiles, []Format{FormatJSON, FormatText})
@@ -132,6 +220,19 @@ func (s *Server) RegisterAllRoutes() {
 	r.Post("/api/policy/save/{id}", s.UpdateDomainPolicy)
 	r.Post("/api/policy/eval", s.HandlePolicyEval)
 
+	// Phase S: Seats API (S0-S6)
+	r.Get("/api/domain/{id}/seats", s.GetDomainSeats)
+	r.Post("/api/domain/{id}/seats/appoint", s.AppointMemberSeat)
+	r.Post("/api/domain/{id}/seats/{seatId}/freeze", s.FreezeSeat)
+	r.Post("/api/domain/{id}/seats/{seatId}/unfreeze", s.UnfreezeSeat)
+	r.Put("/api/domain/{id}/seats/{seatId}/rego", s.UpdateSeatRego)
+
+	// GOV-7: Prime Seat Establishment for Corporeal Domains
+	r.Post("/api/domain/{id}/seat/prime", s.CreatePrimeSeat)
+
+	// Phase 0-R.5: Atomic Corporeal + Actor-Domain Bootstrap
+	r.Handle("/api/corporeal/bootstrap", handlers.CreateCorporealBootstrap(s.corporealBootstrapper))
+
 	// Phase 10G: Cross-Domain Proof Synchronization and Verification
 	r.Post("/api/receipts/proof/sync", s.handleProofSync)
 	r.Post("/api/receipts/proof/sync/json", s.handleProofSync)
@@ -144,7 +245,7 @@ func (s *Server) RegisterAllRoutes() {
 	r.Get("/api/federation/summary/text", s.handleFederationSummary)
 	r.Post("/api/federation/trust", s.handleCreateFederationTrust)
 
-	// Basic CRUD operations (non-format-aware for now)
-	r.Post("/api/domain", s.handleCreateDomainChi)
-	r.Put("/api/domain/{id}", s.handleUpdateDomainChi)
+	// Basic CRUD operations (format-aware)
+	r.Post("/api/domain", s.handleCreateDomainFormatAware)
+	r.Put("/api/domain/{id}", s.handleUpdateDomainFormatAware)
 }

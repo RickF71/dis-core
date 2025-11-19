@@ -190,6 +190,79 @@ func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interfa
 	}, nil
 }
 
+// EvaluateWithSeatPolicies evaluates action with per-seat REGO policies added
+// Phase S5: Per-seat policy integration
+func (e *OPAEngine) EvaluateWithSeatPolicies(ctx context.Context, input map[string]interface{}, seatPolicies map[string]string) (*PolicyDecision, error) {
+	// First run base evaluation (gates/risk/freeze)
+	baseDecision, err := e.EvaluateAction(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	// If base policies deny, per-seat policies cannot override
+	if !baseDecision.Allow {
+		return baseDecision, nil
+	}
+
+	// Evaluate all per-seat policies
+	// Each seat policy can tighten (deny) but not loosen restrictions
+	seatDetails := map[string]interface{}{}
+	seatAllow := true
+
+	for seatID, regoText := range seatPolicies {
+		// Extract package name from REGO to build correct query path
+		// Default to generic path if we can't extract
+		queryPath := "data.dis.seat.export_allow"
+
+		// Compile and evaluate this seat's policy
+		query := rego.New(
+			rego.Query(queryPath),
+			rego.Module(fmt.Sprintf("seat_%s.rego", seatID), regoText),
+		)
+
+		prepared, err := query.PrepareForEval(ctx)
+		if err != nil {
+			// Log error but don't fail - skip invalid policies
+			seatDetails[fmt.Sprintf("seat.%s.error", seatID)] = err.Error()
+			continue
+		}
+
+		rs, err := prepared.Eval(ctx, rego.EvalInput(input))
+		if err != nil {
+			seatDetails[fmt.Sprintf("seat.%s.error", seatID)] = err.Error()
+			continue
+		}
+
+		// Check export_allow result - if undefined (no expressions), treat as deny
+		seatPolicyAllow := false
+		if len(rs) > 0 && len(rs[0].Expressions) > 0 {
+			if allow, ok := rs[0].Expressions[0].Value.(bool); ok {
+				seatPolicyAllow = allow
+			}
+		}
+
+		seatDetails[fmt.Sprintf("seat.%s.allow", seatID)] = seatPolicyAllow
+		if !seatPolicyAllow {
+			seatAllow = false
+		}
+	}
+
+	// Merge seat details into base decision
+	for k, v := range seatDetails {
+		baseDecision.Details[k] = v
+	}
+
+	// If any seat policy denies, overall decision is deny
+	if !seatAllow {
+		baseDecision.Allow = false
+		baseDecision.Reason = "denied by per-seat policy"
+	} else {
+		baseDecision.Reason = fmt.Sprintf("evaluated via gates/risk/freeze + %d seat policies", len(seatPolicies))
+	}
+
+	return baseDecision, nil
+}
+
 // Reload rebuilds the OPAEngine with domain-specific modules
 func (e *OPAEngine) Reload(ctx context.Context, domainID string) error {
 	// Load domain-specific modules with fallbacks

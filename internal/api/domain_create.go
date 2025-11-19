@@ -12,7 +12,7 @@ import (
 type DomainInput struct {
 	Name     string          `json:"name"`
 	ParentID *uuid.UUID      `json:"parent_id,omitempty"`
-	Data     json.RawMessage `json:"data"`
+	Data     json.RawMessage `json:"data"` // Will be stored in payload column
 }
 
 // POST /api/domain
@@ -47,10 +47,11 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 		parentIDStr = &s
 	}
 
+	// Insert domain with name and payload (data is now stored in payload column)
 	_, err := s.DB().Exec(ctx, `
-		INSERT INTO domains (id, parent_id, data)
-		VALUES ($1, $2, $3)
-	`, newID.String(), parentIDStr, input.Data)
+		INSERT INTO domains (id, name, parent_id, payload)
+		VALUES ($1, $2, $3, $4)
+	`, newID.String(), input.Name, parentIDStr, input.Data)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -68,11 +69,12 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Fetch the created domain
 	var d Domain
 	err = s.DB().QueryRow(ctx, `
-		SELECT id, parent_id, payload, created_at, updated_at
+		SELECT id::text, parent_id::text, payload, created_at, updated_at
 		FROM domains
-		WHERE id = $1
+		WHERE id = $1::uuid
 	`, newID.String()).Scan(&d.ID, &d.ParentID, &d.Payload, &d.CreatedAt, &d.UpdatedAt)
 
 	if err != nil {

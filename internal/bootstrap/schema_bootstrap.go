@@ -164,6 +164,28 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_trust_domains ON federation_trust(domain_a, domain_b);`,
 		`CREATE INDEX IF NOT EXISTS idx_federation_trust_level ON federation_trust(trust_level);`,
+
+		// Phase S1: Seats Schema
+		`CREATE TABLE IF NOT EXISTS domain_seats (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			domain_id UUID NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+			parent_seat_id UUID REFERENCES domain_seats(id) ON DELETE SET NULL,
+			seat_type TEXT NOT NULL DEFAULT 'prime',
+			member_id TEXT,
+			appointed_by UUID REFERENCES domain_seats(id) ON DELETE SET NULL,
+			appointment_receipt TEXT,
+			rego_ref TEXT,
+			rego_text TEXT,
+			policy_version TEXT,
+			scope TEXT,
+			status TEXT NOT NULL DEFAULT 'active',
+			created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_seats_domain ON domain_seats(domain_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_seats_type ON domain_seats(seat_type);`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_seats_status ON domain_seats(status);`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_seats_member ON domain_seats(member_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_seats_parent ON domain_seats(parent_seat_id);`,
 	}
 
 	for i, createSQL := range tables {
@@ -203,6 +225,9 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 	if err := performPhase10J2bNormalization(ctx, dbConn); err != nil {
 		return fmt.Errorf("Phase 10J.2b normalization failed: %w", err)
 	}
+
+	// Phase S1: Seats schema is ensured via table creation above
+	fmt.Println("✅ Phase S1 — seats schema online")
 
 	return nil
 }

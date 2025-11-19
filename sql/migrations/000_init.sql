@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS domains (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     parent_id   TEXT,
+    payload     JSONB DEFAULT '{}'::jsonb,  -- Phase 10J.4: renamed from 'data', stores unified domain content
     created_at  TIMESTAMPTZ DEFAULT now(),
     updated_at  TIMESTAMPTZ,
     CONSTRAINT fk_domains_parent
