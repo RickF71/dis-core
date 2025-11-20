@@ -28,6 +28,8 @@ func Attach(r *chi.Mux, pool *pgxpool.Pool, engine policy.PolicyEngine) {
 
 	// External authentication stack (MUST be early in chain)
 	r.Use(auth.ExternalAuthMiddleware(pool)) // Now supports session-based auth
+	// Session token middleware: checks Authorization: Bearer <token> and attaches ActiveUser
+	r.Use(auth.SessionAuthMiddleware(pool))
 	r.Use(auth.ActiveUserResolverMiddleware(pool))
 
 	// Custom DIS-Core middleware

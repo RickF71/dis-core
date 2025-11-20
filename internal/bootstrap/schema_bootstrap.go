@@ -82,6 +82,16 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 			status TEXT,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		);`,
+		// Persistent sessions for long-lived actor authentication (MX-K4)
+		`CREATE TABLE IF NOT EXISTS sessions (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			actor_id UUID NOT NULL,
+			domain_id UUID NOT NULL,
+			seat_id UUID NOT NULL,
+			token TEXT UNIQUE NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			expires_at TIMESTAMPTZ NOT NULL
+		);`,
 		`CREATE TABLE IF NOT EXISTS receipts (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			type TEXT NOT NULL,

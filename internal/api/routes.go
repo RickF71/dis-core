@@ -24,6 +24,14 @@ func (s *Server) RegisterAllRoutes() {
 	// POST /api/login/genesis - create corporeal identity and return a canonical login response
 	r.Post("/api/login/genesis", s.handleLoginGenesis)
 
+	// MX-K3: Prime Seat Session Initialization
+	// POST /api/login/session - load ActorContext for an actor/domain (read-only)
+	r.Post("/api/login/session", s.handleLoginSession)
+
+	// MX-K4: Persistent Session Establishment
+	// POST /api/login/establish - create a persistent session token (TTL 8h)
+	r.Post("/api/login/establish", s.handleLoginEstablish)
+
 	// External Authentication endpoints (sovereign identity)
 	r.Get("/api/whoami", auth.HandleWhoAmI)
 	r.Get("/api/whoami/external", auth.HandleWhoAmIExternal) // DEV ONLY
