@@ -44,7 +44,23 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Call orchestration (thin orchestrator that expects a tx)
+	// Resolve the handshake FOR UPDATE to lock the invite row while we operate.
+	var subject string
+	if err := tx.QueryRow(ctx, `SELECT subject FROM handshakes WHERE token = $1 FOR UPDATE`, body.Token).Scan(&subject); err != nil {
+		http.Error(w, "invalid or unknown invite token", http.StatusBadRequest)
+		return
+	}
+
+	// Basic validation: ensure resolved subject is present
+	if subject == "" {
+		http.Error(w, "invite subject invalid", http.StatusBadRequest)
+		return
+	}
+
+	// Call orchestration (thin orchestrator that expects a tx). We pass the
+	// invite token; the orchestration will create identity/domain/seat and
+	// record receipts. Because we locked the handshake row above (FOR UPDATE),
+	// concurrent accept attempts will be serialized by the DB.
 	res, err := identity.KnowThyselfAtomic(ctx, tx, body.Token, body.WhoAreYou)
 	if err != nil {
 		http.Error(w, "failed to accept invite: "+err.Error(), http.StatusBadRequest)

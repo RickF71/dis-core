@@ -21,10 +21,18 @@ func ExternalAuthMiddleware(db *pgxpool.Pool) func(http.Handler) http.Handler {
 
 			// (Legacy QR/cookie flow removed)
 
-			// Create ActiveUser
+			// If no external UID was provided, do not attach an ActiveUser.
+			// This keeps anonymous requests unauthenticated so handlers that
+			// require authentication can return 401.
+			if externalUID == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Create ActiveUser for requests that provide an external UID
 			user := &ActiveUser{
 				ExternalUID:    externalUID,
-				HasExternalUID: externalUID != "",
+				HasExternalUID: true,
 				Bound:          false, // Will be set by resolver middleware
 			}
 
