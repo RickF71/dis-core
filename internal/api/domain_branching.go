@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"dis-core/internal/authority"
+	coreauth "dis-core/internal/core/authority"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -24,14 +24,14 @@ type BranchDomainRequest struct {
 
 // BranchDomainResponse represents the response from branch creation
 type BranchDomainResponse struct {
-	Success        bool                  `json:"success"`
-	BranchDomainID uuid.UUID             `json:"branch_domain_id"`
-	OriginalDomain uuid.UUID             `json:"original_domain_id"`
-	NewParent      uuid.UUID             `json:"new_parent_id"`
-	BranchDepth    int                   `json:"branch_depth"`
-	ReceiptID      string                `json:"receipt_id,omitempty"`
-	Message        string                `json:"message,omitempty"`
-	BranchInfo     *authority.BranchInfo `json:"branch_info,omitempty"`
+	Success        bool                 `json:"success"`
+	BranchDomainID uuid.UUID            `json:"branch_domain_id"`
+	OriginalDomain uuid.UUID            `json:"original_domain_id"`
+	NewParent      uuid.UUID            `json:"new_parent_id"`
+	BranchDepth    int                  `json:"branch_depth"`
+	ReceiptID      string               `json:"receipt_id,omitempty"`
+	Message        string               `json:"message,omitempty"`
+	BranchInfo     *coreauth.BranchInfo `json:"branch_info,omitempty"`
 }
 
 // handleBranchDomain creates a new domain as a branch of an existing domain
@@ -79,21 +79,26 @@ func (s *Server) handleBranchDomain(w http.ResponseWriter, r *http.Request) {
 
 	// Verify original domain exists
 	var exists bool
-	err = s.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM domains WHERE id = $1)", originalDomainID).Scan(&exists)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	err = db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM domains WHERE id = $1)", originalDomainID).Scan(&exists)
 	if err != nil || !exists {
 		http.Error(w, "original domain not found", http.StatusNotFound)
 		return
 	}
 
 	// Verify new parent exists
-	err = s.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM domains WHERE id = $1)", req.NewParentID).Scan(&exists)
+	err = db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM domains WHERE id = $1)", req.NewParentID).Scan(&exists)
 	if err != nil || !exists {
 		http.Error(w, "new parent domain not found", http.StatusNotFound)
 		return
 	}
 
 	// Create branch
-	branchID, err := authority.CreateBranch(ctx, s.db, authority.CreateBranchRequest{
+	branchID, err := s.Engine.Branch(ctx, db, coreauth.CreateBranchRequest{
 		OriginalDomainID: originalDomainID,
 		NewParentID:      req.NewParentID,
 		BranchName:       req.BranchName,
@@ -108,7 +113,7 @@ func (s *Server) handleBranchDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get branch info
-	branchInfo, err := authority.GetBranchInfo(ctx, s.db, branchID)
+	branchInfo, err := s.Engine.GetBranchInfo(ctx, db, branchID)
 	if err != nil {
 		s.logger.Printf("Warning: failed to get branch info: %v", err)
 	}
@@ -186,10 +191,15 @@ func (s *Server) handleInstantiateSeat(w http.ResponseWriter, r *http.Request) {
 		req.BranchDomainID = branchDomainID
 	}
 
-	// Check DSCI eligibility
-	eligible, reason, err := authority.CanInstantiateSeatFromContract(
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	// Check DSCI eligibility via core engine
+	eligible, reason, err := s.Engine.CanInstantiateSeatFromContract(
 		ctx,
-		s.db,
+		db,
 		req.UserID,
 		req.OriginalDomainID,
 		req.BranchDomainID,
@@ -220,7 +230,7 @@ func (s *Server) handleInstantiateSeat(w http.ResponseWriter, r *http.Request) {
 
 // GetBranchInfoResponse wraps branch info for API response
 type GetBranchInfoResponse struct {
-	*authority.BranchInfo
+	*coreauth.BranchInfo
 }
 
 // handleGetBranchInfo retrieves branching metadata for a domain
@@ -235,7 +245,12 @@ func (s *Server) handleGetBranchInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	branchInfo, err := authority.GetBranchInfo(ctx, s.db, domainID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	branchInfo, err := s.Engine.GetBranchInfo(ctx, db, domainID)
 	if err != nil {
 		s.logger.Printf("Error getting branch info: %v", err)
 		http.Error(w, fmt.Sprintf("failed to get branch info: %v", err), http.StatusInternalServerError)

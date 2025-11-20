@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PolicyValidationResponse represents the result of hierarchical Rego validation
@@ -48,8 +49,14 @@ func (s *Server) ValidateDomainPolicy(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Require DB for policy validation
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Build and validate the hierarchical policy bundle
-	result, err := s.validateHierarchicalPolicy(ctx, domainID, req.Content)
+	result, err := s.validateHierarchicalPolicy(ctx, db, domainID, req.Content)
 	if err != nil {
 		JSON(w, http.StatusOK, PolicyValidationResponse{
 			Success: false,
@@ -63,9 +70,9 @@ func (s *Server) ValidateDomainPolicy(w http.ResponseWriter, r *http.Request) {
 
 // validateHierarchicalPolicy builds a Rego bundle with parent-first ordering and validates it
 // If newContent is provided, it will be used for the target domain instead of database value
-func (s *Server) validateHierarchicalPolicy(ctx context.Context, domainID string, newContent string) (PolicyValidationResponse, error) {
+func (s *Server) validateHierarchicalPolicy(ctx context.Context, db *pgxpool.Pool, domainID string, newContent string) (PolicyValidationResponse, error) {
 	// Get domain lineage (child → parent → ... → null)
-	lineage, err := s.getDomainLineage(ctx, domainID)
+	lineage, err := s.getDomainLineage(ctx, db, domainID)
 	if err != nil {
 		return PolicyValidationResponse{}, fmt.Errorf("failed to get domain lineage: %w", err)
 	}
@@ -87,7 +94,7 @@ func (s *Server) validateHierarchicalPolicy(ctx context.Context, domainID string
 		if domainIDInLineage == domainID && newContent != "" {
 			policy = newContent
 		} else {
-			policy, err = s.getDomainRegoPolicy(ctx, domainIDInLineage)
+			policy, err = s.getDomainRegoPolicy(ctx, db, domainIDInLineage)
 			if err != nil {
 				continue // Skip domains without policy
 			}

@@ -15,7 +15,13 @@ import (
 // ------------------------------------------------------------
 func (s *Server) handleDomainLinks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	rows, err := s.DB().Query(ctx, `
+	// Ensure DB is available
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	rows, err := db.Query(ctx, `
 		SELECT
 			payload->>'domain_id' AS child,
 			payload->>'parent_name' AS parent

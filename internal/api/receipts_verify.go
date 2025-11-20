@@ -19,7 +19,12 @@ func (s *Server) handleVerifyReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := receipts.VerifyReceipt(ctx, s.db, id)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	result, err := receipts.VerifyReceipt(ctx, db, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

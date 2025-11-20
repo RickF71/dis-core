@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // GOV-11C: Identity Projections API
@@ -57,7 +58,13 @@ func (s *Server) handleGetIdentityProjections(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	summary, err := s.buildIdentityProjectionsSummary(ctx, actorID)
+	// Ensure we have a DB available for lineage queries
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	summary, err := s.buildIdentityProjectionsSummary(ctx, db, actorID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -71,9 +78,9 @@ func (s *Server) handleGetIdentityProjections(w http.ResponseWriter, r *http.Req
 }
 
 // buildIdentityProjectionsSummary constructs the projections summary from identity receipts
-func (s *Server) buildIdentityProjectionsSummary(ctx context.Context, actorID uuid.UUID) (*IdentityProjectionsSummary, error) {
+func (s *Server) buildIdentityProjectionsSummary(ctx context.Context, db *pgxpool.Pool, actorID uuid.UUID) (*IdentityProjectionsSummary, error) {
 	// Get full lineage
-	lineage, err := identity.GetIdentityLineage(ctx, s.db, actorID)
+	lineage, err := identity.GetIdentityLineage(ctx, db, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,8 +191,13 @@ func (s *Server) handleGetDomainMemberIdentity(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get full projections summary
-	summary, err := s.buildIdentityProjectionsSummary(ctx, actorID)
+	// Ensure DB is available and build full projections summary
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	summary, err := s.buildIdentityProjectionsSummary(ctx, db, actorID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

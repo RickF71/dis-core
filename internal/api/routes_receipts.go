@@ -21,7 +21,13 @@ func (s *Server) handleGetLatestReceipt(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	row := s.db.QueryRow(ctx, `
+	// Guard DB access
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	row := db.QueryRow(ctx, `
 		SELECT payload
 		FROM receipts
 		ORDER BY created_at DESC

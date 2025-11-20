@@ -16,6 +16,10 @@ func (s *Server) RegisterAllRoutes() {
 	// Phase 10I: Apply CSS validation middleware to all routes (MUST be before routes)
 	r.Use(CSSValidationMiddleware)
 
+	// Phase K-1: Know Thyself atomic invite accept endpoint
+	// Place invite accept AFTER middleware registration to avoid Chi panic
+	r.Post("/api/invite/accept", s.handleInviteAccept)
+
 	// External Authentication endpoints (sovereign identity)
 	r.Get("/api/whoami", auth.HandleWhoAmI)
 	r.Get("/api/whoami/external", auth.HandleWhoAmIExternal) // DEV ONLY
@@ -25,8 +29,22 @@ func (s *Server) RegisterAllRoutes() {
 	r.Get("/api/me/active-actor", s.handleGetActiveActor)    // Get current active actor/seat
 
 	// Dev Auth endpoints (None Space identity selection)
-	r.Get("/api/auth/dev-users", auth.HandleDevUsers(s.DB()))  // DEV ONLY: List available dev users
-	r.Post("/api/auth/dev-login", auth.HandleDevLogin(s.DB())) // DEV ONLY: Validate dev login
+	// Wrap dev handlers so they fetch the DB at request time and return 503 when no DB is configured
+	r.Get("/api/auth/dev-users", func(w http.ResponseWriter, r *http.Request) {
+		db := s.requireDB(w)
+		if db == nil {
+			return
+		}
+		auth.HandleDevUsers(db)(w, r)
+	}) // DEV ONLY: List available dev users
+
+	r.Post("/api/auth/dev-login", func(w http.ResponseWriter, r *http.Request) {
+		db := s.requireDB(w)
+		if db == nil {
+			return
+		}
+		auth.HandleDevLogin(db)(w, r)
+	}) // DEV ONLY: Validate dev login
 
 	// Auth challenge endpoints (new canonical handlers)
 	r.Post("/api/auth/challenge", auth.NewChallengeCreateHandler(s.challengeStore).ServeHTTP)
@@ -229,6 +247,11 @@ func (s *Server) RegisterAllRoutes() {
 
 	// GOV-7: Prime Seat Establishment for Corporeal Domains
 	r.Post("/api/domain/{id}/seat/prime", s.CreatePrimeSeat)
+
+	// MX-3.9: Domain freeze CRUD endpoints
+	r.Post("/api/domain/{id}/freeze", s.handleFreezeDomain)
+	r.Post("/api/domain/{id}/unfreeze", s.handleUnfreezeDomain)
+	r.Post("/api/domain/{id}/freeze/override", s.handleOverrideFreezeDomain)
 
 	// Phase 0-R.5: Atomic Corporeal + Actor-Domain Bootstrap
 	r.Handle("/api/corporeal/bootstrap", handlers.CreateCorporealBootstrap(s.corporealBootstrapper))

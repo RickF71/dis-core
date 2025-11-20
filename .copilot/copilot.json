@@ -1,0 +1,27 @@
+{
+  "context": {
+    "folders": [
+      ".copilot"
+    ],
+    "maxFiles": 30,
+    "includePatterns": [
+      ".copilot/**/*.md",
+      "**/*.go",
+      "cmd/**/*.go",
+      "internal/**/*.go"
+    ]
+  },
+  "behavior": {
+    "preferRefactor": true,
+    "aggressiveRefactorMatching": true,
+    "blockDeprecatedPatterns": true,
+    "honorProhibitedPatterns": true
+  },
+  "completion": {
+    "languageBias": {
+      "go": 1.0,
+      "javascript": 0.1,
+      "other": 0.05
+    }
+  }
+}

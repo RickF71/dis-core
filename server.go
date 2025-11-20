@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dis-core/internal/api"
+	coreauth "dis-core/internal/core/authority"
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
 )
@@ -24,7 +25,8 @@ func buildServer() http.Handler {
 	led := &ledger.Ledger{DB: store}
 
 	// Create the main API server instance.
-	s := api.New(store, led)
+	authEngine := coreauth.NewEngine(&coreauth.Config{}, store)
+	s := api.New(store, led, authEngine)
 
 	// The API server wires routes internally and exposes the mux.
 	return s.Handler()

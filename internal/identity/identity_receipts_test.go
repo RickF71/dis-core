@@ -7,16 +7,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"dis-core/internal/testdb"
 )
 
 // Test database setup
 func setupTestDB(t *testing.T) *pgxpool.Pool {
-	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to test database: %v", err)
-	}
+	// Delegate to centralized test harness. It will skip the test when
+	// DIS_TEST_DB_DSN is not set, or fatal on failure to connect when set.
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	return pool
 }
 

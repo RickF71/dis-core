@@ -10,11 +10,15 @@ import (
 // GET /api/domain/{id}/css
 func (s *Server) handleDomainCSS(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	var css sql.NullString
 	// Phase 10J.4: Fetch from flattened payload->css->content
-	err := s.DB().QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`SELECT payload->'css'->>'content' FROM domains WHERE id = $1`, id,
 	).Scan(&css)
 

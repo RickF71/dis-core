@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dis-core/internal/domain"
 )
@@ -33,7 +34,12 @@ func (s *Server) HandleGetResolvedCSS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Get ancestor chain in order: [root, parent, ..., grandparent]
-	chain, err := domain.ResolveDomainLineage(ctx, s.db, domainUUID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	chain, err := domain.ResolveDomainLineage(ctx, db, domainUUID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("cannot compute ancestry: %v", err), http.StatusInternalServerError)
 		return
@@ -44,14 +50,14 @@ func (s *Server) HandleGetResolvedCSS(w http.ResponseWriter, r *http.Request) {
 
 	// Add CSS from each ancestor in the chain
 	for _, ancestorID := range chain {
-		css, err := s.getDomainCSSByUUID(ctx, ancestorID)
+		css, err := s.getDomainCSSByUUID(ctx, db, ancestorID)
 		if err == nil && css != "" {
 			cssParts = append(cssParts, fmt.Sprintf("/* Domain: %s */\n%s", ancestorID.String(), css))
 		}
 	}
 
 	// 3. Add active domain's CSS last (highest specificity)
-	selfCSS, err := s.getDomainCSSByUUID(ctx, domainUUID)
+	selfCSS, err := s.getDomainCSSByUUID(ctx, db, domainUUID)
 	if err == nil && selfCSS != "" {
 		cssParts = append(cssParts, fmt.Sprintf("/* Domain: %s (current) */\n%s", domainID, selfCSS))
 	}
@@ -67,9 +73,9 @@ func (s *Server) HandleGetResolvedCSS(w http.ResponseWriter, r *http.Request) {
 }
 
 // getDomainCSSByUUID retrieves CSS content for a domain by UUID
-func (s *Server) getDomainCSSByUUID(ctx context.Context, domainID uuid.UUID) (string, error) {
+func (s *Server) getDomainCSSByUUID(ctx context.Context, db *pgxpool.Pool, domainID uuid.UUID) (string, error) {
 	var cssContent string
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(payload->'css'->>'content', '')
 		FROM domains
 		WHERE id = $1

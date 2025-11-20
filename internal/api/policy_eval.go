@@ -169,6 +169,11 @@ func (s *Server) UpdateDomainPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the policy in the database
+	db := s.requireDB(w)
+	if db == nil {
+		// requireDB already wrote 503
+		return
+	}
 	query := `
 		UPDATE domains
 		SET payload = jsonb_set(
@@ -183,7 +188,7 @@ func (s *Server) UpdateDomainPolicy(w http.ResponseWriter, r *http.Request) {
 		WHERE id = $1
 	`
 
-	_, err := s.db.Exec(ctx, query, targetDomainID, req.Content)
+	_, err := db.Exec(ctx, query, targetDomainID, req.Content)
 	if err != nil {
 		JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update policy: %v", err))
 		return

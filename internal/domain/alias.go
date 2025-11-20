@@ -78,9 +78,14 @@ func (am *AliasMetadata) Scan(value interface{}) error {
 		return nil
 	}
 
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to scan AliasMetadata: expected []byte, got %T", value)
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return fmt.Errorf("failed to scan AliasMetadata: expected []byte or string, got %T", value)
 	}
 
 	var data map[string]interface{}

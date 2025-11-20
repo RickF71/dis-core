@@ -11,6 +11,7 @@ import (
 	"dis-core/internal/domain"
 	"dis-core/internal/identity"
 	"dis-core/internal/repo"
+	"dis-core/internal/testdb"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,17 +19,6 @@ import (
 )
 
 // GOV-12: Alias Canon & DSCI Integration - API Handler Tests
-
-// setupTestDBForAPI creates a test database connection
-func setupTestDBForAPI(t *testing.T) *pgxpool.Pool {
-	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Skipf("Skipping API test: cannot connect to test database: %v", err)
-	}
-	return pool
-}
 
 // setupTestDomainsForAPI creates test domains
 func setupTestDomainsForAPI(t *testing.T, pool *pgxpool.Pool) (ownerID, targetID uuid.UUID) {
@@ -61,7 +51,8 @@ func cleanupAliasesForAPI(t *testing.T, pool *pgxpool.Pool, aliasIDs ...uuid.UUI
 }
 
 func TestHandleGetDomainAliases_Success(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	// Create test server
@@ -126,7 +117,8 @@ func TestHandleGetDomainAliases_Success(t *testing.T) {
 }
 
 func TestHandleGetDomainAliases_TypeFilter(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -192,7 +184,8 @@ func TestHandleGetDomainAliases_TypeFilter(t *testing.T) {
 }
 
 func TestHandleGetDomainAliases_InvalidDomain(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -216,7 +209,8 @@ func TestHandleGetDomainAliases_InvalidDomain(t *testing.T) {
 }
 
 func TestHandleCreateRelationshipAlias_Success(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -266,7 +260,8 @@ func TestHandleCreateRelationshipAlias_Success(t *testing.T) {
 }
 
 func TestHandleCreateRelationshipAlias_MissingName(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -300,7 +295,8 @@ func TestHandleCreateRelationshipAlias_MissingName(t *testing.T) {
 }
 
 func TestHandleCreateRelationshipAlias_Conflict(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -350,7 +346,8 @@ func TestHandleCreateRelationshipAlias_Conflict(t *testing.T) {
 }
 
 func TestHandleCreateMaskAlias_Success(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -404,7 +401,8 @@ func TestHandleCreateMaskAlias_Success(t *testing.T) {
 }
 
 func TestHandleCreateMaskAlias_AutoGenerateName(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{
@@ -448,7 +446,8 @@ func TestHandleCreateMaskAlias_AutoGenerateName(t *testing.T) {
 }
 
 func TestHandleCreateMaskAlias_InvalidJSON(t *testing.T) {
-	pool := setupTestDBForAPI(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	server := &Server{

@@ -36,8 +36,13 @@ func (s *Server) RegisterEvalRoute(engine policy.PolicyEngine) {
 		if err != nil {
 			log.Printf("receipt creation error: %v", err)
 		} else {
-			if saveErr := receipt.Save(ctx, s.DB()); saveErr != nil {
-				log.Printf("receipt save error: %v", saveErr)
+			// Save receipt only if a DB pool is available. Saving is best-effort
+			// and should not make the eval endpoint fail when running in test
+			// mode without a DB configured.
+			if s.DB() != nil {
+				if saveErr := receipt.Save(ctx, s.DB()); saveErr != nil {
+					log.Printf("receipt save error: %v", saveErr)
+				}
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")

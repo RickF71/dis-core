@@ -1,0 +1,22 @@
+{
+  "forbidden": [
+    "PhaseS0PrimeSeatSetup",
+    "BootstrapIdentityTriads",
+    "RegisterSyntheticDomains",
+    "terra",
+    "numen",
+    "lima",
+    "auto.corporeal",
+    "synthetic domain",
+    "identity triad",
+    "global seat sweep",
+    "global domain bootstrap",
+    "GOV-1",
+    "GOV-6",
+    "testmech auto-creation"
+  ],
+  "forbiddenComments": [
+    "TODO: bootstrap terra",
+    "TODO: create synthetic domains"
+  ]
+}

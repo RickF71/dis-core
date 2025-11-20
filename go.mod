@@ -19,6 +19,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+replace dis-core => .
+
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

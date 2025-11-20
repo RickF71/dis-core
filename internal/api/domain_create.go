@@ -17,6 +17,10 @@ type DomainInput struct {
 
 // POST /api/domain
 func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	var input DomainInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -27,7 +31,7 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 	// Validate parent if provided
 	if input.ParentID != nil {
 		var exists bool
-		err := s.DB().QueryRow(ctx, `SELECT true FROM domains WHERE id = $1`, input.ParentID.String()).Scan(&exists)
+		err := db.QueryRow(ctx, `SELECT true FROM domains WHERE id = $1`, input.ParentID.String()).Scan(&exists)
 		if err == pgx.ErrNoRows {
 			http.Error(w, "parent not found", http.StatusBadRequest)
 			return
@@ -48,7 +52,7 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert domain with name and payload (data is now stored in payload column)
-	_, err := s.DB().Exec(ctx, `
+	_, err := db.Exec(ctx, `
 		INSERT INTO domains (id, name, parent_id, payload)
 		VALUES ($1, $2, $3, $4)
 	`, newID.String(), input.Name, parentIDStr, input.Data)
@@ -71,7 +75,7 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch the created domain
 	var d Domain
-	err = s.DB().QueryRow(ctx, `
+	err = db.QueryRow(ctx, `
 		SELECT id::text, parent_id::text, payload, created_at, updated_at
 		FROM domains
 		WHERE id = $1::uuid

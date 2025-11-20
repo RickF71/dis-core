@@ -93,7 +93,8 @@ func RecordContractCreateReceipt(
 	}
 
 	if err := store.RecordIdentityReceipt(ctx, receipt); err != nil {
-		return fmt.Errorf("failed to record contract create receipt: %w", err)
+		// include domain context to aid debugging of FK failures in tests
+		return fmt.Errorf("failed to record contract create receipt (domain_id=%s consent_by=%s): %w", contract.DomainID.String(), contract.SubjectDomainID.String(), err)
 	}
 
 	return nil

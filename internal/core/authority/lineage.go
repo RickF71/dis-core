@@ -1,23 +1,20 @@
 package authority
 
-// LineageResult is the structured return type for authority lineage queries.
-type LineageResult struct {
-    DomainID string   `json:"domain_id"`
-    Chain    []string `json:"chain"`
-    Depth    int      `json:"depth"`
-    Notes    []string `json:"notes,omitempty"`
-}
+import "context"
 
-// BuildLineage constructs a domain lineage chain.
-// Actual logic pulled from old API handlers.
-func (e *Engine) BuildLineage(domainID string) *LineageResult {
-    // TODO: replace this stub with the real lineage logic extracted from
-    // internal/api/authority_lineage.go
-
-    out := &LineageResult{
-        DomainID: domainID,
-        Chain:    []string{"null", "void", "lima", "corporeal"},
-        Depth:    4,
-    }
-    return out
+// GetLineage returns a structured lineage result for the target ID.
+// MX-3.3: simple placeholder; full ancestry logic will be migrated in MX-3.4.
+func (e *Engine) GetLineage(ctx context.Context, targetID string) (*LineageResult, error) {
+	// MX-3.3: simple placeholder, real ancestry logic arrives in MX-3.4
+	result := &LineageResult{
+		Root: &LineageNode{
+			ID:   targetID,
+			Type: "placeholder",
+			Notes: "MX-3.3: lineage structure stub. " +
+				"Real ancestry resolution will be migrated in MX-3.4.",
+		},
+		Children: []*LineageNode{},
+		Notes:    "MX-3.3 lineage stub",
+	}
+	return result, nil
 }

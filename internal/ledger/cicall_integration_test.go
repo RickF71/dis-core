@@ -5,24 +5,27 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	testdb "dis-core/internal/testdb"
 )
 
 // TestCICallV1_Integration tests the full ci.call.v1 pipeline with actual database
 func TestCICallV1_Integration(t *testing.T) {
 	// Skip if no test database is available
 	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis_test?sslmode=disable"
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 
-	ledger, err := Open(ctx, dsn, nil, nil)
+	ledger, err := Open(ctx, "", pool, nil)
 	if err != nil {
-		t.Skipf("Skipping integration test - cannot connect to test database: %v", err)
+		t.Fatalf("failed to open ledger: %v", err)
 	}
-	defer ledger.Close()
 
 	// Test data
 	actor := "domain.test.integration"
 	target := "target.test.integration"
-	domain := "integration"
+	// Use canonical test domain UUID seeded by the test harness
+	domain := "a1111111-1111-1111-1111-111111111111"
 	action := "test.integration.v1"
 	payload := map[string]interface{}{
 		"test_type": "integration",
@@ -122,15 +125,17 @@ func TestCICallV1_Integration(t *testing.T) {
 // TestCICallV1_MultipleActions tests multiple actions create separate receipts
 func TestCICallV1_MultipleActions(t *testing.T) {
 	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis_test?sslmode=disable"
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 
-	ledger, err := Open(ctx, dsn, nil, nil)
+	ledger, err := Open(ctx, "", pool, nil)
 	if err != nil {
-		t.Skipf("Skipping test - cannot connect to test database: %v", err)
+		t.Fatalf("failed to open ledger: %v", err)
 	}
-	defer ledger.Close()
 
 	// Record multiple actions
+	// Use canonical test domain UUID seeded by the test harness
+	domain := "a1111111-1111-1111-1111-111111111111"
 	actions := []struct {
 		actor  string
 		action string
@@ -142,7 +147,7 @@ func TestCICallV1_MultipleActions(t *testing.T) {
 	}
 
 	for _, action := range actions {
-		err = ledger.RecordCall(ctx, action.actor, "target.multi", "multi", action.action, action.data)
+		err = ledger.RecordCall(ctx, action.actor, "target.multi", domain, action.action, action.data)
 		if err != nil {
 			t.Fatalf("RecordCall failed for %s: %v", action.actor, err)
 		}

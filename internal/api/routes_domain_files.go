@@ -15,6 +15,10 @@ import (
 // GET /api/domain/{id}/files  →  list files with metadata
 func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	fmt.Printf("[DEBUG] handleDomainFilesList called for domain: %s\n", id)
@@ -31,7 +35,7 @@ func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 		ORDER BY key
 	`
 
-	rows, err := s.DB().Query(ctx, q, id)
+	rows, err := db.Query(ctx, q, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -81,13 +85,17 @@ func (s *Server) handleDomainFilesList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDomainFileGet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	//var content sql.NullString
 	q := `SELECT files->>$2 FROM domains WHERE id=$1`
 	// ↑ this pulls the full JSON string for that key (the whole object)
 	var raw sql.NullString
-	err := s.DB().QueryRow(ctx, q, id, filename).Scan(&raw)
+	err := db.QueryRow(ctx, q, id, filename).Scan(&raw)
 	if err == sql.ErrNoRows {
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return
@@ -117,6 +125,10 @@ func (s *Server) handleDomainFileGet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDomainFilePut(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	data, err := io.ReadAll(r.Body)
@@ -140,7 +152,7 @@ func (s *Server) handleDomainFilePut(w http.ResponseWriter, r *http.Request) {
 	  )
 	  WHERE id = $1::uuid
 	`
-	if _, err := s.DB().Exec(ctx, q, id, filename, content); err != nil {
+	if _, err := db.Exec(ctx, q, id, filename, content); err != nil {
 		http.Error(w, "db update failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -154,10 +166,14 @@ func (s *Server) handleDomainFilePut(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDomainFileDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	q := `UPDATE domains SET files = files - $2 WHERE id=$1::uuid`
-	if _, err := s.DB().Exec(ctx, q, id, filename); err != nil {
+	if _, err := db.Exec(ctx, q, id, filename); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -167,6 +183,10 @@ func (s *Server) handleDomainFileDelete(w http.ResponseWriter, r *http.Request) 
 // POST /api/domain/{id}/file/rename  →  rename an existing file
 func (s *Server) handleDomainFileRename(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	var req struct {
@@ -192,7 +212,7 @@ func (s *Server) handleDomainFileRename(w http.ResponseWriter, r *http.Request) 
 	)
 	WHERE id = $1::uuid
 	`
-	if _, err := s.DB().Exec(ctx, q, id, req.Old, req.New); err != nil {
+	if _, err := db.Exec(ctx, q, id, req.Old, req.New); err != nil {
 		http.Error(w, "rename failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -210,6 +230,10 @@ func (s *Server) handleDomainFileRename(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleDomainFileCreate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	filename := r.PathValue("filename")
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
 	body, err := io.ReadAll(r.Body)
@@ -239,7 +263,7 @@ func (s *Server) handleDomainFileCreate(w http.ResponseWriter, r *http.Request) 
 	`
 
 	var existed sql.NullBool
-	if err := s.DB().QueryRow(ctx, q, id, filename, content).Scan(&existed); err != nil {
+	if err := db.QueryRow(ctx, q, id, filename, content).Scan(&existed); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

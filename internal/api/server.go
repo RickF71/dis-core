@@ -17,6 +17,11 @@ import (
 	"dis-core/internal/seats"
 	"dis-core/internal/services"
 
+	coreauth "dis-core/internal/core/authority"
+	"time"
+
+	"github.com/google/uuid"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -55,15 +60,19 @@ type Server struct {
 
 	// Auth Challenge Store (Phase: Auth Challenge Refactor)
 	challengeStore auth.ChallengeStore
+
+	// New in MX-3.4: the core authority engine and engine config
+	Engine *coreauth.Engine
+	Cfg    *coreauth.Config
 }
 
 // New creates a new Server instance and wires all dependencies.
-func New(db *pgxpool.Pool, led *ledger.Ledger) *Server {
-	return NewWithPolicy(db, led, nil)
+func New(db *pgxpool.Pool, led *ledger.Ledger, engine *coreauth.Engine) *Server {
+	return NewWithPolicy(db, led, nil, engine)
 }
 
 // NewWithPolicy creates a new Server instance with a policy engine.
-func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.PolicyEngine) *Server {
+func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.PolicyEngine, engine *coreauth.Engine) *Server {
 	s := &Server{
 		db:             db,
 		ledger:         led,
@@ -80,6 +89,9 @@ func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.Pol
 
 	s.authoritySchema = authzSchema
 	s.authorityConsole = authority.NewConsole(db, led, nil, s.authoritySchema)
+
+	// Wire in provided authority engine (may be nil during gradual migration)
+	s.Engine = engine
 
 	// Phase S: Initialize seats repository and service
 	s.seatsRepo = seats.NewRepository(db)
@@ -140,9 +152,14 @@ func (s *Server) handleDomainGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ensure DB is available (some tests run without initializing DB)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	var domainData string
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 SELECT content FROM canon
 WHERE type = 'domain' AND content->>'domain_id' = $1
 LIMIT 1
@@ -167,3 +184,226 @@ func (s *Server) Handler() *chi.Mux      { return s.router }
 func (s *Server) DB() *pgxpool.Pool      { return s.db }
 func (s *Server) Ledger() *ledger.Ledger { return s.ledger }
 func (s *Server) Router() *chi.Mux       { return s.router }
+
+// requireDB ensures the server has an initialized DB pool. If not, it writes
+// a 503 response and returns nil so callers can early-return. This is useful
+// in unit tests where a DB may not be configured and avoids nil-pointer
+// dereferences that would panic during pgx operations.
+func (s *Server) requireDB(w http.ResponseWriter) *pgxpool.Pool {
+	if s.db == nil {
+		http.Error(w, "db not initialized (test mode)", http.StatusServiceUnavailable)
+		return nil
+	}
+	return s.db
+}
+
+// handleAuthorityIntrospect serves the /api/authority/introspect endpoint
+func (s *Server) handleAuthorityIntrospect(w http.ResponseWriter, r *http.Request) {
+	if s.Engine == nil {
+		http.Error(w, "authority engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	ctx := r.Context()
+	info, err := s.Engine.GetIntrospect(ctx)
+	if err != nil {
+		http.Error(w, "failed to introspect authority engine: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	JSON(w, http.StatusOK, info)
+}
+
+// handleAuthorityLogs is a placeholder for authority logs endpoint
+func (s *Server) handleAuthorityLogs(w http.ResponseWriter, r *http.Request) {
+	JSON(w, http.StatusNotImplemented, map[string]any{"error": "authority logs not implemented"})
+}
+
+// handleAuthorityLineage handles /api/authority/lineage/{domain_id}
+func (s *Server) handleAuthorityLineage(w http.ResponseWriter, r *http.Request) {
+	if s.Engine == nil {
+		http.Error(w, "authority engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	// Try chi path param first
+	domainID := chi.URLParam(r, "domain_id")
+	if domainID == "" {
+		// fallback to query param
+		domainID = r.URL.Query().Get("id")
+	}
+	if domainID == "" {
+		http.Error(w, "missing domain id", http.StatusBadRequest)
+		return
+	}
+	lineage, err := s.Engine.GetLineage(r.Context(), domainID)
+	if err != nil {
+		http.Error(w, "failed to fetch lineage: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	JSON(w, http.StatusOK, lineage)
+}
+
+// handleAuthorityLineageVerify is a simple wrapper for lineage verification endpoints
+func (s *Server) handleAuthorityLineageVerify(w http.ResponseWriter, r *http.Request) {
+	// For now reuse the lineage response; verification will be implemented in MX-3.4
+	s.handleAuthorityLineage(w, r)
+}
+
+// --- Domain freeze HTTP handlers (MX-3.9)
+
+// handleFreezeDomain accepts JSON body {scope, reason, ttl, created_by}
+// POST /api/domain/{id}/freeze
+func (s *Server) handleFreezeDomain(w http.ResponseWriter, r *http.Request) {
+	if s.Engine == nil {
+		http.Error(w, "authority engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	domainID := chi.URLParam(r, "id")
+	if domainID == "" {
+		http.Error(w, "missing domain id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Scope     string `json:"scope"`
+		Reason    string `json:"reason"`
+		TTL       string `json:"ttl"`
+		CreatedBy string `json:"created_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var ttlPtr *time.Time
+	if req.TTL != "" {
+		t, err := time.Parse(time.RFC3339, req.TTL)
+		if err != nil {
+			http.Error(w, "invalid ttl (RFC3339 expected): "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		ttlPtr = &t
+	}
+
+	// Prefer authenticated actor information from request context. If the
+	// ActiveUser is bound to a corporeal domain we use that UID as the
+	// creator. Fall back to the optional `created_by` field in the request
+	// body for tests and legacy callers.
+	createdBy := uuid.Nil
+	if au := auth.GetActiveUser(r); au != nil && au.IsBound() {
+		if u, err := uuid.Parse(au.CorporealDomainUID); err == nil {
+			createdBy = u
+		}
+	} else if req.CreatedBy != "" {
+		if u, err := uuid.Parse(req.CreatedBy); err == nil {
+			createdBy = u
+		}
+	}
+
+	id, err := s.Engine.FreezeDomain(r.Context(), uuid.MustParse(domainID), req.Scope, req.Reason, createdBy, ttlPtr)
+	if err != nil {
+		http.Error(w, "failed to freeze domain: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]any{"freeze_id": id.String()})
+}
+
+// handleUnfreezeDomain accepts JSON body {scope, reason, created_by}
+// POST /api/domain/{id}/unfreeze
+func (s *Server) handleUnfreezeDomain(w http.ResponseWriter, r *http.Request) {
+	if s.Engine == nil {
+		http.Error(w, "authority engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	domainID := chi.URLParam(r, "id")
+	if domainID == "" {
+		http.Error(w, "missing domain id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Scope     string `json:"scope"`
+		Reason    string `json:"reason"`
+		CreatedBy string `json:"created_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Prefer authenticated actor; fall back to request body value.
+	createdBy := uuid.Nil
+	if au := auth.GetActiveUser(r); au != nil && au.IsBound() {
+		if u, err := uuid.Parse(au.CorporealDomainUID); err == nil {
+			createdBy = u
+		}
+	} else if req.CreatedBy != "" {
+		if u, err := uuid.Parse(req.CreatedBy); err == nil {
+			createdBy = u
+		}
+	}
+
+	if err := s.Engine.UnfreezeDomain(r.Context(), uuid.MustParse(domainID), req.Scope, createdBy, req.Reason); err != nil {
+		http.Error(w, "failed to unfreeze domain: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]any{"unfrozen": true})
+}
+
+// handleOverrideFreezeDomain accepts JSON body {scope, reason, prior_freeze_id, created_by}
+// POST /api/domain/{id}/freeze/override
+func (s *Server) handleOverrideFreezeDomain(w http.ResponseWriter, r *http.Request) {
+	if s.Engine == nil {
+		http.Error(w, "authority engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	domainID := chi.URLParam(r, "id")
+	if domainID == "" {
+		http.Error(w, "missing domain id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Scope       string `json:"scope"`
+		Reason      string `json:"reason"`
+		PriorFreeze string `json:"prior_freeze_id"`
+		CreatedBy   string `json:"created_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Prefer authenticated actor; fall back to request body value.
+	createdBy := uuid.Nil
+	if au := auth.GetActiveUser(r); au != nil && au.IsBound() {
+		if u, err := uuid.Parse(au.CorporealDomainUID); err == nil {
+			createdBy = u
+		}
+	} else if req.CreatedBy != "" {
+		if u, err := uuid.Parse(req.CreatedBy); err == nil {
+			createdBy = u
+		}
+	}
+
+	priorID := uuid.Nil
+	if req.PriorFreeze != "" {
+		if u, err := uuid.Parse(req.PriorFreeze); err == nil {
+			priorID = u
+		} else {
+			http.Error(w, "invalid prior_freeze_id: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		http.Error(w, "prior_freeze_id required for override", http.StatusBadRequest)
+		return
+	}
+
+	id, err := s.Engine.OverrideFreezeDomain(r.Context(), uuid.MustParse(domainID), req.Scope, createdBy, req.Reason, priorID)
+	if err != nil {
+		http.Error(w, "failed to override freeze: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]any{"freeze_id": id.String()})
+}

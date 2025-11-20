@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"dis-core/cmd/dis-core/bootstrap"
+	coreauth "dis-core/internal/core/authority"
 	"dis-core/internal/policy"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // StartDaemon starts the DIS-Core service as a daemon with graceful shutdown
-func StartDaemon(cfg *bootstrap.Config, db *pgxpool.Pool, policyEngine *policy.OPAEngine, console *bootstrap.ConsoleComponents) error {
+func StartDaemon(cfg *bootstrap.Config, db *pgxpool.Pool, policyEngine *policy.OPAEngine, console *bootstrap.ConsoleComponents, engine *coreauth.Engine) error {
 	log.Println("[daemon] Starting DIS-Core daemon...")
 
 	// Create context for graceful shutdown
@@ -24,7 +25,7 @@ func StartDaemon(cfg *bootstrap.Config, db *pgxpool.Pool, policyEngine *policy.O
 	defer cancel()
 
 	// Initialize HTTP server components (reuse existing bootstrap logic)
-	serverComponents, err := bootstrap.InitializeHTTPServer(db, nil, cfg) // ledger will be nil for now
+	serverComponents, err := bootstrap.InitializeHTTPServer(db, nil, cfg, engine) // ledger will be nil for now
 	if err != nil {
 		return err
 	}
@@ -73,3 +74,19 @@ func StartDaemon(cfg *bootstrap.Config, db *pgxpool.Pool, policyEngine *policy.O
 	log.Println("[daemon] DIS-Core daemon stopped gracefully")
 	return nil
 }
+
+// StartDaemonLegacy keeps the old 4-arg signature used by existing tests and
+// convenience callers. It constructs a minimal authority Engine and calls the
+// canonical StartDaemon. This preserves backward compatibility so older tests
+// and call sites that haven't been updated yet will compile and run.
+func StartDaemonLegacy(cfg *bootstrap.Config, db *pgxpool.Pool, policyEngine *policy.OPAEngine, console *bootstrap.ConsoleComponents) error {
+	// Create a minimal authority engine with the provided DB. Use the
+	// engine's NewEngine helper from coreauth to avoid duplicating setup.
+	eng := coreauth.NewEngine(&coreauth.Config{}, db)
+
+	return StartDaemon(cfg, db, policyEngine, console, eng)
+}
+
+// Preserve a simple alias for older call sites/tests expecting a different
+// exported symbol name.
+var StartDaemonOld = StartDaemonLegacy

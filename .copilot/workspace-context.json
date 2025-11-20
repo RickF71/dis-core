@@ -1,0 +1,30 @@
+{
+  "workspace": {
+    "importantDirectories": [
+      "cmd",
+      "internal",
+      "internal/api",
+      "internal/db",
+      "internal/net",
+      "internal/ledger",
+      "internal/policy",
+      ".copilot"
+    ],
+    "ignoreDirectories": [
+      "node_modules",
+      "tmp",
+      "build",
+      "dist"
+    ],
+    "domainDirectories": [
+      "domains",
+      "schemas"
+    ],
+    "priority": {
+      "highest": [
+        ".copilot/moar-x-architecture.md",
+        ".copilot/domain-loader-guidance.md"
+      ]
+    }
+  }
+}

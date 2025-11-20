@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,15 +54,27 @@ func (s *contractService) CreateContract(ctx context.Context, input contracts.Cr
 		return nil, fmt.Errorf("failed to create contract: %w", err)
 	}
 
-	// Record receipt (non-blocking, best-effort)
+	// AUTOGEN-COPILOT: Option A — synchronous receipts in tests
+	// AUTOGEN-COPILOT: initial scaffold, verified by RickF71
+	// When running tests that set DIS_TEST_SYNC_RECEIPTS=1, record receipts
+	// synchronously to avoid background goroutine races that can write after
+	// a test's DB pool has been closed or tables truncated.
 	if s.receiptRecorder != nil {
-		go func() {
+		if os.Getenv("DIS_TEST_SYNC_RECEIPTS") == "1" {
 			receiptCtx := context.Background() // Detached context
 			if err := receipts.RecordContractCreateReceipt(receiptCtx, s.receiptRecorder, created); err != nil {
 				// Log but don't fail the contract creation
 				fmt.Printf("Warning: failed to record contract create receipt: %v\n", err)
 			}
-		}()
+		} else {
+			go func() {
+				receiptCtx := context.Background() // Detached context
+				if err := receipts.RecordContractCreateReceipt(receiptCtx, s.receiptRecorder, created); err != nil {
+					// Log but don't fail the contract creation
+					fmt.Printf("Warning: failed to record contract create receipt: %v\n", err)
+				}
+			}()
+		}
 	}
 
 	return created, nil
@@ -87,14 +100,22 @@ func (s *contractService) RevokeContract(ctx context.Context, contractID string,
 		return nil, fmt.Errorf("failed to revoke contract: %w", err)
 	}
 
-	// Record revocation receipt (non-blocking, best-effort)
+	// Record revocation receipt. When DIS_TEST_SYNC_RECEIPTS=1, do this
+	// synchronously to let tests avoid races with background goroutines.
 	if s.receiptRecorder != nil {
-		go func() {
+		if os.Getenv("DIS_TEST_SYNC_RECEIPTS") == "1" {
 			receiptCtx := context.Background() // Detached context
 			if err := receipts.RecordContractRevokeReceipt(receiptCtx, s.receiptRecorder, revoked, reason, actorID); err != nil {
 				fmt.Printf("Warning: failed to record contract revoke receipt: %v\n", err)
 			}
-		}()
+		} else {
+			go func() {
+				receiptCtx := context.Background() // Detached context
+				if err := receipts.RecordContractRevokeReceipt(receiptCtx, s.receiptRecorder, revoked, reason, actorID); err != nil {
+					fmt.Printf("Warning: failed to record contract revoke receipt: %v\n", err)
+				}
+			}()
+		}
 	}
 
 	return revoked, nil

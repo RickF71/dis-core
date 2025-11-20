@@ -13,6 +13,7 @@ import (
 	"dis-core/internal/identity"
 	"dis-core/internal/repo"
 	"dis-core/internal/services"
+	"dis-core/internal/testdb"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -23,12 +24,8 @@ import (
 
 // setupContractAPITestDB creates a test database connection
 func setupContractAPITestDB(t *testing.T) *pgxpool.Pool {
-	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Skipf("Skipping API test: cannot connect to test database: %v", err)
-	}
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	return pool
 }
 

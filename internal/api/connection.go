@@ -57,13 +57,23 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 
 // handleAuthorityStatus delegates to the authority status handler.
 func (s *Server) handleAuthorityStatus(w http.ResponseWriter, r *http.Request) {
-	HandleAuthorityStatus(w, r, s.DB())
+	// Use the server-wired authority engine to serve status
+	if s.Engine != nil {
+		h := HandleAuthorityStatusHandler(s.Engine)
+		h(w, r)
+		return
+	}
+	http.Error(w, "authority engine not available", http.StatusServiceUnavailable)
 }
 
 // handlePolicyReload handles policy reload requests.
 func (s *Server) handlePolicyReload(w http.ResponseWriter, r *http.Request) {
 	if opaEngine, ok := s.policy.(*policy.OPAEngine); ok {
-		policy.HandlePolicyReload(w, r, s.DB(), opaEngine)
+		db := s.requireDB(w)
+		if db == nil {
+			return
+		}
+		policy.HandlePolicyReload(w, r, db, opaEngine)
 	} else {
 		http.Error(w, "Policy engine not available", http.StatusServiceUnavailable)
 	}
@@ -71,7 +81,11 @@ func (s *Server) handlePolicyReload(w http.ResponseWriter, r *http.Request) {
 
 // handleIdentityBind handles identity binding requests.
 func (s *Server) handleIdentityBind(w http.ResponseWriter, r *http.Request) {
-	identity.HandleCreateIdentityBinding(w, r, s.DB())
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+	identity.HandleCreateIdentityBinding(w, r, db)
 }
 
 // handleOrphanInfo — return canonical orphan domain + schema info.

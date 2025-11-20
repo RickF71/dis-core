@@ -5,9 +5,10 @@ import (
 	"log"
 
 	"dis-core/internal/authority"
-	"dis-core/internal/authority/mutation"
 	"dis-core/internal/config"
 	"dis-core/internal/identity"
+
+	"dis-core/internal/authority/mutation"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )

@@ -35,24 +35,31 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		DisplayName:        user.CorporealDomainUID, // Use UID as display name for now
 	}
 
-	// If bound, retrieve the domain UUID
+	// If bound, retrieve the domain UUID (only if DB is available)
 	if user.Bound && user.CorporealDomainID > 0 {
-		// Query corporeal domain to get UUID
-		var domainUUID string
-		err := s.db.QueryRow(r.Context(), `
-			SELECT id FROM domains WHERE id = $1 OR name = $2 LIMIT 1
-		`, user.CorporealDomainID, user.CorporealDomainUID).Scan(&domainUUID)
+		// Prefer non-failing behavior in test mode: use s.DB() (nil-safe) so we
+		// fall back to non-DB behavior when no database is configured.
+		db := s.DB()
+		if db != nil {
+			// Query corporeal domain to get UUID
+			var domainUUID string
+			err := db.QueryRow(r.Context(), `
+				SELECT id FROM domains WHERE id = $1 OR name = $2 LIMIT 1
+			`, user.CorporealDomainID, user.CorporealDomainUID).Scan(&domainUUID)
 
-		if err == nil {
-			resp.CorporealDomainID = domainUUID
-			s.logger.Printf("[me] Found domain UUID %s for user %s", domainUUID, user.CorporealDomainUID)
+			if err == nil {
+				resp.CorporealDomainID = domainUUID
+				s.logger.Printf("[me] Found domain UUID %s for user %s", domainUUID, user.CorporealDomainUID)
 
-			// Try to get Prime Seat for this domain
-			if s.seatsRepo != nil {
-				resp.PrimeSeatID = fmt.Sprintf("pseat-%s", domainUUID[:8])
+				// Try to get Prime Seat for this domain
+				if s.seatsRepo != nil {
+					resp.PrimeSeatID = fmt.Sprintf("pseat-%s", domainUUID[:8])
+				}
+			} else {
+				s.logger.Printf("[me] Warning: Could not resolve domain UUID for user %s: %v", user.CorporealDomainUID, err)
 			}
 		} else {
-			s.logger.Printf("[me] Warning: Could not resolve domain UUID for user %s: %v", user.CorporealDomainUID, err)
+			s.logger.Printf("[me] Skipping DB lookup: no DB configured for tests")
 		}
 	}
 

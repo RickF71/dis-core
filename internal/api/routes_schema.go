@@ -25,7 +25,13 @@ func (s *Server) handleGetActiveSchema(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListSchemas(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	rows, err := s.db.Query(ctx, `
+	// Ensure DB is present
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	rows, err := db.Query(ctx, `
 		SELECT name, version, is_active
 		FROM schemas
 		ORDER BY created_at DESC

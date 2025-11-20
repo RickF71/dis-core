@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PolicyResponse represents the JSON response for policy GET endpoint
@@ -46,27 +47,33 @@ func (s *Server) GetDomainPolicyMode(w http.ResponseWriter, r *http.Request) {
 	var policyContent string
 	var err error
 
-	// Get domain name for response
+	// Require a DB for policy endpoints
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	// Get domain name for response (optional)
 	var domainName string
-	row := s.db.QueryRow(ctx, "SELECT name FROM domains WHERE id = $1", domainID)
-	row.Scan(&domainName) // Ignore error - name is optional
+	row := db.QueryRow(ctx, "SELECT name FROM domains WHERE id = $1", domainID)
+	_ = row.Scan(&domainName) // Ignore error - name is optional
 
 	switch mode {
 	case "local":
-		policyContent, err = s.getDomainRegoPolicy(ctx, domainID)
+		policyContent, err = s.getDomainRegoPolicy(ctx, db, domainID)
 		if err != nil || policyContent == "" {
 			policyContent = s.getDefaultPolicyTemplate()
 		}
 
 	case "inherited":
-		policyContent, err = s.getInheritedPolicies(ctx, domainID)
+		policyContent, err = s.getInheritedPolicies(ctx, db, domainID)
 		if err != nil {
 			JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get inherited policies: %v", err))
 			return
 		}
 
 	case "effective":
-		policyContent, err = s.getEffectivePolicies(ctx, domainID)
+		policyContent, err = s.getEffectivePolicies(ctx, db, domainID)
 		if err != nil {
 			JSONError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get effective policies: %v", err))
 			return
@@ -98,8 +105,8 @@ func (s *Server) GetDomainPolicyMode(w http.ResponseWriter, r *http.Request) {
 }
 
 // getInheritedPolicies returns parent policies concatenated (excludes current domain)
-func (s *Server) getInheritedPolicies(ctx context.Context, domainID string) (string, error) {
-	lineage, err := s.getDomainLineage(ctx, domainID)
+func (s *Server) getInheritedPolicies(ctx context.Context, db *pgxpool.Pool, domainID string) (string, error) {
+	lineage, err := s.getDomainLineage(ctx, db, domainID)
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +115,7 @@ func (s *Server) getInheritedPolicies(ctx context.Context, domainID string) (str
 	var policies []string
 	for i := len(lineage) - 1; i > 0; i-- {
 		parentID := lineage[i]
-		policy, err := s.getDomainRegoPolicy(ctx, parentID)
+		policy, err := s.getDomainRegoPolicy(ctx, db, parentID)
 		if err == nil && policy != "" {
 			comment := fmt.Sprintf("# Policy from domain: %s", parentID)
 			policies = append(policies, comment, policy)
@@ -123,8 +130,8 @@ func (s *Server) getInheritedPolicies(ctx context.Context, domainID string) (str
 }
 
 // getEffectivePolicies returns full hierarchy including current domain (parent→child order)
-func (s *Server) getEffectivePolicies(ctx context.Context, domainID string) (string, error) {
-	lineage, err := s.getDomainLineage(ctx, domainID)
+func (s *Server) getEffectivePolicies(ctx context.Context, db *pgxpool.Pool, domainID string) (string, error) {
+	lineage, err := s.getDomainLineage(ctx, db, domainID)
 	if err != nil {
 		return "", err
 	}
@@ -133,7 +140,7 @@ func (s *Server) getEffectivePolicies(ctx context.Context, domainID string) (str
 	var policies []string
 	for i := len(lineage) - 1; i >= 0; i-- {
 		domID := lineage[i]
-		policy, err := s.getDomainRegoPolicy(ctx, domID)
+		policy, err := s.getDomainRegoPolicy(ctx, db, domID)
 		if err == nil && policy != "" {
 			comment := fmt.Sprintf("# Policy from domain: %s", domID)
 			policies = append(policies, comment, policy)

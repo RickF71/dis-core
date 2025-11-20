@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type cascadeNode struct {
@@ -31,6 +32,10 @@ func (s *Server) handleDomainCascade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/")
 	ref = strings.TrimSuffix(ref, "/cascade")
@@ -41,13 +46,13 @@ func (s *Server) handleDomainCascade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve ref → internal id
-	internalID, err := s.resolveDomainInternalID(ctx, ref)
+	internalID, err := s.resolveDomainInternalID(ctx, db, ref)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	chain, err := s.buildCascadeChain(ctx, internalID)
+	chain, err := s.buildCascadeChain(ctx, db, internalID)
 	if err != nil {
 		http.Error(w, "cascade error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -73,13 +78,14 @@ func (s *Server) handleDomainCascade(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildCascadeChain returns nodes from ROOT→ACTIVE (domain.null at index 0)
-func (s *Server) buildCascadeChain(ctx context.Context, internalID string) ([]cascadeNode, error) {
+// db must be provided by the caller (handler should call s.requireDB)
+func (s *Server) buildCascadeChain(ctx context.Context, db *pgxpool.Pool, internalID string) ([]cascadeNode, error) {
 	// Walk up: active → root
 	var up []cascadeNode
 	curr := internalID
 	for {
 		var n cascadeNode
-		err := s.DB().QueryRow(ctx, `
+		err := db.QueryRow(ctx, `
 			SELECT id, COALESCE(domain_id, ''), parent_id, COALESCE(css, '')
 			FROM domains
 			WHERE id = $1

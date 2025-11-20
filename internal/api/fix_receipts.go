@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dis-core/internal/receipts"
 )
@@ -66,7 +67,12 @@ func (s *Server) CreateFixReceiptHandler(w http.ResponseWriter, r *http.Request)
 
 	// Insert into database
 	ctx := r.Context()
-	_, err := s.db.Exec(ctx,
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	_, err := db.Exec(ctx,
 		`INSERT INTO fix_receipts (id, original_receipt, domain_ref, action_ref, policy_ref, fix_method, authorized_by, timestamp, verification)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
 		fix.ID, fix.OriginalReceipt, fix.DomainRef, fix.ActionRef, fix.PolicyRef, fix.FixMethod, fix.AuthorizedBy, fix.Timestamp, fix.Verification)
@@ -137,7 +143,12 @@ func (s *Server) ListFixReceiptsHandler(w http.ResponseWriter, r *http.Request) 
 
 	query += " ORDER BY timestamp DESC"
 
-	rows, err := s.db.Query(ctx, query, args...)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -223,7 +234,12 @@ func (s *Server) GetLineageProofHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	proof, err := s.getLineageProof(ctx, originalReceiptID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	proof, err := s.getLineageProof(ctx, db, originalReceiptID)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -264,7 +280,7 @@ func (s *Server) GetLineageProofHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 // getLineageProof retrieves lineage proof for a receipt
-func (s *Server) getLineageProof(ctx context.Context, originalReceiptID string) (receipts.LineageProof, error) {
+func (s *Server) getLineageProof(ctx context.Context, db *pgxpool.Pool, originalReceiptID string) (receipts.LineageProof, error) {
 	var proof receipts.LineageProof
 
 	query := `
@@ -281,7 +297,7 @@ func (s *Server) getLineageProof(ctx context.Context, originalReceiptID string) 
 	`
 
 	var verifiedAt *time.Time
-	err := s.db.QueryRow(ctx, query, originalReceiptID).Scan(
+	err := db.QueryRow(ctx, query, originalReceiptID).Scan(
 		&proof.FixReceiptID,
 		&proof.OriginalReceiptID,
 		&proof.Verified,
@@ -311,19 +327,19 @@ func (s *Server) getLineageProof(ctx context.Context, originalReceiptID string) 
 }
 
 // getLineageSummary provides dashboard metrics for lineage proof system
-func (s *Server) getLineageSummary(ctx context.Context) (receipts.LineageSummary, error) {
+func (s *Server) getLineageSummary(ctx context.Context, db *pgxpool.Pool) (receipts.LineageSummary, error) {
 	summary := receipts.LineageSummary{
 		RecentFixes: []receipts.FixReceipt{},
 	}
 
 	// Count total fix receipts
-	err := s.db.QueryRow(ctx, "SELECT COUNT(*) FROM fix_receipts").Scan(&summary.TotalFixReceipts)
+	err := db.QueryRow(ctx, "SELECT COUNT(*) FROM fix_receipts").Scan(&summary.TotalFixReceipts)
 	if err != nil {
 		return summary, err
 	}
 
 	// Count pending verifications
-	err = s.db.QueryRow(ctx, "SELECT COUNT(*) FROM fix_receipts WHERE verification = 'pending'").Scan(&summary.PendingVerifications)
+	err = db.QueryRow(ctx, "SELECT COUNT(*) FROM fix_receipts WHERE verification = 'pending'").Scan(&summary.PendingVerifications)
 	if err != nil {
 		return summary, err
 	}
@@ -338,13 +354,13 @@ func (s *Server) getLineageSummary(ctx context.Context) (receipts.LineageSummary
 
 	// Get last fix timestamp
 	var lastTimestamp *time.Time
-	err = s.db.QueryRow(ctx, "SELECT timestamp FROM fix_receipts ORDER BY timestamp DESC LIMIT 1").Scan(&lastTimestamp)
+	err = db.QueryRow(ctx, "SELECT timestamp FROM fix_receipts ORDER BY timestamp DESC LIMIT 1").Scan(&lastTimestamp)
 	if err == nil && lastTimestamp != nil {
 		summary.LastFixTimestamp = lastTimestamp.Format(time.RFC3339)
 	}
 
 	// Get recent fixes (last 5)
-	rows, err := s.db.Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT id, original_receipt, domain_ref, action_ref, policy_ref, fix_method, authorized_by, timestamp, verification
 		FROM fix_receipts
 		ORDER BY timestamp DESC

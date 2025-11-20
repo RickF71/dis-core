@@ -40,6 +40,12 @@ func (s *Server) handleMeActors(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Require DB for seat lookup
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Query all seats where member_id is related to this user
 	// Patterns: human.{externalUID}, actor.{externalUID}.*, identity patterns
 	query := `
@@ -66,7 +72,7 @@ func (s *Server) handleMeActors(w http.ResponseWriter, r *http.Request) {
 	actorPattern := "actor." + externalUID + "%"
 	directMatch := externalUID
 
-	rows, err := s.db.Query(ctx, query, humanPattern, actorPattern, directMatch)
+	rows, err := db.Query(ctx, query, humanPattern, actorPattern, directMatch)
 	if err != nil {
 		s.logger.Printf("[me/actors] Query error: %v", err)
 		JSONError(w, http.StatusInternalServerError, "Failed to query actors")

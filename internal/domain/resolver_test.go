@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"dis-core/internal/testdb"
 )
 
 // GOV-8: Test suite enforcing DIS-Invariant-001
@@ -18,8 +19,8 @@ func TestResolveDomainFDN(t *testing.T) {
 		t.Skip("Skipping database integration test")
 	}
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable")
-	require.NoError(t, err)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	// GOV-8: Test UUID → name resolution (display only)
@@ -46,8 +47,8 @@ func TestResolveDomainLineage(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable")
-	require.NoError(t, err)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	// GOV-8: Test UUID-only lineage resolution
@@ -71,8 +72,8 @@ func TestResolveDomainLineageFDN(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable")
-	require.NoError(t, err)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	// GOV-8: Test display-only lineage names
@@ -90,8 +91,8 @@ func TestValidateDomainID(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable")
-	require.NoError(t, err)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	// GOV-8: Validate UUID existence (not name lookups)
@@ -113,8 +114,8 @@ func TestGetDomainMetadata(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable")
-	require.NoError(t, err)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	// Test metadata retrieval
@@ -153,10 +154,8 @@ func TestNoNameBasedQueries(t *testing.T) {
 // GOV-8: Benchmark UUID-based resolution vs name-based (deprecated)
 func BenchmarkUUIDResolution(b *testing.B) {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable")
-	if err != nil {
-		b.Skip("Database not available")
-	}
+	pool := testdb.SetupTestDB(b)
+	testdb.MustHaveDB(b, pool)
 	defer pool.Close()
 
 	domainID := uuid.MustParse("4daf928e-e58c-454e-8395-f3dedd103dde")

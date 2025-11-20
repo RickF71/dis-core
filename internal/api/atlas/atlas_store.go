@@ -18,6 +18,9 @@ func NewAtlasStore(db *sql.DB) *AtlasStore {
 
 // InsertLocationReceipt inserts a new receipt into the database.
 func (s *AtlasStore) InsertLocationReceipt(r *LocationReceipt) error {
+	if s.db == nil {
+		return fmt.Errorf("atlas store: db not initialized")
+	}
 	query := `
 		INSERT INTO atlas_receipts (
 			id, entity_id, location_id, issued_by, method,
@@ -41,6 +44,9 @@ func (s *AtlasStore) InsertLocationReceipt(r *LocationReceipt) error {
 
 // GetLocationReceipt retrieves a single receipt by ID.
 func (s *AtlasStore) GetLocationReceipt(id string) (*LocationReceipt, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("atlas store: db not initialized")
+	}
 	query := `
 		SELECT id, entity_id, location_id, issued_by, method,
 		       confidence, issued_at
@@ -66,6 +72,9 @@ func (s *AtlasStore) GetLocationReceipt(id string) (*LocationReceipt, error) {
 func (s *AtlasStore) ListLocationReceipts(limit int) ([]*LocationReceipt, error) {
 	if limit <= 0 {
 		limit = 50
+	}
+	if s.db == nil {
+		return nil, fmt.Errorf("atlas store: db not initialized")
 	}
 	query := `
 		SELECT id, entity_id, location_id, issued_by, method,
@@ -101,6 +110,9 @@ func (s *AtlasStore) ListLocationReceipts(limit int) ([]*LocationReceipt, error)
 
 // HealthCheck ensures DB connectivity for Atlas.
 func (s *AtlasStore) HealthCheck() error {
+	if s.db == nil {
+		return fmt.Errorf("atlas store: db not initialized")
+	}
 	var now time.Time
 	err := s.db.QueryRow("SELECT NOW()").Scan(&now)
 	if err != nil {

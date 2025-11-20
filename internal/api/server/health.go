@@ -21,15 +21,21 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 		"receipts": 0,
 	}
 
-	// Check database connection
-	startPing := time.Now()
-	if err := s.DB.Ping(); err != nil {
-		status["db"] = "unreachable"
+	// Check database connection (nil-safe)
+	if s.DB == nil {
+		status["db"] = "unavailable"
 		status["latency_ms"] = -1
 		status["status"] = "red"
 	} else {
-		status["db"] = "ok"
-		status["latency_ms"] = time.Since(startPing).Milliseconds()
+		startPing := time.Now()
+		if err := s.DB.Ping(); err != nil {
+			status["db"] = "unreachable"
+			status["latency_ms"] = -1
+			status["status"] = "red"
+		} else {
+			status["db"] = "ok"
+			status["latency_ms"] = time.Since(startPing).Milliseconds()
+		}
 	}
 
 	addRuntime(status)

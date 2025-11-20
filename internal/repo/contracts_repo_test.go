@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"dis-core/internal/contracts"
+	"dis-core/internal/testdb"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,12 +16,8 @@ import (
 
 // setupContractTestDB creates a test database connection
 func setupContractTestDB(t *testing.T) *pgxpool.Pool {
-	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to test database: %v", err)
-	}
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	return pool
 }
 

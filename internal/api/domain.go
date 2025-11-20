@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // DomainResponse represents the GET response struct served to Finagler
@@ -26,24 +27,27 @@ type DomainResponse struct {
 //   - DIS domain longname (domain.user.rick)
 //
 // Returns the INTERNAL ID and matching domain record data.
-func (s *Server) resolveDomainInternalID(ctx context.Context, ref string) (string, error) {
+func (s *Server) resolveDomainInternalID(ctx context.Context, db *pgxpool.Pool, ref string) (string, error) {
 	var id string
+	if db == nil {
+		return "", fmt.Errorf("db not initialized")
+	}
 
 	// Try DB internal ID first (UUID-based - acceptable)
-	err := s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE id=$1`, ref).Scan(&id)
+	err := db.QueryRow(ctx, `SELECT id FROM domains WHERE id=$1`, ref).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
 
 	// Try DIS longname style (domain_id)
-	err = s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE domain_id=$1`, ref).Scan(&id)
+	err = db.QueryRow(ctx, `SELECT id FROM domains WHERE domain_id=$1`, ref).Scan(&id)
 	if err == nil {
 		return id, nil
 	}
 
 	// GOV-8: WARNING - Name-based lookup violates DIS-Invariant-001
 	// This fallback path should be removed once all callers use UUID
-	err = s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE name=$1`, ref).Scan(&id)
+	err = db.QueryRow(ctx, `SELECT id FROM domains WHERE name=$1`, ref).Scan(&id)
 	if err == nil {
 		s.logger.Printf("⚠️  GOV-8 WARNING: Name-based domain lookup used for '%s'. Migrate to UUID.", ref)
 		return id, nil
@@ -54,11 +58,14 @@ func (s *Server) resolveDomainInternalID(ctx context.Context, ref string) (strin
 
 // GOV-8: resolveDomainByUUID enforces UUID-only domain resolution
 // This is the ONLY acceptable method for domain lookups in authority operations
-func (s *Server) resolveDomainByUUID(ctx context.Context, domainID string) (string, error) {
+func (s *Server) resolveDomainByUUID(ctx context.Context, db *pgxpool.Pool, domainID string) (string, error) {
 	var id string
+	if db == nil {
+		return "", fmt.Errorf("db not initialized")
+	}
 
 	// Validate UUID format first
-	err := s.DB().QueryRow(ctx, `SELECT id FROM domains WHERE id = $1`, domainID).Scan(&id)
+	err := db.QueryRow(ctx, `SELECT id FROM domains WHERE id = $1`, domainID).Scan(&id)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return "", fmt.Errorf("GOV-8: domain UUID not found: %s", domainID)
@@ -74,6 +81,10 @@ func (s *Server) resolveDomainByUUID(ctx context.Context, domainID string) (stri
 // POST /api/domain/{id}/css
 // PUT /api/domain/{id}/css
 func (s *Server) handleUpdateDomainCSS(w http.ResponseWriter, r *http.Request) {
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/")
 	ref = strings.TrimSuffix(ref, "/css")
@@ -96,14 +107,14 @@ func (s *Server) handleUpdateDomainCSS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	internalID, err := s.resolveDomainInternalID(ctx, ref)
+	internalID, err := s.resolveDomainInternalID(ctx, db, ref)
 	if err != nil {
 		JSONError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
 	// Phase 10J.4: Update flattened payload->css->content
-	_, err = s.DB().Exec(ctx, `
+	_, err = db.Exec(ctx, `
         UPDATE domains
         SET payload = jsonb_set(
             payload,
@@ -204,6 +215,10 @@ func (s *Server) handleDisDomainGet(w http.ResponseWriter, r *http.Request) {
 // GET /api/domain/theme/{id}
 // Returns stacked/cascaded CSS for given domain
 func (s *Server) handleDomainTheme(w http.ResponseWriter, r *http.Request) {
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	ref := strings.TrimPrefix(r.URL.Path, "/api/domain/theme/")
 	if ref == "" {
@@ -212,7 +227,7 @@ func (s *Server) handleDomainTheme(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Resolve DB row id first
-	internalID, err := s.resolveDomainInternalID(ctx, ref)
+	internalID, err := s.resolveDomainInternalID(ctx, db, ref)
 	if err != nil {
 		JSONError(w, http.StatusNotFound, err.Error())
 		return
@@ -220,7 +235,7 @@ func (s *Server) handleDomainTheme(w http.ResponseWriter, r *http.Request) {
 
 	// TEMP fake cascade: null base + domain css
 	var css string
-	err = s.DB().QueryRow(ctx, `SELECT COALESCE(css,'') FROM domains WHERE id=$1`, internalID).Scan(&css)
+	err = db.QueryRow(ctx, `SELECT COALESCE(css,'') FROM domains WHERE id=$1`, internalID).Scan(&css)
 	if err != nil {
 		JSONError(w, http.StatusInternalServerError, "db error: "+err.Error())
 		return

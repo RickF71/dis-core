@@ -40,7 +40,7 @@ func ResolveDomainLineage(ctx context.Context, pool *pgxpool.Pool, domainID uuid
 			SELECT d.id, d.parent_id, l.depth + 1
 			FROM domains d
 			INNER JOIN lineage l ON d.id = l.parent_id
-			WHERE d.parent_id IS NOT NULL AND l.depth < 20
+			WHERE l.depth < 20
 		)
 		SELECT id FROM lineage ORDER BY depth DESC
 	`

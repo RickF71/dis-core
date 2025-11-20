@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -39,19 +38,21 @@ func (s *Server) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	// --- Safe DB queries ---
 	if s.DB() != nil {
-		ctx := context.Background() // TODO: pass request context through
-		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM canon WHERE type='domain'`).Scan(&resp.Domains); err != nil && err != pgx.ErrNoRows {
+		ctx := r.Context()
+		db := s.DB()
+
+		if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM canon WHERE type='domain'`).Scan(&resp.Domains); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
 		}
-		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM receipts`).Scan(&resp.Receipts); err != nil && err != pgx.ErrNoRows {
+		if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM receipts`).Scan(&resp.Receipts); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
 		}
-		if err := s.DB().QueryRow(ctx, `SELECT COUNT(*) FROM schemas`).Scan(&resp.Schemas); err != nil && err != pgx.ErrNoRows {
+		if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM schemas`).Scan(&resp.Schemas); err != nil && err != pgx.ErrNoRows {
 			resp.Status = "warn"
 		}
 
 		startPing := time.Now()
-		if err := s.DB().Ping(ctx); err == nil {
+		if err := db.Ping(ctx); err == nil {
 			resp.DBLatency = time.Since(startPing).Milliseconds()
 		} else {
 			resp.DBLatency = -1

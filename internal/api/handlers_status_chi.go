@@ -8,6 +8,8 @@ import (
 
 	"dis-core/internal/api/middleware"
 	"dis-core/internal/receipts"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // handlePingChi handles GET /api/ping with format support
@@ -54,8 +56,9 @@ func (s *Server) handleStatusChi(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAuthorityStatusChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 
-	// Get authority status using existing logic
-	authStatus := s.getAuthorityStatus()
+	// Get middleware DB and build authority status using it when available
+	db := middleware.FromDB(r.Context())
+	authStatus := s.getAuthorityStatus(db)
 
 	switch format {
 	case FormatJSON:
@@ -88,7 +91,7 @@ func (s *Server) getSystemStatus() map[string]any {
 }
 
 // getAuthorityStatus retrieves authority status information
-func (s *Server) getAuthorityStatus() map[string]any {
+func (s *Server) getAuthorityStatus(db *pgxpool.Pool) map[string]any {
 	status := map[string]any{
 		"authority": "active",
 		"policies":  []string{"gates.rego", "risk.rego"},
@@ -97,9 +100,9 @@ func (s *Server) getAuthorityStatus() map[string]any {
 	}
 
 	// Phase 10E: Add policy continuity status and risk assessment
-	if s.db != nil {
+	if db != nil {
 		ctx := context.Background()
-		if globalStats, err := s.getGlobalPolicyContinuityStats(ctx); err == nil {
+		if globalStats, err := s.getGlobalPolicyContinuityStats(ctx, db); err == nil {
 			thresholds := receipts.DefaultContinuityThresholds()
 			riskLevel := receipts.GetContinuityRiskLevel(globalStats.ContinuityRate)
 

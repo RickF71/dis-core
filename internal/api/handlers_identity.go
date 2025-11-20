@@ -22,7 +22,12 @@ func (s *Server) handleGetIdentityLineage(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	lineage, err := identity.GetIdentityLineage(ctx, s.db, actorID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	lineage, err := identity.GetIdentityLineage(ctx, db, actorID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -47,7 +52,12 @@ func (s *Server) handleGetIdentityLineageVerify(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	lineage, err := identity.GetIdentityLineageSummary(ctx, s.db, actorID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	lineage, err := identity.GetIdentityLineageSummary(ctx, db, actorID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

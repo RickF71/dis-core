@@ -30,7 +30,13 @@ func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	receipts, err := phase9c.ListReceipts(ctx, s.db, limit, offset)
+	// Require DB for listing receipts
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	receipts, err := phase9c.ListReceipts(ctx, db, limit, offset)
 	if err != nil {
 		http.Error(w, "Failed to list receipts: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -51,7 +57,13 @@ func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleReceiptsDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	stats, err := phase9c.GetReceiptStats(ctx, s.db)
+	// Require DB for dashboard stats
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	stats, err := phase9c.GetReceiptStats(ctx, db)
 	if err != nil {
 		http.Error(w, "Failed to get receipt stats: "+err.Error(), http.StatusInternalServerError)
 		return

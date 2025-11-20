@@ -1,3 +1,12 @@
+// NOTE: This bootstrap is intended for test and development convenience. Production
+// schema changes should be delivered via SQL migrations in the `migrations/`
+// directory. The bootstrap below mirrors those migrations so the test harness
+// can rely on a consistent schema even without running the migration tool.
+//
+// When adding or changing persistent schema required by runtime code (for
+// example fields used by the K-1 KnowThyself atomic flow), please create a
+// migration SQL file under migrations/ with UP and DOWN sections and keep this
+// bootstrap in-sync for the test harness.
 package bootstrap
 
 import (
@@ -19,13 +28,14 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 	// updating all the individual EnsureXTable functions
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS domains (
-			id TEXT PRIMARY KEY,
-			type TEXT,
-			version TEXT,
-			content JSONB,
-			source_file TEXT,
-			hash TEXT,
-			imported_at TIMESTAMPTZ DEFAULT NOW()
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			name TEXT UNIQUE,
+			parent_id UUID REFERENCES domains(id),
+			domain_type TEXT,
+			authority TEXT,
+			payload JSONB DEFAULT '{}'::jsonb,
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
 		);`,
 		`CREATE TABLE IF NOT EXISTS schemas (
 			id TEXT PRIMARY KEY,
@@ -56,32 +66,84 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 			last_seen TIMESTAMPTZ DEFAULT NOW()
 		);`,
 		`CREATE TABLE IF NOT EXISTS identities (
-			id TEXT PRIMARY KEY,
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			subject TEXT UNIQUE,
+			presentation_name TEXT,
+			identity_type TEXT,
 			public_key TEXT,
 			metadata JSONB,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		);`,
 		`CREATE TABLE IF NOT EXISTS handshakes (
 			id TEXT PRIMARY KEY,
+			token TEXT UNIQUE,
+			subject TEXT,
 			peer_id TEXT,
 			status TEXT,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		);`,
 		`CREATE TABLE IF NOT EXISTS receipts (
-			id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 			type TEXT NOT NULL,
 			actor TEXT,
 			target TEXT,
-			domain TEXT,
+			domain UUID,
 			payload JSONB,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		);`,
+
+		// GOV-10: identity_receipts ledger used throughout identity/aliases
+		`CREATE TABLE IF NOT EXISTS identity_receipts (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			domain_id UUID NOT NULL REFERENCES domains(id),
+			actor_id UUID NOT NULL,
+			action TEXT NOT NULL,
+			payload JSONB NOT NULL,
+			prev_id UUID REFERENCES identity_receipts(id),
+			hash TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			consent_by UUID NOT NULL REFERENCES domains(id),
+			alias_scope TEXT,
+			target_domain_id UUID NULL REFERENCES domains(id),
+			source_domain_id UUID NULL REFERENCES domains(id),
+			external_subject TEXT NULL,
+			channel TEXT NULL,
+			method TEXT NULL,
+			scope TEXT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_identity_receipts_actor ON identity_receipts(actor_id, created_at ASC);`,
+		`CREATE INDEX IF NOT EXISTS idx_identity_receipts_domain ON identity_receipts(domain_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_identity_receipts_action ON identity_receipts(action);`,
+		`CREATE INDEX IF NOT EXISTS idx_identity_receipts_prev ON identity_receipts(prev_id);`,
 		`CREATE TABLE IF NOT EXISTS import_warnings (
 			id TEXT PRIMARY KEY,
 			message TEXT,
 			source_file TEXT,
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		);`,
+
+		// GOV-12: aliases
+		`CREATE TABLE IF NOT EXISTS aliases (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			owner_domain_id UUID NOT NULL,
+			target_domain_id UUID NOT NULL,
+			alias_name TEXT NOT NULL,
+			alias_type TEXT NOT NULL,
+			is_corporeal_auto BOOLEAN NOT NULL DEFAULT FALSE,
+			dsci_contract_id UUID NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			retired_at TIMESTAMPTZ NULL,
+			metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_aliases_owner_domain ON aliases(owner_domain_id, alias_type);`,
+		`CREATE INDEX IF NOT EXISTS idx_aliases_target_domain ON aliases(target_domain_id, alias_type);`,
+		`CREATE INDEX IF NOT EXISTS idx_aliases_dsci_contract ON aliases(dsci_contract_id) WHERE dsci_contract_id IS NOT NULL;`,
+		`CREATE INDEX IF NOT EXISTS idx_aliases_created_at ON aliases(created_at DESC);`,
+		`CREATE INDEX IF NOT EXISTS idx_aliases_active ON aliases(owner_domain_id, alias_type) WHERE retired_at IS NULL;`,
+		// Partial unique index for active aliases (owner,target,name) tuple
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_aliases_unique_active ON aliases(owner_domain_id, target_domain_id, alias_name) WHERE retired_at IS NULL;`,
 		`CREATE TABLE IF NOT EXISTS authority_decisions (
 			id VARCHAR(36) PRIMARY KEY,
 			created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -186,6 +248,46 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_domain_seats_status ON domain_seats(status);`,
 		`CREATE INDEX IF NOT EXISTS idx_domain_seats_member ON domain_seats(member_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_domain_seats_parent ON domain_seats(parent_seat_id);`,
+		// Domain freeze state (authority-driven)
+		`CREATE TABLE IF NOT EXISTS domain_freeze_state (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			domain_id UUID NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+			scope TEXT NOT NULL,
+			reason TEXT NOT NULL,
+			created_by UUID NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			ttl_until TIMESTAMPTZ NULL,
+			override_of UUID NULL REFERENCES domain_freeze_state(id) ON DELETE SET NULL,
+			is_active BOOLEAN NOT NULL DEFAULT TRUE
+		);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_freeze_unique_active ON domain_freeze_state(domain_id, scope) WHERE is_active = TRUE;`,
+		`CREATE INDEX IF NOT EXISTS idx_domain_freeze_domain_active ON domain_freeze_state(domain_id, is_active);`,
+
+		// GOV-13: contracts table (lightweight implementation matching migration)
+		`CREATE TABLE IF NOT EXISTS contracts (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			domain_id UUID NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+			subject_domain_id UUID NOT NULL REFERENCES domains(id) ON DELETE CASCADE,
+			alias_id UUID NULL REFERENCES domains(id) ON DELETE SET NULL,
+			contract_type TEXT NOT NULL,
+			dsci_channel TEXT NOT NULL,
+			dsci_reference TEXT NOT NULL,
+			dsci_version TEXT NOT NULL,
+			effective_at TIMESTAMPTZ NOT NULL,
+			expires_at TIMESTAMPTZ NULL,
+			revoked_at TIMESTAMPTZ NULL,
+			status TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			created_by UUID NULL REFERENCES domains(id) ON DELETE SET NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_contracts_domain_id ON contracts(domain_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_contracts_subject_domain_id ON contracts(subject_domain_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_contracts_alias_id ON contracts(alias_id) WHERE alias_id IS NOT NULL;`,
+		`CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);`,
+		`CREATE INDEX IF NOT EXISTS idx_contracts_effective_at ON contracts(effective_at);`,
+		`CREATE INDEX IF NOT EXISTS idx_contracts_created_at ON contracts(created_at DESC);`,
 	}
 
 	for i, createSQL := range tables {
@@ -195,6 +297,26 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 	}
 
 	fmt.Println("✅ All tables ensured.")
+
+	// Ensure canonical test domains used by GOV-8 tests exist. These are
+	// idempotent upserts so repeated bootstraps are safe. Tests expect the
+	// terra UUID and a corporeal domain with a known parent relationship.
+	// terra: 4daf928e-e58c-454e-8395-f3dedd103dde
+	// corporeal: a1111111-1111-1111-1111-111111111111 (parent -> terra)
+	seedSQL := []string{
+		`INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at)
+		 VALUES ('4daf928e-e58c-454e-8395-f3dedd103dde', 'terra', NULL, 'terra', '{"meta": {"governance": "human_sovereign"}}'::jsonb, now(), now())
+		 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, payload = EXCLUDED.payload, updated_at = now();`,
+		`INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at)
+		 VALUES ('a1111111-1111-1111-1111-111111111111', 'terra.numen.lima.corporeal', '4daf928e-e58c-454e-8395-f3dedd103dde', 'corporeal', '{"meta": {"governance": "human_sovereign"}}'::jsonb, now(), now())
+		 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, payload = EXCLUDED.payload, updated_at = now();`,
+	}
+
+	for _, s := range seedSQL {
+		if _, err := dbConn.Exec(ctx, s); err != nil {
+			return fmt.Errorf("seeding canonical domains: %w", err)
+		}
+	}
 
 	// Phase 10F: Setup continuity lineage proofs
 	if err := performPhase10FSetup(dbConn); err != nil {

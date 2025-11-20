@@ -29,13 +29,13 @@ func NewAliasRepository(pool *pgxpool.Pool) *AliasRepository {
 
 // CreateAlias inserts a new alias
 func (r *AliasRepository) CreateAlias(ctx context.Context, alias *domain.Alias) error {
-	if err := alias.Validate(); err != nil {
-		return fmt.Errorf("invalid alias: %w", err)
-	}
-
-	// Ensure ID is set
+	// Ensure ID is set before validation so repository can generate one.
 	if alias.ID == uuid.Nil {
 		alias.ID = uuid.New()
+	}
+
+	if err := alias.Validate(); err != nil {
+		return fmt.Errorf("invalid alias: %w", err)
 	}
 
 	// Ensure created_at is set
@@ -243,7 +243,26 @@ func (r *AliasRepository) FindActiveAliasByName(ctx context.Context, ownerDomain
 	)
 
 	if err == pgx.ErrNoRows {
-		return nil, nil // Not found
+		// If no active alias was found, check whether a retired alias exists with the
+		// same owner/target/name. If a retired alias exists we return an error so
+		// callers are aware a retired record with that name exists.
+		var exists bool
+		err2 := r.pool.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM aliases
+				WHERE owner_domain_id = $1
+				  AND target_domain_id = $2
+				  AND alias_name = $3
+			)
+		`, ownerDomainID, targetDomainID, aliasName).Scan(&exists)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to check alias existence: %w", err2)
+		}
+		if exists {
+			return nil, fmt.Errorf("alias exists but is retired: %s", aliasName)
+		}
+
+		return nil, nil // Not found at all
 	}
 
 	if err != nil {

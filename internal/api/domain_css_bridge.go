@@ -122,8 +122,13 @@ func (s *Server) handleDomainCSSBridgeText(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleGetDomainCSS(w http.ResponseWriter, r *http.Request, domainID string) {
 	ctx := r.Context()
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	var cssJSON json.RawMessage
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(payload->'css', '{}'::jsonb)
 		FROM domains
 		WHERE id = $1::uuid
@@ -149,8 +154,13 @@ func (s *Server) handleGetDomainCSS(w http.ResponseWriter, r *http.Request, doma
 func (s *Server) handleGetDomainCSSText(w http.ResponseWriter, r *http.Request, domainID string) {
 	ctx := r.Context()
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	var cssContent string
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(payload->'css'->>'content', '')
 		FROM domains
 		WHERE id = $1::uuid
@@ -205,8 +215,13 @@ func (s *Server) handlePutDomainCSS(w http.ResponseWriter, r *http.Request, doma
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Phase 10J.4: Update payload->css directly
-	_, err = s.db.Exec(ctx, `
+	_, err = db.Exec(ctx, `
 		UPDATE domains
 		SET payload = jsonb_set(
 			payload,
@@ -259,8 +274,13 @@ func (s *Server) handlePutDomainCSSText(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Update payload->css directly in database
-	_, err = s.db.Exec(ctx, `
+	_, err = db.Exec(ctx, `
 		UPDATE domains
 		SET payload = jsonb_set(
 			payload,
@@ -361,9 +381,14 @@ func (s *Server) handleGetCSSVariables(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Phase 10J.4: Get CSS from payload
 	var cssContent string
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(payload->'css'->>'content', '')
 		FROM domains
 		WHERE id = $1::uuid
@@ -464,7 +489,12 @@ func (s *Server) handleUpdateDomainCSSFormatAwareBridge(w http.ResponseWriter, r
 	}
 
 	// Phase 10J.4: Update payload->css directly
-	_, err = s.db.Exec(ctx, `
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	_, err = db.Exec(ctx, `
 		UPDATE domains
 		SET payload = jsonb_set(
 			payload,

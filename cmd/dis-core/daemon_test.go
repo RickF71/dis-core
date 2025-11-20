@@ -12,8 +12,11 @@ import (
 
 	"dis-core/cmd/dis-core/bootstrap"
 	"dis-core/cmd/dis-core/service"
+	"dis-core/internal/ledger"
 	logutil "dis-core/internal/log"
 	"dis-core/internal/policy"
+	"dis-core/internal/schema"
+	testdb "dis-core/internal/testdb"
 )
 
 // TestDaemonStartupShutdown tests the daemon's startup and graceful shutdown
@@ -23,32 +26,27 @@ func TestDaemonStartupShutdown(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Use test DSN or default
-	testDSN := os.Getenv("DIS_TEST_DB_DSN")
-	if testDSN == "" {
-		testDSN = "postgres://dis_user:card567@localhost:5432/dis_test?sslmode=disable"
-	}
+	// Ensure a test DB is available; skip gracefully if DIS_TEST_DB_DSN is not set.
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 
-	// Load configuration with test port
+	// Load configuration with test port (DSN handled by harness)
 	config := &bootstrap.Config{
-		DSN:  testDSN,
+		DSN:  "",
 		Port: "8081", // Use different port for test
 	}
 
-	// Initialize database components
-	dbComponents, err := bootstrap.InitializeDatabase(ctx, config.DSN)
+	// Initialize schema registry
+	schemaReg := schema.NewRegistry()
+
+	// Initialize ledger using the harness pool
+	led, err := ledger.Open(ctx, "", pool, schemaReg)
 	if err != nil {
-		t.Fatalf("failed to initialize database: %v", err)
-	}
-	defer dbComponents.Close()
-
-	// Bootstrap database tables
-	if err := bootstrap.BootstrapTables(dbComponents.Database); err != nil {
-		t.Fatalf("failed to bootstrap tables: %v", err)
+		t.Fatalf("failed to open ledger: %v", err)
 	}
 
-	// Initialize Authority Console
-	console, err := bootstrap.InitializeAuthorityConsole(dbComponents.Database, dbComponents.Registry, dbComponents.Ledger)
+	// Initialize Authority Console using harness-managed pool and ledger
+	console, err := bootstrap.InitializeAuthorityConsole(pool, schemaReg, led)
 	if err != nil {
 		t.Fatalf("failed to initialize authority console: %v", err)
 	}
@@ -60,10 +58,10 @@ func TestDaemonStartupShutdown(t *testing.T) {
 	testCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// Start daemon in a goroutine
+	// Start daemon in a goroutine (use compatibility wrapper for older test signature)
 	errChan := make(chan error, 1)
 	go func() {
-		err := service.StartDaemon(config, dbComponents.Database, policyEngine, console)
+		err := service.StartDaemonOld(config, pool, policyEngine, console)
 		errChan <- err
 	}()
 

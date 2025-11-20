@@ -12,6 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"dis-core/internal/receipts"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // handlePolicyContinuity handles GET /api/policy/continuity/{domain} for Phase 10D policy continuity validation
@@ -32,7 +34,12 @@ func (s *Server) handlePolicyContinuity(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	result, err := receipts.VerifyPolicyContinuity(ctx, s.db, domainID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	result, err := receipts.VerifyPolicyContinuity(ctx, db, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -105,9 +112,13 @@ func writePolicyContinuityText(w http.ResponseWriter, result receipts.PolicyCont
 func (s *Server) handlePolicyContinuityGlobal(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	ctx := r.Context()
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 
 	// Get global policy continuity statistics
-	globalStats, err := s.getGlobalPolicyContinuityStats(ctx)
+	globalStats, err := s.getGlobalPolicyContinuityStats(ctx, db)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -153,21 +164,21 @@ type GlobalPolicyContinuityStats struct {
 }
 
 // getGlobalPolicyContinuityStats computes global policy continuity statistics
-func (s *Server) getGlobalPolicyContinuityStats(ctx context.Context) (GlobalPolicyContinuityStats, error) {
+func (s *Server) getGlobalPolicyContinuityStats(ctx context.Context, db *pgxpool.Pool) (GlobalPolicyContinuityStats, error) {
 	stats := GlobalPolicyContinuityStats{
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		DomainStats: []receipts.DomainReceiptStats{},
 	}
 
 	// Get total receipts
-	if s.db != nil {
-		err := s.db.QueryRow(ctx, "SELECT COUNT(*) FROM receipts").Scan(&stats.TotalReceipts)
+	if db != nil {
+		err := db.QueryRow(ctx, "SELECT COUNT(*) FROM receipts").Scan(&stats.TotalReceipts)
 		if err != nil {
 			return stats, fmt.Errorf("failed to count total receipts: %w", err)
 		}
 
 		// Count receipts with valid policy refs
-		err = s.db.QueryRow(ctx, `
+		err = db.QueryRow(ctx, `
 			SELECT COUNT(*) FROM receipts
 			WHERE policy_ref IS NOT NULL AND policy_ref != ''
 		`).Scan(&stats.ValidRefs)
@@ -184,7 +195,7 @@ func (s *Server) getGlobalPolicyContinuityStats(ctx context.Context) (GlobalPoli
 		}
 
 		// Get unique domains from receipts (simplified - extract from event_id patterns)
-		rows, err := s.db.Query(ctx, `
+		rows, err := db.Query(ctx, `
 			SELECT DISTINCT
 				CASE
 					WHEN event_id ILIKE '%domain.%' THEN
@@ -211,7 +222,7 @@ func (s *Server) getGlobalPolicyContinuityStats(ctx context.Context) (GlobalPoli
 				if domainName != "" && domainName != "unknown" {
 					stats.TotalDomains++
 					// Get detailed stats for this domain
-					if domainStats, err := receipts.GetDomainReceiptStats(ctx, s.db, domainName); err == nil {
+					if domainStats, err := receipts.GetDomainReceiptStats(ctx, db, domainName); err == nil {
 						stats.DomainStats = append(stats.DomainStats, domainStats)
 					}
 				}
@@ -243,7 +254,12 @@ func (s *Server) handleRemediateOrphans(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	result, err := receipts.RemediateOrphans(ctx, s.db, domainID, dryRun)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	result, err := receipts.RemediateOrphans(ctx, db, domainID, dryRun)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -274,9 +290,13 @@ func (s *Server) handleRemediateOrphans(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleContinuityDashboard(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	ctx := r.Context()
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 
 	// Get global continuity overview
-	globalStats, err := s.getGlobalPolicyContinuityStats(ctx)
+	globalStats, err := s.getGlobalPolicyContinuityStats(ctx, db)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -293,14 +313,14 @@ func (s *Server) handleContinuityDashboard(w http.ResponseWriter, r *http.Reques
 	thresholds := receipts.DefaultContinuityThresholds()
 
 	// Phase 10F: Get lineage proof data
-	lineageSummary, err := s.getLineageSummary(ctx)
+	lineageSummary, err := s.getLineageSummary(ctx, db)
 	if err != nil {
 		// Log error but continue - lineage data is optional
 		lineageSummary = receipts.LineageSummary{}
 	}
 
 	// Phase 10G: Get federation summary data
-	federationSummary, err := s.getFederationSummary(ctx)
+	federationSummary, err := s.getFederationSummary(ctx, db)
 	if err != nil {
 		// Log error but continue - federation data is optional
 		federationSummary = receipts.FederationSummary{}
@@ -495,8 +515,8 @@ func calculateRemediationPotential(overview GlobalPolicyContinuityStats) float64
 }
 
 // getFederationSummary retrieves cross-domain federation metrics for Phase 10G
-func (s *Server) getFederationSummary(ctx context.Context) (receipts.FederationSummary, error) {
-	synchronizer := receipts.NewProofSynchronizer(s.db, "local.domain") // TODO: Get from config
+func (s *Server) getFederationSummary(ctx context.Context, db *pgxpool.Pool) (receipts.FederationSummary, error) {
+	synchronizer := receipts.NewProofSynchronizer(db, "local.domain") // TODO: Get from config
 	summary, err := synchronizer.GetFederationSummary(ctx)
 	if err != nil {
 		return receipts.FederationSummary{}, err

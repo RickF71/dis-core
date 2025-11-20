@@ -1,133 +1,137 @@
-# /task Implement Phase 9D: Receipt Listing & Continuity Dashboard
-# Objective: Add receipts_status_view + GET /api/receipts/list + phase_9d.log bootstrap continuity check.
+# Summary:
+# Copilot instructions for DIS-Core — enforce non-negotiable invariants around Terra/Root/Null, domain + receipt creation, handshake schema, and KnowThyselfAtomic so generated code cannot bypass core DIS rules.
 
-Create the following files and apply migrations exactly as shown.
+# =========================================================
+# GLOBAL STYLE RULES
+# =========================================================
 
-=== migrations/20251111_add_receipts_list_view.sql ===
--- Phase 9D: receipts_status_view for continuity dashboard
-CREATE OR REPLACE VIEW receipts_status_view AS
-SELECT
-  r.id,
-  r.receipt_type,
-  r.event_id,
-  (r.policy_ref IS NOT NULL)  AS policy_linked,
-  (r.redaction_ref IS NOT NULL) AS redacted,
-  (o.receipt_id IS NOT NULL) AS orphaned
-FROM receipts r
-LEFT JOIN receipts_orphan_view o ON r.id = o.receipt_id;
+- Always prefer small, focused edits over large refactors.
+- Preserve existing public APIs unless explicitly instructed to change them.
+- Keep changes localized to the package or phase you are asked to work on.
+- When adding new functionality, write or update tests in the same change.
+- When unsure about domain concepts (Terra, Root, Null, PAIN, Jikka, etc.), ASK THE USER instead of guessing.
 
-COMMENT ON VIEW receipts_status_view IS
-'Phase 9D continuity dashboard: summarizes linkage and orphan status for receipts.';
+# =========================================================
+# DIS-CORE INVARIANTS (NON-NEGOTIABLE)
+# =========================================================
+# These are “laws of physics” for this repo. Do not violate them.
 
-=== internal/model/receipts.go ===
-package model
+- Terra / Root / Null domains:
+  - Are created ONLY by bootstrap/migrations and canonical seed scripts.
+  - MUST NOT be created, re-created, or “proven” from application logic or tests.
+  - NEVER emit new events like terra.existence.proof.v1, root.existence.validation.v1, null.presence.allow.v1 unless explicitly defined by the user in schemas/events.
 
-type ReceiptSummary struct {
-	ID           string `json:"id"`
-	Type         string `json:"receipt_type"`
-	EventID      string `json:"event_id"`
-	PolicyLinked bool   `json:"policy_linked"`
-	Redacted     bool   `json:"redacted"`
-	Orphaned     bool   `json:"orphaned"`
-}
+- Domains:
+  - New domains MUST NOT be created via raw INSERTs into the domains table from handlers or identity code.
+  - Use a canonical helper or service for domain instantiation (e.g., domain.CreateCorporealDomain / domain.Instantiate) so that:
+    - parent domain is resolved consistently,
+    - payload structure is standardized,
+    - related receipts and seats are created correctly.
+  - Do not guess domain IDs or special names (e.g., "domain.terra") without checking the canonical constants or bootstrap rules.
 
-=== internal/api/receipts_list.go ===
-package api
+- Receipts:
+  - New receipts MUST NOT be created with raw INSERT INTO receipts in handlers, identity, or ad-hoc helpers.
+  - ALWAYS go through the canonical receipts engine/helper (e.g., authority.RecordAuthorityReceipt or a dedicated ReceiptWriter), so you:
+    - preserve hash chaining (prev_hash, hash),
+    - keep chain continuity,
+    - apply policy/hooks consistently,
+    - allow future signing upgrades.
+  - Do NOT invent new receipt types unless explicitly instructed and backed by a schema/event design (e.g., ci.call.login.v1 is allowed if already in use; anything new must be approved).
 
-import (
-	"context"
-	"encoding/json"
-	"net/http"
-	"strconv"
+- Terra/Root/Null acting as “actor”:
+  - Do NOT set actor or issued_by to domain.null, domain.terra, or domain.root unless there is a clearly defined and agreed pattern.
+  - By default, receipts should reflect a concrete actor/representation, not abstract roots, unless explicitly required.
 
-	"dis-core/internal/model"
-)
+- Schema / DB access:
+  - NEVER guess table or column names based on “what might exist.” If you are not sure about a schema, ASK THE USER.
+  - Do not introduce dual-path “fallback” queries for old column names in new code (e.g., “try subject then initiator, try token then handshake_id”) unless explicitly cleaning up legacy.
+  - New code should use the authoritative, current schema only.
 
-func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-	q := r.URL.Query()
-	limit, _ := strconv.Atoi(q.Get("limit"))
-	offset, _ := strconv.Atoi(q.Get("offset"))
-	orphanOnly := q.Get("orphaned") == "true"
-	if limit <= 0 { limit = 50 }
+# =========================================================
+# HANDSHAKE / INVITE TOKEN SCHEMA (AUTHORITATIVE)
+# =========================================================
 
-	query := `
-	SELECT id, receipt_type, event_id, policy_linked, redacted, orphaned
-	FROM receipts_status_view`
-	if orphanOnly {
-		query += " WHERE orphaned = true"
-	}
-	query += " ORDER BY id LIMIT $1 OFFSET $2"
+# Treat this as the canonical handshake representation for new code.
+# If the actual DB schema differs, ask the user BEFORE generating migrations or new queries.
 
-	rows, err := s.db.Query(ctx, query, limit, offset)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
+- Table: handshakes
+- Columns (for new code):
+  - token      TEXT PRIMARY KEY
+  - subject    TEXT NOT NULL   # identifies the human / external subject
+  - created_at TIMESTAMPTZ NOT NULL
 
-	type Response struct {
-		Receipts []model.ReceiptSummary `json:"receipts"`
-		Page     int                    `json:"page"`
-		Limit    int                    `json:"limit"`
-	}
-	var result Response
-	for rows.Next() {
-		var rec model.ReceiptSummary
-		if err := rows.Scan(&rec.ID, &rec.Type, &rec.EventID, &rec.PolicyLinked, &rec.Redacted, &rec.Orphaned); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		result.Receipts = append(result.Receipts, rec)
-	}
-	result.Page = offset/limit + 1
-	result.Limit = limit
+Rules for Copilot:
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
-}
+- For resolving invite tokens, use ONLY:
+  - SELECT subject FROM handshakes WHERE token = $1
+- Do NOT query columns like initiator, handshake_id, or other legacy names in new logic.
+- If you need to interact with legacy columns, ask the user for explicit instructions and/or write migration scripts, not ad-hoc fallbacks.
 
-=== internal/api/routes.go (append) ===
-mux.HandleFunc("GET /api/receipts/list", s.handleListReceipts)
+# =========================================================
+# KNOWTHYSELFATOMIC (K-SERIES) — SCOPE & RULES
+# =========================================================
 
-=== internal/bootstrap/console.go (append) ===
-package bootstrap
+# This function is a THIN orchestrator. It MUST NOT become a mini-bootstrap engine.
 
-import (
-	"context"
-	"fmt"
-	"log"
+# Intended behavior:
+#   Invite token → subject → corporeal domain birth via canonical helper → login receipt via receipts engine.
 
-	"github.com/jackc/pgx/v5/pgxpool"
-)
+Required behavior for KnowThyselfAtomic (or any successor):
 
-func performPhase9DCheck(db *pgxpool.Pool) error {
-	ctx := context.Background()
-	row := db.QueryRow(ctx, `
-		SELECT COUNT(*),
-		       COUNT(*) FILTER (WHERE orphaned)
-		FROM receipts_status_view;
-	`)
-	var total, orphaned int
-	if err := row.Scan(&total, &orphaned); err != nil {
-		return err
-	}
-	log.Printf("[phase_9d] receipts total=%d orphaned=%d", total, orphaned)
-	appendPhaseLog("phase_9d.log",
-		fmt.Sprintf("Phase 9D: %d total, %d orphaned", total, orphaned))
-	return nil
-}
+- MUST:
+  - Validate the invite token using the authoritative handshake schema:
+    - SELECT subject FROM handshakes WHERE token = $1
+    - Or call a dedicated helper such as:
+      - identity.ResolveInviteSubject(ctx, tx, token)
+  - Create the corporeal domain via a canonical domain helper, for example:
+    - domain.CreateCorporealDomainFromSubject(ctx, tx, subject)
+    - or a similarly named function approved by the user.
+  - Record a login / know-thyself receipt using the canonical receipts engine, for example:
+    - authority.RecordAuthorityReceipt(ctx, tx, ReceiptInput{ Type: "ci.call.login.v1", ... })
+  - Run the above steps in a single DB transaction so that either:
+    - all of them succeed and commit, or
+    - all of them are rolled back on failure.
 
-=== internal/api/authority_schema.go (append) ===
-"receipts_api": {
-  "list": "/api/receipts/list",
-  "verify": "/api/receipts/verify/{id}"
-}
+- MUST NOT:
+  - Construct new “Terra / Root / Null proof” events (e.g., terra.existence.proof.v1, root.existence.validation.v1, null.presence.allow.v1) unless the user has explicitly defined and approved those event types.
+  - Insert directly into the domains table from within KnowThyselfAtomic.
+    - Instead, call the canonical domain creation helper.
+  - Insert directly into the receipts table from within KnowThyselfAtomic.
+    - Instead, call the canonical receipt-writing helper.
+  - Invent or assume new event / receipt types without explicit instruction and corresponding schema updates.
+  - Implicitly assign actor or issued_by to domain.null, domain.terra, or domain.root unless there is a documented pattern.
 
-=== Validation ===
-- Compile with no errors.
-- Bootstrap must produce phase_9d.log containing:
-  [phase_9d] receipts total=<N> orphaned=<M>
-- curl -s http://localhost:8080/api/receipts/list | jq  returns JSON array.
+- Error handling:
+  - If any step fails (invalid token, domain creation failure, receipt failure), the transaction MUST be rolled back and an error returned.
+  - Do NOT partially create a domain or partial receipts on failure.
 
-# end of Phase 9D
+# =========================================================
+# LAYERING & ARCHITECTURE RULES
+# =========================================================
+
+- Layer boundaries:
+  - API handlers → call services/core helpers → which call authority/identity/domain layers → which use DB.
+  - Identity code must NOT bypass domain/authority layers to talk to DB directly for core invariants (domains, receipts) unless you are explicitly implementing those layers.
+  - High-level logic (handlers, identity orchestration, etc.) should express intent; low-level helpers actually perform DB operations.
+
+- When adding new helpers:
+  - Prefer narrow, well-named helpers that reflect domain concepts:
+    - e.g. CreateCorporealDomainFromSubject, ResolveInviteSubject, RecordLoginReceipt.
+  - Ensure helpers themselves respect the no-raw-INSERT rule for domains and receipts and use canonical sub-helpers.
+
+# =========================================================
+# WHEN UNSURE
+# =========================================================
+
+- If you are unsure about:
+  - Terra/Root/Null semantics,
+  - which layer a new function belongs to,
+  - the correct parent domain for an operation,
+  - the canonical schema for a table,
+  - or the proper receipt type / structure,
+- THEN:
+  - Stop and ASK THE USER for clarification before generating or modifying code.
+
+
+
+

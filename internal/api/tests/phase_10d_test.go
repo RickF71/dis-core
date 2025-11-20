@@ -21,7 +21,8 @@ func TestPhase10DEndpoints(t *testing.T) {
 	router.Get("/api/authority/schema/domain/{id}", server.GetAuthoritySchemaForDomain)
 	router.Get("/api/authority/schema/domain/{id}/json", server.GetAuthoritySchemaForDomain)
 	router.Get("/api/authority/schema/domain/{id}/text", server.GetAuthoritySchemaForDomain)
-	router.Post("/api/authority/schema/validate", server.HandleSchemaValidation)
+	// Allow the handler to receive other methods so it can return Method Not Allowed body
+	router.Handle("/api/authority/schema/validate", http.HandlerFunc(server.HandleSchemaValidation))
 
 	tests := []struct {
 		name           string

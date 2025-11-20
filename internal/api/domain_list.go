@@ -21,9 +21,13 @@ type DomainSummary struct {
 // GET /api/domains — Returns all known domains (JSON list)
 // ------------------------------------------------------------
 func (s *Server) handleDomainList(w http.ResponseWriter, r *http.Request) {
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 
-	rows, err := s.DB().Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT
 			id::text AS id,
 			name,

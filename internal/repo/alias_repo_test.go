@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"dis-core/internal/domain"
+	"dis-core/internal/testdb"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,16 +13,7 @@ import (
 
 // GOV-12: Alias Canon & DSCI Integration - Repository Tests
 
-// setupTestDB creates a test database connection
-func setupTestDB(t *testing.T) *pgxpool.Pool {
-	ctx := context.Background()
-	dsn := "postgres://dis_user:card567@localhost:5432/dis?sslmode=disable"
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Skipf("Skipping test: cannot connect to test database: %v", err)
-	}
-	return pool
-}
+// Tests should use the centralized testdb harness.
 
 // setupTestDomains creates test domains for alias testing
 func setupTestDomains(t *testing.T, pool *pgxpool.Pool) (ownerID, targetID uuid.UUID) {
@@ -54,7 +46,8 @@ func cleanupAliases(t *testing.T, pool *pgxpool.Pool, aliasIDs ...uuid.UUID) {
 }
 
 func TestCreateAlias(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -101,7 +94,8 @@ func TestCreateAlias(t *testing.T) {
 }
 
 func TestCreateAliasUniqueConstraint(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -141,7 +135,8 @@ func TestCreateAliasUniqueConstraint(t *testing.T) {
 }
 
 func TestRetireAlias(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -191,7 +186,8 @@ func TestRetireAlias(t *testing.T) {
 }
 
 func TestGetAliasesForOwner(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -257,7 +253,8 @@ func TestGetAliasesForOwner(t *testing.T) {
 }
 
 func TestGetAliasesByType(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -333,7 +330,8 @@ func TestGetAliasesByType(t *testing.T) {
 }
 
 func TestGetCorporealAutoAlias(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -375,7 +373,8 @@ func TestGetCorporealAutoAlias(t *testing.T) {
 }
 
 func TestFindActiveAliasByName(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()
@@ -444,7 +443,8 @@ func TestGenerateMaskName(t *testing.T) {
 }
 
 func TestRetireAliasAllowsReuse(t *testing.T) {
-	pool := setupTestDB(t)
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
 	defer pool.Close()
 
 	ctx := context.Background()

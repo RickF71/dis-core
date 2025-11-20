@@ -6,6 +6,7 @@ import (
 
 	"dis-core/cmd/dis-core/bootstrap"
 	"dis-core/cmd/dis-core/service"
+	coreauth "dis-core/internal/core/authority"
 	logutil "dis-core/internal/log"
 	"dis-core/internal/policy"
 )
@@ -61,8 +62,12 @@ func main() {
 		log.Fatalf("failed to initialize authority console: %v", err)
 	}
 
+	// Initialize the new core authority engine and pass it into the daemon
+	authorityCfg := &coreauth.Config{}
+	authorityEngine := coreauth.NewEngine(authorityCfg, dbComponents.Database)
+
 	// Start daemon service with graceful shutdown
-	if err := service.StartDaemon(config, dbComponents.Database, policyEngine, console); err != nil {
+	if err := service.StartDaemon(config, dbComponents.Database, policyEngine, console, authorityEngine); err != nil {
 		log.Fatalf("daemon error: %v", err)
 	}
 }

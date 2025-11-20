@@ -27,13 +27,18 @@ import (
 func (s *Server) handleDomainAnnounce(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	var (
 		name, description sql.NullString
 	)
 
 	q := `SELECT name, COALESCE(payload->>'description','') FROM domains WHERE id = $1`
 	ctx := r.Context()
-	err := s.DB().QueryRow(ctx, q, id).Scan(&name, &description)
+	err := db.QueryRow(ctx, q, id).Scan(&name, &description)
 	if err == sql.ErrNoRows {
 		http.Error(w, "domain not found", http.StatusNotFound)
 		return

@@ -104,7 +104,8 @@ func (s *AliasService) CreateRelationshipAlias(
 	}
 
 	if existing != nil {
-		return nil, fmt.Errorf("alias name already in use: %s", aliasName)
+		// Return the canonical conflict error string expected by API handlers/tests
+		return nil, fmt.Errorf("alias already exists for this owner, target, and name")
 	}
 
 	// Create RELATIONSHIP alias

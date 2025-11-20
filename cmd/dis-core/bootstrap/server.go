@@ -6,6 +6,7 @@ import (
 
 	"dis-core/internal/api"
 	"dis-core/internal/api/server"
+	coreauth "dis-core/internal/core/authority"
 	"dis-core/internal/ledger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,7 +20,7 @@ type ServerComponents struct {
 }
 
 // InitializeHTTPServer creates and configures the HTTP API server
-func InitializeHTTPServer(database *pgxpool.Pool, ledger *ledger.Ledger, config *Config) (*ServerComponents, error) {
+func InitializeHTTPServer(database *pgxpool.Pool, ledger *ledger.Ledger, config *Config, engine *coreauth.Engine) (*ServerComponents, error) {
 	log.Printf("🚀 DIS-Core %s starting on http://%s", config.Version, config.Address())
 
 	// Initialize policy engine
@@ -30,13 +31,13 @@ func InitializeHTTPServer(database *pgxpool.Pool, ledger *ledger.Ledger, config 
 		policyComponents = nil
 	}
 
-	// Create API server with policy engine
+	// Create API server with policy engine and the core authority engine
 	var srv *api.Server
 	if policyComponents != nil {
-		srv = api.NewWithPolicy(database, ledger, policyComponents.Engine)
+		srv = api.NewWithPolicy(database, ledger, policyComponents.Engine, engine)
 		log.Println("✅ API server initialized with policy engine")
 	} else {
-		srv = api.New(database, ledger)
+		srv = api.New(database, ledger, engine)
 		log.Println("✅ API server initialized without policy engine")
 	}
 

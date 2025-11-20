@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // DomainPolicy represents a policy associated with a domain
@@ -40,18 +41,16 @@ func (s *Server) GetDomainPolicy(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// Query policies for the domain (only if database is available)
-	var policies []DomainPolicy
-	var err error
+	// Prefer database-backed policies when present, but allow
+	// filesystem-only operation when DB is not configured. Use s.DB()
+	// (nil-safe) instead of requireDB which would write a 503.
+	db := s.DB()
 
-	if s.db != nil {
-		policies, err = s.getDomainPolicies(ctx, domainID)
-	}
-
-	if s.db == nil || err != nil {
-		// Return empty array for testing or if no database
+	policies, err := s.getDomainPolicies(ctx, db, domainID)
+	if err != nil {
 		policies = []DomainPolicy{}
-	} // Format-specific response
+	}
+	// Format-specific response
 	switch format {
 	case FormatJSON:
 		w.Header().Set("Content-Type", "application/json")
@@ -80,7 +79,7 @@ func (s *Server) GetDomainPolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 // getDomainPolicies queries the policies table filtered by domain_id
-func (s *Server) getDomainPolicies(ctx context.Context, domainID string) ([]DomainPolicy, error) {
+func (s *Server) getDomainPolicies(ctx context.Context, db *pgxpool.Pool, domainID string) ([]DomainPolicy, error) {
 	query := `
 		SELECT id, name, COALESCE(version, '1.0') as version,
 		       domain_id, COALESCE(policy_type, 'unknown') as policy_type,
@@ -90,7 +89,13 @@ func (s *Server) getDomainPolicies(ctx context.Context, domainID string) ([]Doma
 		ORDER BY name, version
 	`
 
-	rows, err := s.db.Query(ctx, query, domainID)
+	if db == nil {
+		// No DB configured: return empty policy list (filesystem-only callers
+		// should use alternative logic). This avoids panics when db is nil.
+		return []DomainPolicy{}, nil
+	}
+
+	rows, err := db.Query(ctx, query, domainID)
 	if err != nil {
 		// If policies table doesn't exist or query fails, return empty array
 		return []DomainPolicy{}, nil
@@ -122,8 +127,14 @@ func (s *Server) GetDomainPolicyInherited(w http.ResponseWriter, r *http.Request
 
 	ctx := r.Context()
 
+	// Require DB for lineage lookup
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Get domain lineage
-	lineage, err := s.getDomainLineage(ctx, domainID)
+	lineage, err := s.getDomainLineage(ctx, db, domainID)
 	if err != nil {
 		JSONError(w, http.StatusInternalServerError, "Failed to get domain lineage")
 		return
@@ -133,7 +144,7 @@ func (s *Server) GetDomainPolicyInherited(w http.ResponseWriter, r *http.Request
 	var inheritedPolicies []string
 	for i := len(lineage) - 1; i > 0; i-- { // Start from root, skip current domain
 		parentID := lineage[i]
-		policy, err := s.getDomainRegoPolicy(ctx, parentID)
+		policy, err := s.getDomainRegoPolicy(ctx, db, parentID)
 		if err == nil && policy != "" {
 			inheritedPolicies = append(inheritedPolicies, fmt.Sprintf("# Policy from domain: %s\n%s", parentID, policy))
 		}
@@ -159,7 +170,12 @@ func (s *Server) GetDomainPolicyCurrent(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	policy, err := s.getDomainRegoPolicy(ctx, domainID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	policy, err := s.getDomainRegoPolicy(ctx, db, domainID)
 	if err != nil {
 		JSONError(w, http.StatusNotFound, "Policy not found")
 		return
@@ -174,8 +190,8 @@ func (s *Server) GetDomainPolicyCurrent(w http.ResponseWriter, r *http.Request) 
 }
 
 // getDomainLineage returns the chain of domain IDs from current up to null
-func (s *Server) getDomainLineage(ctx context.Context, domainID string) ([]string, error) {
-	if s.db == nil {
+func (s *Server) getDomainLineage(ctx context.Context, db *pgxpool.Pool, domainID string) ([]string, error) {
+	if db == nil {
 		return []string{domainID}, nil
 	}
 
@@ -186,7 +202,7 @@ func (s *Server) getDomainLineage(ctx context.Context, domainID string) ([]strin
 		lineage = append(lineage, currentID)
 
 		var parentID *string
-		err := s.db.QueryRow(ctx, "SELECT parent_id FROM domains WHERE id = $1", currentID).Scan(&parentID)
+		err := db.QueryRow(ctx, "SELECT parent_id FROM domains WHERE id = $1", currentID).Scan(&parentID)
 		if err != nil || parentID == nil {
 			break
 		}
@@ -197,13 +213,13 @@ func (s *Server) getDomainLineage(ctx context.Context, domainID string) ([]strin
 }
 
 // getDomainRegoPolicy fetches the Rego policy content for a specific domain
-func (s *Server) getDomainRegoPolicy(ctx context.Context, domainID string) (string, error) {
-	if s.db == nil {
+func (s *Server) getDomainRegoPolicy(ctx context.Context, db *pgxpool.Pool, domainID string) (string, error) {
+	if db == nil {
 		return "", fmt.Errorf("database not available")
 	}
 
 	var policy string
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(payload->'policy'->>'content', '')
 		FROM domains
 		WHERE id = $1

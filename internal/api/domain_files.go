@@ -29,8 +29,14 @@ func (s *Server) handleDomainFiles(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Require DB
+	dbPool := s.requireDB(w)
+	if dbPool == nil {
+		return
+	}
+
 	// Get files using the DB helper
-	fileNames, err := db.ListFilesForDomain(ctx, s.db, domainID)
+	fileNames, err := db.ListFilesForDomain(ctx, dbPool, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -79,8 +85,13 @@ func (s *Server) handleDomainFilesFormatAware(w http.ResponseWriter, r *http.Req
 
 	ctx := r.Context()
 
+	dbPool := s.requireDB(w)
+	if dbPool == nil {
+		return
+	}
+
 	// Get files using the DB helper
-	fileNames, err := db.ListFilesForDomain(ctx, s.db, domainID)
+	fileNames, err := db.ListFilesForDomain(ctx, dbPool, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:

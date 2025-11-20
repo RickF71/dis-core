@@ -86,8 +86,14 @@ func (s *Server) HandleGetDomainAliases(w http.ResponseWriter, r *http.Request) 
 	includeRetired := r.URL.Query().Get("includeRetired") == "true"
 	typeFilter := r.URL.Query().Get("type")
 
+	// Ensure DB is available
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Create alias service (lazy initialization pattern)
-	aliasRepo := repo.NewAliasRepository(s.db)
+	aliasRepo := repo.NewAliasRepository(db)
 	aliasService := services.NewAliasService(aliasRepo)
 
 	// Retrieve aliases
@@ -184,8 +190,14 @@ func (s *Server) HandleCreateRelationshipAlias(w http.ResponseWriter, r *http.Re
 	// This should follow the same pattern as other domain-scoped endpoints.
 	// For now, we allow the operation (development phase).
 
+	// Ensure DB is available
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Create alias service
-	aliasRepo := repo.NewAliasRepository(s.db)
+	aliasRepo := repo.NewAliasRepository(db)
 	aliasService := services.NewAliasService(aliasRepo)
 
 	// Create RELATIONSHIP alias
@@ -269,8 +281,14 @@ func (s *Server) HandleCreateMaskAlias(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Authorization check - verify caller has authority to create mask for owner domain
 
+	// Ensure DB is available
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Create alias service
-	aliasRepo := repo.NewAliasRepository(s.db)
+	aliasRepo := repo.NewAliasRepository(db)
 	aliasService := services.NewAliasService(aliasRepo)
 
 	// Create MASK alias

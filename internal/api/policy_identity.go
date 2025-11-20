@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // IdentityPolicyResponse represents the effective identity policy for a domain
@@ -44,7 +45,12 @@ func (s *Server) handleGetIdentityPolicy(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	policy, err := s.getIdentityPolicy(ctx, domainID)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	policy, err := s.getIdentityPolicy(ctx, db, domainID)
 	if err != nil {
 		s.logger.Printf("Error fetching identity policy for domain %s: %v", domainID, err)
 		http.Error(w, fmt.Sprintf("failed to fetch identity policy: %v", err), http.StatusInternalServerError)
@@ -56,11 +62,11 @@ func (s *Server) handleGetIdentityPolicy(w http.ResponseWriter, r *http.Request)
 }
 
 // getIdentityPolicy fetches and merges identity policy for a domain
-func (s *Server) getIdentityPolicy(ctx context.Context, domainID string) (*IdentityPolicyResponse, error) {
+func (s *Server) getIdentityPolicy(ctx context.Context, db *pgxpool.Pool, domainID string) (*IdentityPolicyResponse, error) {
 	// Fetch domain info
 	var domainName, parentID string
 	var updatedAt time.Time
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT name, parent_id, updated_at
 		FROM domains
 		WHERE id = $1
@@ -70,7 +76,7 @@ func (s *Server) getIdentityPolicy(ctx context.Context, domainID string) (*Ident
 	}
 
 	// Fetch local identity policy from domain payload
-	localPolicy, err := s.getDomainIdentityPolicy(ctx, domainID)
+	localPolicy, err := s.getDomainIdentityPolicy(ctx, db, domainID)
 	if err != nil {
 		s.logger.Printf("Warning: failed to fetch local identity policy for %s: %v", domainID, err)
 		localPolicy = make(map[string]interface{})
@@ -81,13 +87,13 @@ func (s *Server) getIdentityPolicy(ctx context.Context, domainID string) (*Ident
 
 	// If domain has a parent, fetch parent's identity policy
 	if parentID != "" {
-		parentPolicy, err := s.getDomainIdentityPolicy(ctx, parentID)
+		parentPolicy, err := s.getDomainIdentityPolicy(ctx, db, parentID)
 		if err != nil {
 			s.logger.Printf("Warning: failed to fetch parent identity policy for %s: %v", parentID, err)
 		} else {
 			// Fetch parent domain name
 			var parentName string
-			err := s.db.QueryRow(ctx, "SELECT name FROM domains WHERE id = $1", parentID).Scan(&parentName)
+			err := db.QueryRow(ctx, "SELECT name FROM domains WHERE id = $1", parentID).Scan(&parentName)
 			if err == nil {
 				// Compute parent policy digest
 				parentDigest := computePolicyDigest(parentPolicy)
@@ -129,9 +135,9 @@ func (s *Server) getIdentityPolicy(ctx context.Context, domainID string) (*Ident
 }
 
 // getDomainIdentityPolicy extracts identity policy from domain payload
-func (s *Server) getDomainIdentityPolicy(ctx context.Context, domainID string) (map[string]interface{}, error) {
+func (s *Server) getDomainIdentityPolicy(ctx context.Context, db *pgxpool.Pool, domainID string) (map[string]interface{}, error) {
 	var payloadJSON []byte
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT payload
 		FROM domains
 		WHERE id = $1

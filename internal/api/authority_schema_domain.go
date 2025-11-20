@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"
 
 	"dis-core/internal/receipts"
@@ -16,13 +17,13 @@ import (
 
 // DomainSchemaAggregate represents the aggregated schema and policy data for a domain
 type DomainSchemaAggregate struct {
-	DomainRef        string                           `json:"domain_ref"`
-	Timestamp        string                           `json:"timestamp"`
-	Schema           interface{}                      `json:"schema"`
-	Policies         interface{}                      `json:"policies"`
-	PolicyCount      int                              `json:"policy_count"`
-	PolicyContinuity *receipts.PolicyContinuityResult `json:"policy_continuity,omitempty"`
-	ReceiptStats     *receipts.DomainReceiptStats     `json:"receipt_stats,omitempty"`
+	DomainRef        string                           `json:"domain_ref" yaml:"domain_ref"`
+	Timestamp        string                           `json:"timestamp" yaml:"timestamp"`
+	Schema           interface{}                      `json:"schema" yaml:"schema"`
+	Policies         interface{}                      `json:"policies" yaml:"policies"`
+	PolicyCount      int                              `json:"policy_count" yaml:"policy_count"`
+	PolicyContinuity *receipts.PolicyContinuityResult `json:"policy_continuity,omitempty" yaml:"policy_continuity,omitempty"`
+	ReceiptStats     *receipts.DomainReceiptStats     `json:"receipt_stats,omitempty" yaml:"receipt_stats,omitempty"`
 }
 
 // GetAuthoritySchemaForDomain handles GET /api/authority/schema/domain/{id}
@@ -45,8 +46,12 @@ func (s *Server) GetAuthoritySchemaForDomain(w http.ResponseWriter, r *http.Requ
 
 	ctx := r.Context()
 
+	// Use DB if available for aggregated authority schema endpoints;
+	// allow filesystem-only operation when no DB is configured (nil-safe).
+	db := s.DB()
+
 	// Aggregate data from Phase 10C endpoints
-	aggregate, err := s.aggregateDomainSchemaData(ctx, domainID)
+	aggregate, err := s.aggregateDomainSchemaData(ctx, db, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -80,7 +85,7 @@ func (s *Server) GetAuthoritySchemaForDomain(w http.ResponseWriter, r *http.Requ
 }
 
 // aggregateDomainSchemaData fetches and combines data from Phase 10C endpoints
-func (s *Server) aggregateDomainSchemaData(ctx context.Context, domainID string) (*DomainSchemaAggregate, error) {
+func (s *Server) aggregateDomainSchemaData(ctx context.Context, db *pgxpool.Pool, domainID string) (*DomainSchemaAggregate, error) {
 	timestamp := time.Now().UTC().Format(time.RFC3339)
 
 	aggregate := &DomainSchemaAggregate{
@@ -93,50 +98,38 @@ func (s *Server) aggregateDomainSchemaData(ctx context.Context, domainID string)
 
 	// Fetch schema data using the same logic as GetDomainSchema
 	var schemaData map[string]interface{}
-	if s.db != nil {
-		var err error
-		schemaData, err = s.getDomainSchemaFromDB(ctx, domainID)
-		if err != nil {
-			// Try filesystem fallback
-			schemaData = s.getDomainSchemaFromFS(domainID)
-		}
-	} else {
-		// For testing with nil database, use filesystem fallback
+	var err error
+	schemaData, err = s.getDomainSchemaFromDB(ctx, db, domainID)
+	if err != nil {
+		// Try filesystem fallback
 		schemaData = s.getDomainSchemaFromFS(domainID)
 	}
 	aggregate.Schema = schemaData
 
 	// Fetch policy data using the same logic as GetDomainPolicy
-	if s.db != nil {
-		policies, err := s.getDomainPolicies(ctx, domainID)
-		if err != nil {
-			// Use empty policies for missing domains or database errors
-			aggregate.Policies = []interface{}{}
-			aggregate.PolicyCount = 0
-		} else {
-			// Convert policies to interface{} for JSON marshaling
-			policyInterfaces := make([]interface{}, len(policies))
-			for i, policy := range policies {
-				policyInterfaces[i] = policy
-			}
-			aggregate.Policies = policyInterfaces
-			aggregate.PolicyCount = len(policies)
-		}
-	} else {
-		// For testing with nil database, use empty policies
+	policies, err := s.getDomainPolicies(ctx, db, domainID)
+	if err != nil {
+		// Use empty policies for missing domains or database errors
 		aggregate.Policies = []interface{}{}
 		aggregate.PolicyCount = 0
+	} else {
+		// Convert policies to interface{} for JSON marshaling
+		policyInterfaces := make([]interface{}, len(policies))
+		for i, policy := range policies {
+			policyInterfaces[i] = policy
+		}
+		aggregate.Policies = policyInterfaces
+		aggregate.PolicyCount = len(policies)
 	}
 
-	// Phase 10D: Add policy continuity data
-	if s.db != nil {
-		// Get policy continuity data for this domain
-		if continuityResult, err := receipts.VerifyPolicyContinuity(ctx, s.db, domainID); err == nil {
+	// Phase 10D: Add policy continuity data (only if DB is available)
+	if db != nil {
+		if continuityResult, err := receipts.VerifyPolicyContinuity(ctx, db, domainID); err == nil {
 			aggregate.PolicyContinuity = &continuityResult
 		}
 
 		// Get receipt statistics for this domain
-		if receiptStats, err := receipts.GetDomainReceiptStats(ctx, s.db, domainID); err == nil {
+		if receiptStats, err := receipts.GetDomainReceiptStats(ctx, db, domainID); err == nil {
 			aggregate.ReceiptStats = &receiptStats
 		}
 	}

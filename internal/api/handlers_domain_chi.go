@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // handleGetDomainChi handles GET /api/domain/{id} with format support
@@ -29,7 +30,12 @@ func (s *Server) handleGetDomainChi(w http.ResponseWriter, r *http.Request) {
 
 	// Get domain data using existing logic
 	ctx := r.Context()
-	domain, err := s.getDomainByID(ctx, domainID)
+	// Ensure DB is present for domain lookup
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+	domain, err := s.getDomainByID(ctx, db, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -59,8 +65,14 @@ func (s *Server) handleDomainListChi(w http.ResponseWriter, r *http.Request) {
 	format := DetectFormat(r)
 	ctx := r.Context()
 
+	// Ensure DB is present for domain listing
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Get domains using existing logic
-	domains, err := s.getAllDomains(ctx)
+	domains, err := s.getAllDomains(ctx, db)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -106,8 +118,14 @@ func (s *Server) handleDomainCSSChi(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Ensure DB is available before querying domain CSS
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Get CSS content using existing logic
-	css, err := s.getDomainCSS(ctx, domainID)
+	css, err := s.getDomainCSS(ctx, db, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:
@@ -150,6 +168,12 @@ func (s *Server) handleCreateDomainFormatAware(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Ensure DB is present for creation
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Delegate to existing handler and convert response
 	s.handleCreateDomain(w, r)
 }
@@ -159,6 +183,12 @@ func (s *Server) handleUpdateDomainFormatAware(w http.ResponseWriter, r *http.Re
 	// Domain updates are JSON-only for now
 	if r.Header.Get("Content-Type") != "application/json" {
 		JSONError(w, http.StatusBadRequest, "content-type must be application/json")
+		return
+	}
+
+	// Ensure DB is present for updates
+	db := s.requireDB(w)
+	if db == nil {
 		return
 	}
 
@@ -203,13 +233,14 @@ func (s *Server) handleUpdateDomainCSSFormatAware(w http.ResponseWriter, r *http
 // Helper methods that integrate with existing domain logic
 
 // getDomainByID retrieves domain data by ID
-func (s *Server) getDomainByID(ctx context.Context, domainID string) (map[string]any, error) {
+// getDomainByID retrieves domain data by ID
+func (s *Server) getDomainByID(ctx context.Context, db *pgxpool.Pool, domainID string) (map[string]any, error) {
 	var id, name string
 	var parentID *string
 	var createdAt, updatedAt time.Time
 	var payload, policy, act, files interface{}
 
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT id, name, parent_id, created_at, updated_at, payload, policy, act, files
 		FROM domains
 		WHERE id = $1
@@ -247,8 +278,10 @@ func (s *Server) getDomainByID(ctx context.Context, domainID string) (map[string
 
 // getAllDomains retrieves all domains with detailed information
 // GOV-6: Enhanced to return full domain manifest for unified listing endpoints
-func (s *Server) getAllDomains(ctx context.Context) ([]map[string]any, error) {
-	rows, err := s.db.Query(ctx, `
+// getAllDomains retrieves all domains with detailed information
+// GOV-6: Enhanced to return full domain manifest for unified listing endpoints
+func (s *Server) getAllDomains(ctx context.Context, db *pgxpool.Pool) ([]map[string]any, error) {
+	rows, err := db.Query(ctx, `
 		SELECT id, name, parent_id, created_at, updated_at, payload
 		FROM domains
 		ORDER BY name ASC
@@ -297,10 +330,11 @@ func (s *Server) getAllDomains(ctx context.Context) ([]map[string]any, error) {
 }
 
 // getDomainCSS retrieves CSS for a domain
-func (s *Server) getDomainCSS(ctx context.Context, domainID string) (string, error) {
+// getDomainCSS retrieves CSS for a domain
+func (s *Server) getDomainCSS(ctx context.Context, db *pgxpool.Pool, domainID string) (string, error) {
 	// Phase 10J.4: Query payload->css->content from unified structure
 	var cssContent string
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(payload->'css'->>'content', '')
 		FROM domains
 		WHERE id = $1::uuid
@@ -336,8 +370,14 @@ func (s *Server) handleDomainCSSFormatAware(w http.ResponseWriter, r *http.Reque
 
 	ctx := r.Context()
 
+	// Ensure DB is available before querying domain CSS
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Get CSS content using existing logic
-	css, err := s.getDomainCSS(ctx, domainID)
+	css, err := s.getDomainCSS(ctx, db, domainID)
 	if err != nil {
 		switch format {
 		case FormatJSON:

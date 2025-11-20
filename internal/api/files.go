@@ -43,8 +43,12 @@ func (s *Server) handleListFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
-	rows, err := s.DB().Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT id, rel_path, filename,
 		       octet_length(content) AS size,
 		       COALESCE(exported_to, '') AS exported_to,
@@ -107,13 +111,18 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		ctx := r.Context()
 		var filename, relPath string
 		var content []byte
 
-		if err := s.DB().QueryRow(ctx, `
+		if err := db.QueryRow(ctx, `
 			SELECT filename, rel_path, content
 			FROM bootstrap_files WHERE id = $1
 		`, id).Scan(&filename, &relPath, &content); err != nil {
@@ -155,7 +164,7 @@ func (s *Server) handleFileByID(w http.ResponseWriter, r *http.Request) {
 			decoded = body
 		}
 
-		_, err = s.DB().Exec(ctx, `UPDATE bootstrap_files SET content = $1 WHERE id = $2`, decoded, id)
+		_, err = db.Exec(ctx, `UPDATE bootstrap_files SET content = $1 WHERE id = $2`, decoded, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -187,8 +196,12 @@ func (s *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	like := "%" + strings.ToLower(query) + "%"
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
-	rows, err := s.DB().Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT id, rel_path, filename,
 		       octet_length(content) AS size,
 		       COALESCE(exported_to, '') AS exported_to,
@@ -269,6 +282,10 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 	var result pgconn.CommandTag
 	var err error
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	if len(req.IDs) > 0 {
 		// Batch update by IDs
 		placeholders := make([]string, len(req.IDs))
@@ -284,10 +301,10 @@ func (s *Server) handleFileExport(w http.ResponseWriter, r *http.Request) {
 			SET exported_to = $%d, exported_at = NOW()
 			WHERE id IN (%s) AND exported_to IS NULL
 		`, len(args), strings.Join(placeholders, ","))
-		result, err = s.DB().Exec(ctx, q, args...)
+		result, err = db.Exec(ctx, q, args...)
 	} else {
 		// Single update by rel_path
-		result, err = s.DB().Exec(ctx, `
+		result, err = db.Exec(ctx, `
 			UPDATE bootstrap_files
 			SET exported_to = $1, exported_at = NOW()
 			WHERE rel_path = $2 AND exported_to IS NULL

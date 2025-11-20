@@ -6,6 +6,7 @@ import (
 	"dis-core/internal/api/server"
 	"dis-core/internal/bootstrap"
 	"dis-core/internal/config"
+	coreauth "dis-core/internal/core/authority"
 	"dis-core/internal/db"
 	"dis-core/internal/ledger"
 	"dis-core/internal/schema"
@@ -78,7 +79,9 @@ func Run() error {
 	addr := fmt.Sprintf("%s:%s", host, port)
 	log.Printf("🚀 DIS-Core %s starting on http://%s", version, addr)
 
-	srv := api.New(database, led) // Use the main api package
+	// Create a minimal authority engine for local runs
+	authEngine := coreauth.NewEngine(&coreauth.Config{}, database)
+	srv := api.New(database, led, authEngine) // Use the main api package
 
 	handler := server.WithCORS(srv.Handler()) // Use Handler() method
 

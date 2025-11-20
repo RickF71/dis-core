@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // handleGetIdentitySchema returns the schema set for a domain
@@ -24,7 +25,12 @@ func (s *Server) handleGetIdentitySchema(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resolver := identity.NewSchemaResolver(s.db)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	resolver := identity.NewSchemaResolver(db)
 	schemaSet, err := resolver.ResolveSchemaSet(ctx, domainID)
 	if err != nil {
 		s.logger.Printf("Error resolving schema set for domain %s: %v", domainID, err)
@@ -65,8 +71,13 @@ func (s *Server) handleAdoptSchema(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Check compatibility
-	resolver := identity.NewSchemaResolver(s.db)
+	resolver := identity.NewSchemaResolver(db)
 	if err := resolver.CheckSchemaCompatibility(ctx, domainID, req.SchemaID, req.SchemaVersion); err != nil {
 		s.logger.Printf("Schema compatibility check failed for %s: %v", domainID, err)
 		http.Error(w, fmt.Sprintf("schema incompatible: %v", err), http.StatusConflict)
@@ -79,7 +90,7 @@ func (s *Server) handleAdoptSchema(w http.ResponseWriter, r *http.Request) {
 		adoptedBy = &req.ActorID
 	}
 
-	err := s.db.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		INSERT INTO domain_schemas (domain_id, schema_id, schema_version, adopted_by, adopted_at)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (domain_id, schema_id, schema_version) DO NOTHING
@@ -168,7 +179,12 @@ func (s *Server) handleSaveIdentityPolicy(w http.ResponseWriter, r *http.Request
 	}
 
 	// Load effective schema
-	resolver := identity.NewSchemaResolver(s.db)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	resolver := identity.NewSchemaResolver(db)
 	schemaSet, err := resolver.ResolveSchemaSet(ctx, domainID)
 	if err != nil {
 		s.logger.Printf("Error resolving schema set for domain %s: %v", domainID, err)
@@ -218,14 +234,14 @@ func (s *Server) handleSaveIdentityPolicy(w http.ResponseWriter, r *http.Request
 	}
 
 	// Save policy to domain payload
-	if err := s.saveLocalIdentityPolicy(ctx, domainID, req.Policy); err != nil {
+	if err := s.saveLocalIdentityPolicy(ctx, db, domainID, req.Policy); err != nil {
 		s.logger.Printf("Error saving policy for domain %s: %v", domainID, err)
 		http.Error(w, fmt.Sprintf("failed to save policy: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	// Compute effective policy (merge parent + local with shadowing)
-	effectivePolicy, err := s.computeEffectiveIdentityPolicy(ctx, domainID)
+	effectivePolicy, err := s.computeEffectiveIdentityPolicy(ctx, db, domainID)
 	if err != nil {
 		s.logger.Printf("Warning: failed to compute effective policy: %v", err)
 		effectivePolicy = req.Policy // Fallback to local only
@@ -278,10 +294,10 @@ func (s *Server) handleSaveIdentityPolicy(w http.ResponseWriter, r *http.Request
 }
 
 // saveLocalIdentityPolicy saves the local identity policy to domain payload
-func (s *Server) saveLocalIdentityPolicy(ctx context.Context, domainID string, policy map[string]interface{}) error {
+func (s *Server) saveLocalIdentityPolicy(ctx context.Context, db *pgxpool.Pool, domainID string, policy map[string]interface{}) error {
 	// Fetch current payload
 	var payloadJSON []byte
-	err := s.db.QueryRow(ctx, "SELECT payload FROM domains WHERE id = $1", domainID).Scan(&payloadJSON)
+	err := db.QueryRow(ctx, "SELECT payload FROM domains WHERE id = $1", domainID).Scan(&payloadJSON)
 	if err != nil {
 		return fmt.Errorf("domain not found: %w", err)
 	}
@@ -304,7 +320,7 @@ func (s *Server) saveLocalIdentityPolicy(ctx context.Context, domainID string, p
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	_, err = s.db.Exec(ctx, `
+	_, err = db.Exec(ctx, `
 		UPDATE domains
 		SET payload = $1, updated_at = $2
 		WHERE id = $3
@@ -317,22 +333,22 @@ func (s *Server) saveLocalIdentityPolicy(ctx context.Context, domainID string, p
 }
 
 // computeEffectiveIdentityPolicy computes merged effective policy with parent inheritance
-func (s *Server) computeEffectiveIdentityPolicy(ctx context.Context, domainID string) (map[string]interface{}, error) {
+func (s *Server) computeEffectiveIdentityPolicy(ctx context.Context, db *pgxpool.Pool, domainID string) (map[string]interface{}, error) {
 	// Get local policy
-	localPolicy, err := s.getDomainIdentityPolicy(ctx, domainID)
+	localPolicy, err := s.getDomainIdentityPolicy(ctx, db, domainID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get parent policy
 	var parentID string
-	err = s.db.QueryRow(ctx, "SELECT parent_id FROM domains WHERE id = $1", domainID).Scan(&parentID)
+	err = db.QueryRow(ctx, "SELECT parent_id FROM domains WHERE id = $1", domainID).Scan(&parentID)
 	if err != nil || parentID == "" {
 		// No parent, return local only
 		return localPolicy, nil
 	}
 
-	parentPolicy, err := s.getDomainIdentityPolicy(ctx, parentID)
+	parentPolicy, err := s.getDomainIdentityPolicy(ctx, db, parentID)
 	if err != nil {
 		// Parent has no policy, return local only
 		return localPolicy, nil

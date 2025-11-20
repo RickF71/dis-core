@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,15 +31,18 @@ func (s *Server) GetDomainSchema(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// Try to get schema from database first (only if database is available)
+	// Try to get schema from database first (only if database is available).
+	// Use s.DB() (nil-safe) rather than requireDB which writes a 503 response:
+	// we want to fall back to filesystem when DB isn't configured.
 	var schema map[string]interface{}
 	var err error
 
-	if s.db != nil {
-		schema, err = s.getDomainSchemaFromDB(ctx, domainID)
+	db := s.DB()
+	if db != nil {
+		schema, err = s.getDomainSchemaFromDB(ctx, db, domainID)
 	}
 
-	if s.db == nil || err != nil || schema == nil {
+	if db == nil || err != nil || schema == nil {
 		// Fallback: try filesystem
 		schema = s.getDomainSchemaFromFS(domainID)
 	} // Always return 200 OK even if no schema found (return empty object)
@@ -67,11 +71,16 @@ func (s *Server) GetDomainSchema(w http.ResponseWriter, r *http.Request) {
 }
 
 // getDomainSchemaFromDB queries the domain_schemas table for the schema
-func (s *Server) getDomainSchemaFromDB(ctx context.Context, domainID string) (map[string]interface{}, error) {
+// getDomainSchemaFromDB queries the domain_schemas table for the schema
+func (s *Server) getDomainSchemaFromDB(ctx context.Context, db *pgxpool.Pool, domainID string) (map[string]interface{}, error) {
 	var schemaContent []byte
 	query := `SELECT schema_content FROM domain_schemas WHERE domain_id = $1`
 
-	err := s.db.QueryRow(ctx, query, domainID).Scan(&schemaContent)
+	if db == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+
+	err := db.QueryRow(ctx, query, domainID).Scan(&schemaContent)
 	if err != nil {
 		// Schema not found in database
 		return nil, err

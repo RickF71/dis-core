@@ -27,8 +27,14 @@ func (s *Server) handleProofSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ensure DB present
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Initialize proof synchronizer
-	synchronizer := receipts.NewProofSynchronizer(s.db, "local.domain") // TODO: Get from config
+	synchronizer := receipts.NewProofSynchronizer(db, "local.domain") // TODO: Get from config
 
 	// Perform synchronization
 	response, err := synchronizer.SyncProofs(ctx, syncRequest.SourceDomain, syncRequest.TargetDomain)
@@ -56,8 +62,14 @@ func (s *Server) handleVerifyProof(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ensure DB present
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Initialize proof synchronizer
-	synchronizer := receipts.NewProofSynchronizer(s.db, "local.domain") // TODO: Get from config
+	synchronizer := receipts.NewProofSynchronizer(db, "local.domain") // TODO: Get from config
 
 	// Verify the proof
 	verified, err := synchronizer.VerifyForeignProof(ctx, proofID)
@@ -90,8 +102,14 @@ func (s *Server) handleVerifyProof(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleFederationSummary(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	// Ensure DB present
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
 	// Initialize proof synchronizer
-	synchronizer := receipts.NewProofSynchronizer(s.db, "local.domain") // TODO: Get from config
+	synchronizer := receipts.NewProofSynchronizer(db, "local.domain") // TODO: Get from config
 
 	// Get federation summary
 	summary, err := synchronizer.GetFederationSummary(ctx)
@@ -156,7 +174,12 @@ func (s *Server) handleCreateFederationTrust(w http.ResponseWriter, r *http.Requ
 	`
 
 	trustID := fmt.Sprintf("trust-%s-%s", trustRequest.DomainA, trustRequest.DomainB)
-	_, err := s.db.Exec(ctx, query, trustID, trustRequest.DomainA, trustRequest.DomainB, trustRequest.TrustLevel)
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	_, err := db.Exec(ctx, query, trustID, trustRequest.DomainA, trustRequest.DomainB, trustRequest.TrustLevel)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create trust relationship: %v", err), http.StatusInternalServerError)
 		return

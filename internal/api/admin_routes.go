@@ -81,7 +81,11 @@ func (s *Server) handleRecentReceipts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Query recent receipts from database
-	rows, err := s.DB().Query(ctx, `
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+	rows, err := db.Query(ctx, `
 		SELECT id, type, actor, target, domain, payload, created_at
 		FROM receipts
 		ORDER BY created_at DESC

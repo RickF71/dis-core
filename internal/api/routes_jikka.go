@@ -64,7 +64,13 @@ func (s *Server) handleCreateJikka(w http.ResponseWriter, r *http.Request) {
 // GET /api/jikka/list
 func (s *Server) handleListJikkas(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	rows, err := s.DB().Query(ctx, `SELECT id, participants, type, flows, rules, state, created_at, updated_at FROM jikkas ORDER BY created_at DESC`)
+	// Ensure DB is available for this handler; listing requires a DB.
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
+
+	rows, err := db.Query(ctx, `SELECT id, participants, type, flows, rules, state, created_at, updated_at FROM jikkas ORDER BY created_at DESC`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

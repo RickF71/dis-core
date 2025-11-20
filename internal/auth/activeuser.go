@@ -45,6 +45,16 @@ func GetActiveUser(r *http.Request) *ActiveUser {
 	return user
 }
 
+// GetActiveUserFromCtx retrieves the ActiveUser from a context.Context directly.
+// This is useful for non-HTTP layers (engines) that only have a context.
+func GetActiveUserFromCtx(ctx context.Context) *ActiveUser {
+	user, ok := ctx.Value(activeUserKey).(*ActiveUser)
+	if !ok {
+		return nil
+	}
+	return user
+}
+
 // IsAuthenticated returns true if an external UID is present
 func (u *ActiveUser) IsAuthenticated() bool {
 	return u != nil && u.HasExternalUID

@@ -1,0 +1,28 @@
+{
+  "refactor": {
+    "name": "MOAR X – Reorientation Refactor",
+    "goals": [
+      "Remove global bootstrap governance",
+      "Remove terra/numen/lima triads",
+      "Remove synthetic domain injection",
+      "Introduce minimal bootstrap with domain.null only",
+      "Create Universal Domain Loader",
+      "Shift governance into domain loader",
+      "Add ancestry resolution logic",
+      "Add capability inheritance logic",
+      "Add domain-centric receipt and policy behavior",
+      "Simplify main.go to minimal bootstrap only"
+    ],
+    "sequence": [
+      "Delete GOV-1, GOV-6 bootstrap code",
+      "Delete synthetic domain creation files",
+      "Add EnsureRootDomain()",
+      "Rewrite main.go to minimal form",
+      "Create UniversalDomainLoader.go",
+      "Update policy evaluation to use loader output",
+      "Update identity resolution to use loader ancestry",
+      "Update Finagler endpoints to use domain loader responses",
+      "Run smoke tests"
+    ]
+  }
+}

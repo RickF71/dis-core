@@ -12,6 +12,7 @@ import (
 	"dis-core/internal/receipts"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // AuthorityStatusResponse represents the response for /api/authority/status
@@ -41,21 +42,27 @@ type PolicyEvaluationResponse struct {
 
 // handleAuthoritySchemaPhase7 returns the loaded Authority Console schema for Phase 7
 func (s *Server) handleAuthoritySchemaPhase7(w http.ResponseWriter, r *http.Request) {
-	// Get database from middleware context
-	db := middleware.FromDB(r.Context())
+	// Use DB if available; allow filesystem fallback when DB is not configured
+	db := s.DB()
 
-	if db == nil {
-		http.Error(w, "Database unavailable", http.StatusInternalServerError)
-		return
-	}
+	ctx := r.Context()
 
-	ctx := context.Background()
-
-	// Retrieve schema.json from canon table
+	// Retrieve schema.json from canon table if DB is available, otherwise read from filesystem
 	var content []byte
-	err := db.QueryRow(ctx, "SELECT content FROM canon WHERE type = 'authority.console.schema' LIMIT 1").Scan(&content)
-	if err != nil {
-		// Fallback: try to read from filesystem
+	var err error
+	if db != nil {
+		err = db.QueryRow(ctx, "SELECT content FROM canon WHERE type = 'authority.console.schema' LIMIT 1").Scan(&content)
+		if err != nil {
+			// Fallback: try to read from filesystem
+			schemaPath := "internal/schema/schema.json"
+			content, err = os.ReadFile(schemaPath)
+			if err != nil {
+				http.Error(w, "Schema not found", http.StatusNotFound)
+				return
+			}
+		}
+	} else {
+		// No DB configured - read from filesystem
 		schemaPath := "internal/schema/schema.json"
 		content, err = os.ReadFile(schemaPath)
 		if err != nil {
@@ -75,9 +82,9 @@ func (s *Server) handleAuthoritySchemaPhase7(w http.ResponseWriter, r *http.Requ
 	schemaData["receipts"] = []string{"ci.call.v1", "ci.import.v1"}
 
 	// Phase 10D: Add policy continuity section
-	if s.db != nil {
+	if db != nil {
 		// Get global policy continuity statistics
-		if globalStats, err := s.getGlobalPolicyContinuityStats(context.Background()); err == nil {
+		if globalStats, err := s.getGlobalPolicyContinuityStats(context.Background(), db); err == nil {
 			// Phase 10E: Add risk assessment and threshold information
 			thresholds := receipts.DefaultContinuityThresholds()
 			riskLevel := receipts.GetContinuityRiskLevel(globalStats.ContinuityRate)
@@ -242,26 +249,23 @@ type PolicyContinuityOverview struct {
 }
 
 // getGlobalPolicyContinuityOverview returns a simplified overview of policy continuity
-func (s *Server) getGlobalPolicyContinuityOverview() (PolicyContinuityOverview, error) {
-	ctx := context.Background()
+func (s *Server) getGlobalPolicyContinuityOverview(ctx context.Context, db *pgxpool.Pool) (PolicyContinuityOverview, error) {
 	overview := PolicyContinuityOverview{}
 
-	if s.db == nil {
+	if db == nil {
 		return overview, fmt.Errorf("database not available")
 	}
 
 	// Get total receipts
-	err := s.db.QueryRow(ctx, "SELECT COUNT(*) FROM receipts").Scan(&overview.TotalReceipts)
-	if err != nil {
+	if err := db.QueryRow(ctx, "SELECT COUNT(*) FROM receipts").Scan(&overview.TotalReceipts); err != nil {
 		return overview, fmt.Errorf("failed to count total receipts: %w", err)
 	}
 
 	// Count receipts with valid policy refs
-	err = s.db.QueryRow(ctx, `
+	if err := db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM receipts
 		WHERE policy_ref IS NOT NULL AND policy_ref != ''
-	`).Scan(&overview.ValidRefs)
-	if err != nil {
+	`).Scan(&overview.ValidRefs); err != nil {
 		return overview, fmt.Errorf("failed to count valid refs: %w", err)
 	}
 

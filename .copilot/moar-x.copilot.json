@@ -1,0 +1,25 @@
+{
+  "phase": "MOAR X – Reorientation Edition",
+  "description": "DIS-Core is transitioning from global bootstrap governance to domain-centric sovereignty. Copilot should generate code aligned with the Universal Domain Loader and minimal bootstrap philosophy.",
+  "context_files": [
+    ".copilot/moar-x-architecture.md",
+    ".copilot/domain-loader-guidance.md",
+    ".copilot/bootstrap-removal-rules.md",
+    ".copilot/sovereignty-rules.md",
+    ".copilot/finagler-guidance.md"
+  ],
+  "rules": {
+    "noGlobalDomains": true,
+    "noBootstrapTriads": true,
+    "useUniversalDomainLoader": true,
+    "domainSovereigntyFirst": true,
+    "capabilityInheritanceEnabled": true
+  },
+  "assistant_expectations": {
+    "be_consistent_with_moar_x": true,
+    "explain_loader_based_design": true,
+    "avoid_legacy_bootstrap": true,
+    "suggest_domain_first_patterns": true,
+    "reject_global_governance": true
+  }
+}

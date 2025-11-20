@@ -11,6 +11,10 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	id := r.PathValue("id")
 	var body struct {
@@ -22,7 +26,7 @@ func (s *Server) handleUpdateDomain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Phase 10J.4: Update flattened payload->css->content
-	_, err := s.DB().Exec(ctx, `
+	_, err := db.Exec(ctx, `
 		UPDATE domains
 		SET payload = jsonb_set(
 			payload,

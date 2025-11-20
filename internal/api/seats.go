@@ -84,8 +84,10 @@ func (s *Server) FreezeSeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// GOV-9: Record authority receipt for freeze action
-	if s.db != nil {
+	// GOV-9: Record authority receipt for freeze action (optional)
+	// Only record if a DB is configured; don't require DB for the main seat operation.
+	db := s.DB()
+	if db != nil {
 		domainID, err := uuid.Parse(domainIDStr)
 		if err == nil {
 			receiptPayload := map[string]interface{}{
@@ -94,7 +96,7 @@ func (s *Server) FreezeSeat(w http.ResponseWriter, r *http.Request) {
 				"reason":  "admin_action",
 				"scope":   "seat",
 			}
-			authority.RecordAuthorityReceipt(ctx, s.db, domainID, "seat.freeze.v1", receiptPayload, nil)
+			authority.RecordAuthorityReceipt(ctx, db, domainID, "seat.freeze.v1", receiptPayload, nil)
 		}
 	}
 
@@ -120,8 +122,9 @@ func (s *Server) UnfreezeSeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// GOV-9: Record authority receipt for unfreeze action
-	if s.db != nil {
+	// GOV-9: Record authority receipt for unfreeze action (optional)
+	db := s.DB()
+	if db != nil {
 		domainID, err := uuid.Parse(domainIDStr)
 		if err == nil {
 			receiptPayload := map[string]interface{}{
@@ -130,7 +133,7 @@ func (s *Server) UnfreezeSeat(w http.ResponseWriter, r *http.Request) {
 				"reason":  "admin_action",
 				"scope":   "seat",
 			}
-			authority.RecordAuthorityReceipt(ctx, s.db, domainID, "seat.unfreeze.v1", receiptPayload, nil)
+			authority.RecordAuthorityReceipt(ctx, db, domainID, "seat.unfreeze.v1", receiptPayload, nil)
 		}
 	}
 

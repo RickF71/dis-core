@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -89,5 +91,50 @@ func RegisterSyntheticDomains(ctx context.Context, db *pgxpool.Pool) error {
 	log.Println("      - Capabilities: sandbox-restricted (no delegation/freeze override)")
 	log.Println("      - Warning: Not a true corporeal entity")
 
+	return nil
+}
+
+// EnsureRootDomain ensures the special root domain `domain.null` exists.
+// This domain is used as the canonical root for deterministic operations and
+// must be present at process start. The function is idempotent.
+func EnsureRootDomain(ctx context.Context, db *pgxpool.Pool) error {
+	log.Println("🔧 Ensuring root domain: domain.null")
+
+	// Quick table existence check to avoid noisy errors when DB isn't provisioned.
+	var tableExists bool
+	if err := db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT FROM information_schema.tables
+			WHERE table_name = 'domains'
+		)
+	`).Scan(&tableExists); err != nil {
+		return err
+	}
+	if !tableExists {
+		log.Println("   ⚠️  Domains table not found, skipping root domain ensure")
+		return nil
+	}
+
+	// Check if domain.null already exists
+	var exists bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM domains WHERE name = 'domain.null')`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		log.Println("   ✅ domain.null already present")
+		return nil
+	}
+
+	// Insert domain.null
+	id := uuid.New()
+	now := time.Now().UTC()
+	_, err := db.Exec(ctx, `
+		INSERT INTO domains (id, name, parent_id, payload, created_at)
+		VALUES ($1, $2, $3, '{}'::jsonb, $4)
+	`, id, "domain.null", nil, now)
+	if err != nil {
+		return err
+	}
+	log.Println("   ✅ Created root domain: domain.null")
 	return nil
 }

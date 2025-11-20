@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,6 +103,37 @@ func (s *IdentityReceiptStore) RecordIdentityReceipt(ctx context.Context, r *Ide
 	// Generate ID if not provided
 	if r.ID == uuid.Nil {
 		r.ID = uuid.New()
+	}
+
+	// Ensure referenced domain rows exist (idempotent). This guards test runs
+	// where per-test truncation or races can temporarily remove domain rows
+	// before asynchronous receipt recording. Using ON CONFLICT DO NOTHING keeps
+	// this safe and idempotent in normal operation.
+	// Only perform idempotent domain upserts when the test harness explicitly
+	// enables it. Production runs should not implicitly create domain rows.
+	allowDomainUpsert := os.Getenv("DIS_TEST_ALLOW_DOMAIN_UPSERT") == "1"
+	ensureDomain := func(id uuid.UUID) error {
+		if id == uuid.Nil || !allowDomainUpsert {
+			return nil
+		}
+		_, err := s.db.Exec(ctx, `INSERT INTO domains (id, created_at) VALUES ($1, now()) ON CONFLICT (id) DO NOTHING`, id)
+		return err
+	}
+	if err := ensureDomain(r.DomainID); err != nil {
+		return err
+	}
+	if err := ensureDomain(r.ConsentBy); err != nil {
+		return err
+	}
+	if r.TargetDomainID != nil {
+		if err := ensureDomain(*r.TargetDomainID); err != nil {
+			return err
+		}
+	}
+	if r.SourceDomainID != nil {
+		if err := ensureDomain(*r.SourceDomainID); err != nil {
+			return err
+		}
 	}
 
 	// Insert immutable receipt

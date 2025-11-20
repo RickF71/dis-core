@@ -22,6 +22,10 @@ type Domain struct {
 
 // GET /api/domain/{id}
 func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
+	db := s.requireDB(w)
+	if db == nil {
+		return
+	}
 	ctx := r.Context()
 	idParam := r.PathValue("id")
 	idParam = strings.TrimSpace(idParam)
@@ -39,7 +43,7 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 	// Try as UUID if possible
 	if _, parseErr := uuid.Parse(idParam); parseErr == nil {
 		log.Printf("[domain_get] Querying by UUID: %s", idParam)
-		err = s.DB().QueryRow(ctx, `
+		err = db.QueryRow(ctx, `
 			SELECT id::text, parent_id::text, payload, created_at, updated_at
 			FROM domains
 			WHERE id = $1::uuid
@@ -48,7 +52,7 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Treat it as canonical domain ID (e.g. "domain.null")
 		log.Printf("[domain_get] Querying by name/id string: %s", idParam)
-		err = s.DB().QueryRow(ctx, `
+		err = db.QueryRow(ctx, `
 			SELECT id::text, parent_id::text, payload, created_at, updated_at
 			FROM domains
 			WHERE id = $1
