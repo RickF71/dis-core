@@ -20,6 +20,10 @@ func (s *Server) RegisterAllRoutes() {
 	// Place invite accept AFTER middleware registration to avoid Chi panic
 	r.Post("/api/invite/accept", s.handleInviteAccept)
 
+	// MX-K2: First Human Login Integration (Genesis)
+	// POST /api/login/genesis - create corporeal identity and return a canonical login response
+	r.Post("/api/login/genesis", s.handleLoginGenesis)
+
 	// External Authentication endpoints (sovereign identity)
 	r.Get("/api/whoami", auth.HandleWhoAmI)
 	r.Get("/api/whoami/external", auth.HandleWhoAmIExternal) // DEV ONLY
