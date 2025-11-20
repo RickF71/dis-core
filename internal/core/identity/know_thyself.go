@@ -118,6 +118,12 @@ func KnowThyselfAtomic(
 	receiptID, _ := uuid.Parse(receiptIDStr)
 
 	// 6) Return both IDs
+
+	// 6) Consume the handshake so the token cannot be reused
+	if _, err := tx.Exec(ctx, `DELETE FROM handshakes WHERE token = $1`, inviteToken); err != nil {
+		return nil, fmt.Errorf("know_thyself: consume handshake: %w", err)
+	}
+
 	return &KnowThyselfResult{
 		ActorID:   actorID,
 		DomainID:  domainID,
