@@ -155,8 +155,37 @@ func (s *Server) handlePolicyEvaluatePhase7(w http.ResponseWriter, r *http.Reque
 		if risk, ok := req.Context["risk"]; ok {
 			input["risk"] = risk
 		}
+
+		// Attempt to build an enriched, role-aware policy context when actor_id
+		// and domain_id are provided and a DB is available. This uses the
+		// transactional builder so policy evaluations have consistent data.
+		if db := s.DB(); db != nil && req.Context != nil {
+			if actorID, ok := req.Context["actor_id"].(string); ok && actorID != "" {
+				if domainIDStr, ok2 := req.Context["domain_id"].(string); ok2 && domainIDStr != "" {
+					tx, txErr := db.Begin(r.Context())
+					if txErr == nil {
+						// BuildPolicyContextTx returns a map usable as evaluation context
+						if ctxMap, berr := policy.BuildContextTx(r.Context(), tx, actorID, domainIDStr); berr == nil {
+							// use this richer context as the evaluation context
+							input["context"] = ctxMap
+							if roles, ok := ctxMap["roles"]; ok {
+								input["roles"] = roles
+							}
+							if domainID, ok := ctxMap["domain_id"]; ok {
+								input["domain_id"] = domainID
+							}
+						}
+						_ = tx.Rollback(r.Context())
+					}
+				}
+			}
+		}
 		if domainID, ok := req.Context["domain_id"]; ok {
 			input["domain_id"] = domainID
+		}
+		// Include any provided subject roles so REGO can reason about them
+		if roles, ok := req.Context["roles"]; ok {
+			input["roles"] = roles
 		}
 	}
 

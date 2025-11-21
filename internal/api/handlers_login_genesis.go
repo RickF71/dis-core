@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"dis-core/internal/core/identity"
+	"dis-core/internal/util"
 )
 
 // handleLoginGenesis handles the first human login flow via the K-1 orchestration.
@@ -13,6 +14,8 @@ func (s *Server) handleLoginGenesis(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		InviteToken      string `json:"invite_token"`
 		PresentationName string `json:"presentation_name"`
+		// Optional: domain_id may be supplied; if present it must be UID-only
+		DomainID string `json:"domain_id,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -25,6 +28,13 @@ func (s *Server) handleLoginGenesis(w http.ResponseWriter, r *http.Request) {
 	if body.PresentationName == "" {
 		http.Error(w, "presentation_name required", http.StatusBadRequest)
 		return
+	}
+
+	if body.DomainID != "" {
+		if err := util.ValidateDomainUID(body.DomainID); err != nil {
+			http.Error(w, "invalid domain_id: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	db := s.requireDB(w)

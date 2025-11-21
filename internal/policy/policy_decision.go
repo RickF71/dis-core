@@ -9,4 +9,5 @@ type PolicyDecision struct {
 	BreakGlass bool                   `json:"break_glass,omitempty"`
 	Details    map[string]interface{} `json:"details,omitempty"`
 	Timestamp  time.Time              `json:"timestamp"`
+	Roles      []string               `json:"roles,omitempty"`
 }

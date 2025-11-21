@@ -194,6 +194,38 @@ func ListSeatReceipts(ctx context.Context, db *pgxpool.Pool, seatID string) ([]m
 	return out, rows.Err()
 }
 
+// AddRoleTx adds a role to a seat inside the provided transaction.
+// It's idempotent: duplicate inserts are ignored.
+func AddRoleTx(ctx context.Context, tx pgx.Tx, seatID string, role string) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO seat_roles (seat_id, role, created_at)
+		VALUES ($1::uuid, $2, NOW())
+		ON CONFLICT (seat_id, role) DO NOTHING
+	`, seatID, role)
+	if err != nil {
+		return fmt.Errorf("failed to add role to seat (tx): %w", err)
+	}
+	return nil
+}
+
+// ListRolesForSeatTx returns a list of roles assigned to a given seat inside tx.
+func ListRolesForSeatTx(ctx context.Context, tx pgx.Tx, seatID string) ([]string, error) {
+	rows, err := tx.Query(ctx, `SELECT role FROM seat_roles WHERE seat_id = $1::uuid ORDER BY role`, seatID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list roles for seat (tx): %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var r string
+		if err := rows.Scan(&r); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // FreezeSeatTx records a freeze for a seat inside the provided transaction.
 func FreezeSeatTx(ctx context.Context, tx pgx.Tx, seatID int64, scope string) error {
 	_, err := tx.Exec(ctx,

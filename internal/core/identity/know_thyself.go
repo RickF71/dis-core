@@ -7,6 +7,7 @@ import (
 	"dis-core/internal/core/authority"
 	"dis-core/internal/core/domain"
 	"dis-core/internal/db"
+	"dis-core/internal/util"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -57,9 +58,14 @@ func KnowThyselfAtomic(
 		return nil, fmt.Errorf("presentation name is required")
 	}
 
-	// 1) Resolve invite subject
-	subject, err := ResolveInviteSubject(ctx, tx, inviteToken)
-	if err != nil {
+	// 1) Resolve invite subject and lock the handshake row so concurrent
+	// accept attempts are serialized. Previously callers (invite handler)
+	// sometimes locked the row before calling this function; to ensure
+	// KnowThyselfAtomic is safe to call directly we perform the FOR UPDATE
+	// here.
+	var subject string
+	var err error
+	if err = tx.QueryRow(ctx, `SELECT subject FROM handshakes WHERE token = $1 FOR UPDATE`, inviteToken).Scan(&subject); err != nil {
 		return nil, fmt.Errorf("know_thyself: resolve invite: %w", err)
 	}
 
@@ -96,13 +102,16 @@ func KnowThyselfAtomic(
 	}
 
 	// 5) Record genesis login receipt
+	// Include roles explicitly (empty list at genesis) and ensure the
+	// domain/actor fields use UID strings only.
 	payload := map[string]any{
 		"domain":         domainID.String(),
 		"actor":          actorID.String(),
 		"presentation":   presentationName,
-		"issued_by":      "domain.null", // your existing rule
+		"issued_by":      "domain.null",
 		"invite_subject": subject,
 		"invite_token":   inviteToken,
+		"roles":          []string{},
 	}
 
 	receiptIDStr, err := authority.RecordAuthorityReceiptTx(
@@ -117,11 +126,16 @@ func KnowThyselfAtomic(
 	}
 	receiptID, _ := uuid.Parse(receiptIDStr)
 
-	// 6) Return both IDs
-
 	// 6) Consume the handshake so the token cannot be reused
 	if _, err := tx.Exec(ctx, `DELETE FROM handshakes WHERE token = $1`, inviteToken); err != nil {
 		return nil, fmt.Errorf("know_thyself: consume handshake: %w", err)
+	}
+
+	// Defensive validation: ensure the created domain ID is a valid UUID
+	// (it will be because we generated it, but this keeps invariant checks
+	// explicit and mirrors the UID-only enforcement for inputs).
+	if err := util.ValidateDomainUID(domainID.String()); err != nil {
+		return nil, fmt.Errorf("know_thyself: created domain id invalid: %w", err)
 	}
 
 	return &KnowThyselfResult{

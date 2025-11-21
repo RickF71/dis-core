@@ -85,6 +85,19 @@ func TestKnowThyselfAtomic_HappyPath(t *testing.T) {
 	if payload["presentation"] != who {
 		t.Fatalf("receipt payload presentation mismatch: got=%v want=%v", payload["presentation"], who)
 	}
+
+	// At genesis we expect an explicit empty roles array in the receipt payload
+	if proles, ok := payload["roles"]; ok {
+		if arr, ok := proles.([]interface{}); ok {
+			if len(arr) != 0 {
+				t.Fatalf("expected empty roles array at genesis; got=%v", arr)
+			}
+		} else {
+			t.Fatalf("receipt payload roles not array: %T", proles)
+		}
+	} else {
+		t.Fatalf("receipt payload missing roles field")
+	}
 }
 
 func TestKnowThyselfAtomic_InvalidToken(t *testing.T) {

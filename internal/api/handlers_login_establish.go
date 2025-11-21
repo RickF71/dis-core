@@ -7,6 +7,7 @@ import (
 
 	"dis-core/internal/core/identity"
 	"dis-core/internal/core/session"
+	"dis-core/internal/util"
 )
 
 // handleLoginEstablish creates a persistent session token (TTL 8h) for an actor/domain
@@ -36,6 +37,12 @@ func (s *Server) handleLoginEstablish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Validate that DomainID is a UID-only value before loading context
+	if err := util.ValidateDomainUID(body.DomainID); err != nil {
+		http.Error(w, "invalid domain_id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Validate actor context inside the transaction
 	actx, err := identity.LoadActorContextTx(ctx, tx, body.ActorID, body.DomainID)

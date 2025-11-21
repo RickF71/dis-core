@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"dis-core/internal/core/identity"
+	"dis-core/internal/util"
 )
 
 // handleInviteAccept is implemented in Phase K-1.
@@ -15,6 +16,9 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token     string `json:"token"`
 		WhoAreYou string `json:"who_are_you"`
+		// Optional: callers may supply a domain_id to indicate intent. If
+		// provided we enforce UID-only semantics.
+		DomainID string `json:"domain_id,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -27,6 +31,14 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 	if body.WhoAreYou == "" {
 		http.Error(w, "who_are_you required", http.StatusBadRequest)
 		return
+	}
+
+	// If a domain_id was provided, validate it is UID-only (UUID string).
+	if body.DomainID != "" {
+		if err := util.ValidateDomainUID(body.DomainID); err != nil {
+			http.Error(w, "invalid domain_id: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Ensure DB is configured

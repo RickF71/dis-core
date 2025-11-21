@@ -90,7 +90,8 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 			seat_id UUID NOT NULL,
 			token TEXT UNIQUE NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-			expires_at TIMESTAMPTZ NOT NULL
+			expires_at TIMESTAMPTZ NOT NULL,
+			revoked_at TIMESTAMPTZ NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS receipts (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -258,6 +259,14 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_domain_seats_status ON domain_seats(status);`,
 		`CREATE INDEX IF NOT EXISTS idx_domain_seats_member ON domain_seats(member_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_domain_seats_parent ON domain_seats(parent_seat_id);`,
+		// Seat roles table (MX-K10)
+		`CREATE TABLE IF NOT EXISTS seat_roles (
+			seat_id UUID NOT NULL,
+			role TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (seat_id, role)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_seat_roles_role ON seat_roles(role);`,
 		// Domain freeze state (authority-driven)
 		`CREATE TABLE IF NOT EXISTS domain_freeze_state (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

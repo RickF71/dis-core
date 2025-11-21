@@ -41,8 +41,16 @@ func SessionAuthMiddleware(db *pgxpool.Pool) func(http.Handler) http.Handler {
 
 			sess, err := session.LoadSessionTx(ctx, tx, token)
 			if err != nil {
-				// invalid token -> continue without binding
+				// invalid token -> continue without binding (handler will return 401)
 				next.ServeHTTP(w, r)
+				return
+			}
+
+			// reject revoked sessions explicitly
+			if sess.RevokedAt != nil {
+				// Session has been revoked - return 401 Unauthorized
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				http.Error(w, "session revoked", http.StatusUnauthorized)
 				return
 			}
 			// reject expired

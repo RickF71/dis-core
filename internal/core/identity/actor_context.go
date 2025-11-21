@@ -18,6 +18,7 @@ type ActorContext struct {
 	PresentationName string   `json:"presentation_name"`
 	DomainFDN        string   `json:"domain_fdn"`
 	Permissions      []string `json:"permissions"`
+	Roles            []string `json:"roles,omitempty"`
 }
 
 // LoadActorContextTx loads a minimal ActorContext using the provided transaction.
@@ -43,6 +44,19 @@ func LoadActorContextTx(ctx context.Context, tx pgx.Tx, actorID string, domainID
 		return nil, fmt.Errorf("load actor context: resolve domain fdn: %w", err)
 	}
 
+	// Load roles for the resolved prime seat (if any)
+	var roles []string
+	rows, err := tx.Query(ctx, `SELECT role FROM seat_roles WHERE seat_id = $1::uuid ORDER BY role`, seatID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var r string
+			if err := rows.Scan(&r); err == nil {
+				roles = append(roles, r)
+			}
+		}
+	}
+
 	return &ActorContext{
 		ActorID:          actorID,
 		DomainID:         domainID,
@@ -50,5 +64,6 @@ func LoadActorContextTx(ctx context.Context, tx pgx.Tx, actorID string, domainID
 		PresentationName: presentation,
 		DomainFDN:        domainName,
 		Permissions:      []string{},
+		Roles:            roles,
 	}, nil
 }

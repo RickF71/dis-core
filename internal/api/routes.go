@@ -32,6 +32,14 @@ func (s *Server) RegisterAllRoutes() {
 	// POST /api/login/establish - create a persistent session token (TTL 8h)
 	r.Post("/api/login/establish", s.handleLoginEstablish)
 
+	// MX-K6: Session revocation (logout)
+	// POST /api/logout - revoke the current session token
+	r.Post("/api/logout", s.handleLogout)
+
+	// MX-K6: List active sessions for authenticated user
+	// GET /api/sessions - list sessions (non-revoked, non-expired)
+	r.Get("/api/sessions", s.handleListSessions)
+
 	// External Authentication endpoints (sovereign identity)
 	r.Get("/api/whoami", auth.HandleWhoAmI)
 	r.Get("/api/whoami/external", auth.HandleWhoAmIExternal) // DEV ONLY
@@ -256,6 +264,10 @@ func (s *Server) RegisterAllRoutes() {
 	r.Post("/api/domain/{id}/seats/{seatId}/freeze", s.FreezeSeat)
 	r.Post("/api/domain/{id}/seats/{seatId}/unfreeze", s.UnfreezeSeat)
 	r.Put("/api/domain/{id}/seats/{seatId}/rego", s.UpdateSeatRego)
+
+	// MX-K10: Seat roles API
+	r.Post("/api/seat/{id}/roles/add", s.handleAddSeatRole)
+	r.Get("/api/seat/{id}/roles", s.handleListSeatRoles)
 
 	// GOV-7: Prime Seat Establishment for Corporeal Domains
 	r.Post("/api/domain/{id}/seat/prime", s.CreatePrimeSeat)
