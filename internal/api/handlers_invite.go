@@ -58,13 +58,15 @@ func (s *Server) handleInviteAccept(w http.ResponseWriter, r *http.Request) {
 
 	// Resolve the handshake FOR UPDATE to lock the invite row while we operate.
 	var subject string
-	if err := tx.QueryRow(ctx, `SELECT subject FROM handshakes WHERE token = $1 FOR UPDATE`, body.Token).Scan(&subject); err != nil {
+	var status string
+	if err := tx.QueryRow(ctx, `SELECT subject, COALESCE(status,'') FROM handshakes WHERE token = $1 FOR UPDATE`, body.Token).Scan(&subject, &status); err != nil {
 		http.Error(w, "invalid or unknown invite token", http.StatusBadRequest)
 		return
 	}
 
-	// Basic validation: ensure resolved subject is present
-	if subject == "" {
+	// Basic validation: subject may be empty for a genesis bootstrap handshake
+	// (status='genesis'). If it's empty and not a genesis handshake, reject.
+	if subject == "" && status != "genesis" {
 		http.Error(w, "invite subject invalid", http.StatusBadRequest)
 		return
 	}

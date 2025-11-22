@@ -41,7 +41,7 @@ func (s *Server) RegisterAllRoutes() {
 	r.Get("/api/sessions", s.handleListSessions)
 
 	// External Authentication endpoints (sovereign identity)
-	r.Get("/api/whoami", auth.HandleWhoAmI)
+	r.Get("/api/whoami", s.handleWhoAmI)
 	r.Get("/api/whoami/external", auth.HandleWhoAmIExternal) // DEV ONLY
 	r.Get("/api/me", s.handleMe)                             // Sprint Step 1: Read-only identity surface
 	r.Get("/api/me/actors", s.handleMeActors)                // List all actors/seats for authenticated user

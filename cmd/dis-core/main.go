@@ -32,27 +32,15 @@ func main() {
 		log.Printf("Warning: failed to bootstrap tables: %v", err)
 	}
 
-	// ✅ Minimal structural bootstrap: ensure domain.null exists.
-	// This is the ONLY domain that must exist at process start.
-	if err := bootstrap.EnsureRootDomain(ctx, dbComponents.Database); err != nil {
-		log.Fatalf("failed to ensure root domain.null: %v", err)
+	// 🔵 BedrockBootstrap: one-time, human-approved creation of the 1D root domain `null`
+	if err := bootstrap.RunBedrockBootstrap(ctx, dbComponents.Database); err != nil {
+		log.Fatalf("bedrock bootstrap failed: %v", err)
 	}
 
-	// ❌ Removed:
-	// - PhaseS0PrimeSeatSetup (pseats should be ensured by the domain loader per-branch)
-	// - BootstrapIdentityTriads (terra/numen/lima should be adoptable, not globally pre-created)
-	// - RegisterSyntheticDomains (synthetic/system domains should be opt-in, not auto-injected)
-
-	// Initialize policy engine (OPA/Rego) – domain-aware policies will be loaded here.
-	// You’ll implement this to compile gates.rego, freeze.rego, risk.rego, etc.
+	// Initialize policy engine (OPA/Rego) – future wiring
 	var policyEngine *policy.OPAEngine
-	// Example future shape:
-	// policyEngine, err = bootstrap.InitializePolicyEngine(ctx, dbComponents)
-	// if err != nil {
-	//     log.Fatalf("failed to initialize policy engine: %v", err)
-	// }
 
-	// Initialize Authority Console (introspection, not governance imposition)
+	// Initialize Authority Console (introspection)
 	console, err := bootstrap.InitializeAuthorityConsole(
 		dbComponents.Database,
 		dbComponents.Registry,

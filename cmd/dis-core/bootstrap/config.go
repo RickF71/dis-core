@@ -14,13 +14,21 @@ type Config struct {
 	DSN     string
 }
 
-// LoadConfig initializes configuration from environment variables with sensible defaults
+// LoadConfig initializes configuration from environment variables with sensible defaults.
+// If DIS_TEST_DB_DSN is set it will be preferred so test runs can target the test DB
+// without having to override the other DSN-related env vars.
 func LoadConfig() *Config {
+	// Prefer explicit test DSN when present
+	dsn := os.Getenv("DIS_TEST_DB_DSN")
+	if dsn == "" {
+		dsn = config.DatabaseURL()
+	}
+
 	return &Config{
 		Host:    getenvDefault("DIS_API_HOST", "0.0.0.0"),
 		Port:    getenvDefault("DIS_API_PORT", "8080"),
 		Version: getenvDefault("DIS_VERSION", "v1.0-dev"),
-		DSN:     config.DatabaseURL(),
+		DSN:     dsn,
 	}
 }
 

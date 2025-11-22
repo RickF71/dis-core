@@ -8,6 +8,8 @@ import (
 	"dis-core/internal/core/identity"
 	"dis-core/internal/core/session"
 	"dis-core/internal/util"
+
+	"github.com/google/uuid"
 )
 
 // handleLoginEstablish creates a persistent session token (TTL 8h) for an actor/domain
@@ -20,10 +22,10 @@ func (s *Server) handleLoginEstablish(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if body.ActorID == "" || body.DomainID == "" {
-		http.Error(w, "actor_id and domain_id are required", http.StatusBadRequest)
-		return
-	}
+	// Note: if the system is empty (no identities and no domains) we
+	// support a minimal bootstrap path: create a one-time handshake token
+	// marked as a genesis challenge and return it. The client can then
+	// submit that token to /api/invite/accept to complete the bootstrap.
 
 	db := s.requireDB(w)
 	if db == nil {
@@ -31,6 +33,26 @@ func (s *Server) handleLoginEstablish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+
+	// Quick check for empty system: if both identities and domains are zero
+	// we emit a single-use genesis handshake token and return a challenge.
+	var idCount int64
+	var domainCount int64
+	if err := db.QueryRow(ctx, `SELECT COUNT(1) FROM identities`).Scan(&idCount); err == nil {
+		_ = db.QueryRow(ctx, `SELECT COUNT(1) FROM domains`).Scan(&domainCount)
+	}
+	if idCount == 0 && domainCount == 0 {
+		// generate handshake token
+		token := uuid.NewString()
+		hid := uuid.NewString()
+		if _, err := db.Exec(ctx, `INSERT INTO handshakes (id, token, subject, status, created_at) VALUES ($1,$2,$3,$4,NOW())`, hid, token, "", "genesis"); err != nil {
+			http.Error(w, "failed to create bootstrap challenge: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"status": "challenge", "challenge_id": token})
+		return
+	}
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		http.Error(w, "failed to begin transaction", http.StatusInternalServerError)
