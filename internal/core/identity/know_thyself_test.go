@@ -116,3 +116,77 @@ func TestKnowThyselfAtomic_InvalidToken(t *testing.T) {
 		t.Fatalf("expected error for invalid token")
 	}
 }
+
+// First corporeal KnowThyselfAtomic invocation should establish the root sovereign
+// on the null domain if none exists. The second invocation should NOT overwrite it.
+func TestKnowThyselfAtomic_EstablishesRootSovereign(t *testing.T) {
+	pool := testdb.SetupTestDB(t)
+	testdb.MustHaveDB(t, pool)
+
+	ctx := context.Background()
+
+	// first actor (will cause root sovereign establishment)
+	token1 := "root-token-1"
+	id1 := uuid.NewString()
+	if _, err := pool.Exec(ctx, `INSERT INTO handshakes (id, token, subject) VALUES ($1,$2,$3)`, id1, token1, "human:alice"); err != nil {
+		t.Fatalf("insert handshake1: %v", err)
+	}
+	tx1, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin tx1: %v", err)
+	}
+	res1, err := identity.KnowThyselfAtomic(ctx, tx1, token1, "Alice")
+	if err != nil {
+		t.Fatalf("first KnowThyselfAtomic: %v", err)
+	}
+	if err := tx1.Commit(ctx); err != nil {
+		t.Fatalf("commit tx1: %v", err)
+	}
+
+	// find null domain id
+	var nullDomainID string
+	if err := pool.QueryRow(ctx, `SELECT id::text FROM domains WHERE name = 'domain.null' LIMIT 1`).Scan(&nullDomainID); err != nil {
+		t.Fatalf("query null domain: %v", err)
+	}
+
+	// find prime seat in null domain
+	var rootSeatID, rootSeatMember string
+	if err := pool.QueryRow(ctx, `SELECT id::text, COALESCE(member_id::text,'') FROM domain_seats WHERE domain_id = $1::uuid AND seat_type = 'prime' LIMIT 1`, nullDomainID).Scan(&rootSeatID, &rootSeatMember); err != nil {
+		t.Fatalf("query null prime seat: %v", err)
+	}
+	if rootSeatMember != res1.ActorID.String() {
+		t.Fatalf("root seat not assigned to first actor: got=%s want=%s", rootSeatMember, res1.ActorID.String())
+	}
+
+	// second actor should NOT overwrite root seat
+	token2 := "root-token-2"
+	id2 := uuid.NewString()
+	if _, err := pool.Exec(ctx, `INSERT INTO handshakes (id, token, subject) VALUES ($1,$2,$3)`, id2, token2, "human:bob"); err != nil {
+		t.Fatalf("insert handshake2: %v", err)
+	}
+	tx2, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin tx2: %v", err)
+	}
+	res2, err := identity.KnowThyselfAtomic(ctx, tx2, token2, "Bob")
+	if err != nil {
+		t.Fatalf("second KnowThyselfAtomic: %v", err)
+	}
+	if err := tx2.Commit(ctx); err != nil {
+		t.Fatalf("commit tx2: %v", err)
+	}
+
+	// re-check root seat ownership
+	var finalSeatMember string
+	if err := pool.QueryRow(ctx, `SELECT COALESCE(member_id::text,'') FROM domain_seats WHERE id = $1::uuid`, rootSeatID).Scan(&finalSeatMember); err != nil {
+		t.Fatalf("re-query root seat: %v", err)
+	}
+	if finalSeatMember != rootSeatMember {
+		t.Fatalf("root seat was overwritten: before=%s after=%s", rootSeatMember, finalSeatMember)
+	}
+
+	// Ensure second actor got its own prime seat in its corporeal domain
+	if res2.DomainID == uuid.Nil || res2.ActorID == uuid.Nil {
+		t.Fatalf("second actor result invalid: %+v", res2)
+	}
+}

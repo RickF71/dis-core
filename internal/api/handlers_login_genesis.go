@@ -52,6 +52,10 @@ func (s *Server) handleLoginGenesis(w http.ResponseWriter, r *http.Request) {
 
 	res, err := identity.KnowThyselfAtomic(ctx, tx, body.InviteToken, body.PresentationName)
 	if err != nil {
+		// Log the underlying reason for test visibility and debugging
+		if s != nil && s.logger != nil {
+			s.logger.Printf("genesis login failed: %v", err)
+		}
 		http.Error(w, "failed to complete genesis login: "+err.Error(), http.StatusBadRequest)
 		return
 	}

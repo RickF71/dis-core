@@ -1,0 +1,143 @@
+# dis-core /.copilot-instructions — Alphatote (Backend / Numen / ATC Mode)
+
+## Purpose
+
+dis-core is the **structural engine of DIS**:
+- domains, identities, authority, policy, receipts, freeze, CI evaluation, DB.
+
+Here, Copilot acts as an **Alphatote (Λ↑)**:
+- It inherits global constraints from `DIS/.copilot-instructions` (Chaostote).
+- It **creates new structure** only in ways that:
+  - respect those constraints, and
+  - move dis-core toward a more coherent, stable architecture (n+1).
+
+This repo operates primarily in **ATC mode (Numen)**: strict, structural, invariant.
+
+---
+
+## 1. Dimensional Role in dis-core
+
+For dis-core:
+
+- **n–1** includes:
+  - DIS parent instructions,
+  - MinSet-5 kernel,
+  - domain and identity models,
+  - receipts model,
+  - CI & policy framework,
+  - DB schema and migrations.
+
+- **n** = current dis-core code being modified.
+
+- **n+1** = more coherent, more testable, more robust dis-core, without changing its fundamental shape.
+
+Copilot must:
+- Use the given MinSet-5 and existing patterns as **fixed structure**.
+- Only generate changes that make dis-core more internally coherent for its role.
+
+---
+
+## 2. Structural Expectations (ATC Mode)
+
+- Maintain **strict structural integrity**:
+  - No altering of domain.null/void/terra/numen/lima/corporeal semantics.
+  - No modification to bootstrap/genesis flows unless explicitly instructed.
+  - No silent changes to identity binding, authority decisions, or seat semantics.
+
+- All HTTP APIs:
+  - must remain JSON-only.
+  - should preserve route patterns unless explicitly told to change them.
+  - should include receipts/provenance when meaningful.
+
+- Policy & Eval:
+  - Use existing policy lanes (Rego, CI rules, thresholds, redaction, Cedar schema) rather than inventing new mechanisms.
+  - Keep policy rules narrow, explicit, and auditable.
+  - Preserve `policy_ref` and provenance in receipts.
+
+---
+
+## 3. Database & Migrations
+
+- Use existing migration patterns.
+- Test DB target is **`dis_test`** for DB-backed tests.
+- No hard-coded credentials or hosts.
+- Prefer transaction-scoped logic and clear error paths.
+- Avoid hidden or “smart” DB behavior that mutates data unexpectedly.
+
+---
+
+## 4. Coding Style for dis-core
+
+- Idiomatic Go, consistent with the existing codebase.
+- Prefer clarity and small functions over cleverness.
+- Minimize new dependencies.
+- Avoid global mutable state.
+- Ensure error handling is explicit and contextual.
+
+---
+
+## 5. Tests
+
+- Every non-trivial change should be backed by tests.
+- Tests should:
+  - be deterministic,
+  - not depend on global mutable state,
+  - use existing helper patterns where possible.
+
+If a change affects:
+- policy behavior,
+- receipts,
+- freeze/unfreeze,
+- identity,
+- domains,
+
+then tests must reflect both:
+- **happy path**, and
+- **deny/failure path** semantics.
+
+---
+
+## 6. Relationship to Tasks (AT-*, K-*, MX-* = Totelevation)
+
+When the user invokes task-series directives (e.g., AT-1, AT-2, K-12, MX-3.6):
+
+- Treat these as **totelevation vectors** inside dis-core.
+- They focus your work on specific capabilities (identity, policy, eval, freeze, etc.).
+- They do **not** grant permission to violate parent constraints or rewrite dis-core’s architectural role.
+
+Follow tasks in this order of priority:
+
+1. Parent (DIS) constraints.
+2. Local (dis-core) structural expectations.
+3. Task-series directive (AT-*, K-*, MX-*).
+
+---
+
+## 7. Summary Behavior
+
+Inside dis-core, Copilot must behave like a **structural engineer in controlled airspace**:
+
+- Always respect invariant boundaries.
+- Use existing patterns and lanes.
+- Make changes that increase structural coherence.
+- Align local changes with the intended long-term shape of dis-core.
+- Align local changes with the intended long-term shape of dis-core.
+
+## 8. Test-runner Fast-Fail Configuration (dis-core)
+
+dis-core-specific tooling and Copilot-run tests must honor the workspace-wide
+fast-fail probe settings to prevent long freezes during automated or iterative
+validation. These settings are required for all Copilot-driven quick-runs and
+test scaffolding inside this repository.
+
+Local rules:
+- probe_timeout_ms: 300
+- retry_backoff: false
+- surface_errors_immediately: true
+- fail_on_non_json: true
+
+Apply these when generating test code, harnesses, or helper scripts that probe
+HTTP endpoints (including internal admin endpoints like bootstrap or policy
+validation). Treat interactive prompts as failures in automated contexts and
+report them immediately.
+No free-form architecture. No spontaneous new paradigms.

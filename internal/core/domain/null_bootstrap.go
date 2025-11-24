@@ -34,11 +34,17 @@ func EnsureNullDomainExistsTx(ctx context.Context, tx pgx.Tx) (uuid.UUID, error)
 // seat already exists and is assigned to this member, it's a no-op. Returns
 // the seat id.
 func EnsureNullPrimeSeatExistsTx(ctx context.Context, tx pgx.Tx, domainID uuid.UUID, memberID string) (uuid.UUID, error) {
-	// Try to find an existing prime seat for this domain assigned to member
+	// If any prime seat already exists for this domain, refuse to silently
+	// create another: return the existing seat if it's assigned to the
+	// requested member, otherwise return an error to block recreation.
 	var sid string
-	if err := tx.QueryRow(ctx, `SELECT id FROM domain_seats WHERE domain_id = $1::uuid AND seat_type = 'prime' AND COALESCE(member_id,'') = $2 LIMIT 1`, domainID.String(), memberID).Scan(&sid); err == nil {
-		id, _ := uuid.Parse(sid)
-		return id, nil
+	var existingMember string
+	if err := tx.QueryRow(ctx, `SELECT id::text, COALESCE(member_id,'') FROM domain_seats WHERE domain_id = $1::uuid AND seat_type = 'prime' LIMIT 1`, domainID.String()).Scan(&sid, &existingMember); err == nil {
+		if existingMember == memberID {
+			id, _ := uuid.Parse(sid)
+			return id, nil
+		}
+		return uuid.Nil, fmt.Errorf("prime seat already exists for domain %s assigned to %s", domainID.String(), existingMember)
 	}
 
 	seatID := uuid.New()

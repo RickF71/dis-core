@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"log"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,6 +24,18 @@ func Attach(r *chi.Mux, pool *pgxpool.Pool, engine policy.PolicyEngine) {
 	// Using MOAR-CORS v1 with dynamic origin checking and DIS_ALLOWED_ORIGINS support
 	r.Use(cors.Middleware)
 
+	// Debug middleware: log Authorization header and dis_session cookie for
+	// requests to /api/whoami. Temporary aid for debugging bridge forwarding.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.URL.Path == "/api/whoami" {
+				// Print full headers for deep inspection (temporary).
+				log.Printf("[mw.debug] whoami request from %s headers=%+v", req.RemoteAddr, req.Header)
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
+
 	// Chi built-in middleware
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -36,6 +51,8 @@ func Attach(r *chi.Mux, pool *pgxpool.Pool, engine policy.PolicyEngine) {
 	r.Use(WithDB(pool))
 	r.Use(WithProvenance())
 	r.Use(WithPolicyEngine(engine))
+	// Enforce policy decisions for mutating requests and attach decision to context
+	r.Use(WithPolicyEnforcement())
 }
 
 // AttachWithCORS is deprecated - CORS is now included in Attach()

@@ -73,7 +73,7 @@ func HandleGetSchemaSummary(w http.ResponseWriter, r *http.Request) {
 		summary.Thresholds = map[string]interface{}{
 			"policy_evaluation": map[string]interface{}{
 				"max_depth":  10,
-				"timeout_ms": 5000,
+				"timeout_ms": 300,
 				"max_rules":  100,
 			},
 			"domain_operations": map[string]interface{}{

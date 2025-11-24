@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Lightweight CLI for common dev tasks. Currently supports:
+#   dis restart   -> non-blocking restart of dis-core (background, logs -> /tmp/dis-core.log)
+
+CMD=${1:-}
+
+usage() {
+  echo "Usage: $0 <command>" >&2
+  echo "Commands: restart | run" >&2
+}
+
+start_server() {
+  # ensure we run from repo root (script located in repo root)
+  cd "$(dirname "$0")" || return 1
+
+  echo "dis: building dis-core..."
+  if ! go build -v ./... >/dev/null 2>&1; then
+    echo "dis: build failed" >&2
+    return 2
+  fi
+
+  LOG=/tmp/dis-core.log
+  echo "dis: starting dis-core in background; logs -> $LOG"
+  nohup ./dis-core &> "$LOG" &
+  PID=$!
+  echo "dis: started pid=$PID"
+
+  echo "dis: waiting for server ready (looking for 'HTTP server listening' in $LOG)"
+  READY=0
+  for i in $(seq 1 60); do
+    if grep -q "HTTP server listening" "$LOG" 2>/dev/null; then
+      READY=1
+      break
+    fi
+    sleep 1
+  done
+
+  if [ $READY -eq 1 ]; then
+    echo "dis: server ready"
+    echo "dis: pid=$PID logs=$LOG"
+    return 0
+  else
+    echo "dis: timeout waiting for server to become ready; check $LOG" >&2
+    return 3
+  fi
+}
+
+if [ "$CMD" = "run" ]; then
+  echo "dis: run requested"
+  start_server
+  exit $?
+fi
+
+if [ "$CMD" != "restart" ]; then
+  usage
+  exit 2
+fi
+
+echo "dis: restart requested"
+
+# stop existing processes listening on :8080 (best-effort)
+echo "dis: checking for existing process listening on :8080..."
+PIDS=""
+if command -v lsof >/dev/null 2>&1; then
+  PIDS=$(lsof -t -iTCP:8080 -sTCP:LISTEN 2>/dev/null || true)
+fi
+if [ -z "$PIDS" ] && command -v ss >/dev/null 2>&1; then
+  PIDS=$(ss -ltnp 2>/dev/null | grep -E ":8080" | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | tr '\n' ' ' || true)
+fi
+if [ -z "$PIDS" ] && command -v pgrep >/dev/null 2>&1; then
+  PIDS=$(pgrep -f "dis-core" || true)
+fi
+
+if [ -n "$PIDS" ]; then
+  echo "dis: stopping PIDs: $PIDS"
+  for pid in $PIDS; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" || true
+    fi
+  done
+  # wait a short while
+  for i in $(seq 1 10); do
+    ALIVE=0
+    for pid in $PIDS; do
+      if kill -0 "$pid" 2>/dev/null; then
+        ALIVE=1
+        break
+      fi
+    done
+    [ $ALIVE -eq 0 ] && break
+    sleep 1
+  done
+  for pid in $PIDS; do
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "dis: PID $pid still alive, SIGKILLing"
+      kill -9 "$pid" || true
+    fi
+  done
+else
+  echo "dis: no running dis-core found"
+fi
+
+# Start the server after stop
+start_server
+exit $?

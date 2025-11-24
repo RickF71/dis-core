@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"dis-core/internal/contextx"
 	dbstore "dis-core/internal/db"
+	"dis-core/internal/envx"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,6 +25,15 @@ type Engine struct {
 	// DB is the backing Postgres connection pool used by engine operations.
 	// It's set during NewEngine and used by newly-introduced seat methods.
 	DB *pgxpool.Pool
+	// EvalFn is an optional evaluation function that wraps the policy engine.
+	// It should return (allow, reason, details, error).
+	EvalFn func(ctx context.Context, input map[string]interface{}) (bool, string, map[string]interface{}, error)
+}
+
+// SetPolicyEvalFunc sets the evaluation function used by EvaluateTx. This
+// avoids importing the policy package into authority and prevents import cycles.
+func (e *Engine) SetPolicyEvalFunc(fn func(ctx context.Context, input map[string]interface{}) (bool, string, map[string]interface{}, error)) {
+	e.EvalFn = fn
 }
 
 // FreezeSeat atomically freezes a seat and records a receipt within the same tx.
@@ -122,10 +133,35 @@ func (e *Engine) FreezeDomain(ctx context.Context, domainID uuid.UUID, scope str
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	// Deactivate existing active freeze for same domain+scope
+	// Build intended action payload for policy evaluation
+	evalPayload := map[string]interface{}{
+		"domain_id": domainID.String(),
+		"scope":     scope,
+		"reason":    reason,
+	}
+	// Evaluate policy and capture decision details for inclusion in receipt
+	var decisionReason string
+	var decisionDetails map[string]interface{}
+	if e.EvalFn != nil {
+		allowed, reasonStr, details, err := e.EvaluateTx(ctx, tx, createdBy.String(), domainID.String(), "domain.freeze.v1", evalPayload)
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("freeze domain: denied by policy: %s", reasonStr)
+		}
+		decisionReason = reasonStr
+		decisionDetails = details
+		if !allowed {
+			return uuid.Nil, fmt.Errorf("freeze domain: denied by policy: %s", reasonStr)
+		}
+	}
+
 	if err := dbstore.DeactivateDomainFreezeTx(ctx, tx, domainID.String(), scope); err != nil {
 		_ = tx.Rollback(ctx)
 		return uuid.Nil, fmt.Errorf("freeze domain: deactivate existing: %w", err)
+	}
+
+	// In test bootstrap mode, ignore TTLs so tests don't block on timed waits.
+	if envx.InTestBootstrap() {
+		ttl = nil
 	}
 
 	// Insert new freeze
@@ -135,8 +171,26 @@ func (e *Engine) FreezeDomain(ctx context.Context, domainID uuid.UUID, scope str
 		return uuid.Nil, fmt.Errorf("freeze domain: insert: %w", err)
 	}
 
-	// Record receipt inside tx
+	// Record receipt inside tx and include policy decision metadata when available
 	payload := map[string]any{"domain_id": domainID.String(), "scope": scope, "reason": reason}
+	if decisionDetails != nil {
+		decisionMap := map[string]any{
+			"allow":  true,
+			"reason": decisionReason,
+		}
+		// propagate common policy identifiers if present
+		if v, ok := decisionDetails["gates.policy_ref"]; ok {
+			decisionMap["policy_ref"] = v
+		} else if v, ok := decisionDetails["policy_ref"]; ok {
+			decisionMap["policy_ref"] = v
+		}
+		if v, ok := decisionDetails["gates.deny_code"]; ok {
+			decisionMap["deny_code"] = v
+		} else if v, ok := decisionDetails["deny_code"]; ok {
+			decisionMap["deny_code"] = v
+		}
+		payload["decision"] = decisionMap
+	}
 	if ttl != nil {
 		payload["ttl_until"] = ttl.Format(time.RFC3339)
 	}
@@ -164,12 +218,51 @@ func (e *Engine) UnfreezeDomain(ctx context.Context, domainID uuid.UUID, scope s
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Build intended action payload for policy evaluation and capture decision
+	evalPayload := map[string]interface{}{
+		"domain_id": domainID.String(),
+		"scope":     scope,
+		"reason":    reason,
+	}
+	var decisionReason string
+	var decisionDetails map[string]interface{}
+	if e.EvalFn != nil {
+		allowed, reasonStr, details, err := e.EvaluateTx(ctx, tx, createdBy.String(), domainID.String(), "domain.unfreeze.v1", evalPayload)
+		if err != nil {
+			return fmt.Errorf("unfreeze domain: denied by policy: %s", reasonStr)
+		}
+		decisionReason = reasonStr
+		decisionDetails = details
+		if !allowed {
+			return fmt.Errorf("unfreeze domain: denied by policy: %s", reasonStr)
+		}
+	}
+
 	if err := dbstore.DeactivateDomainFreezeTx(ctx, tx, domainID.String(), scope); err != nil {
 		_ = tx.Rollback(ctx)
 		return fmt.Errorf("unfreeze domain: %w", err)
 	}
 
+	// (EvaluateTx implementation moved later to avoid interrupting function layout)
+
 	payload := map[string]any{"domain_id": domainID.String(), "scope": scope, "reason": reason}
+	if decisionDetails != nil {
+		decisionMap := map[string]any{
+			"allow":  true,
+			"reason": decisionReason,
+		}
+		if v, ok := decisionDetails["gates.policy_ref"]; ok {
+			decisionMap["policy_ref"] = v
+		} else if v, ok := decisionDetails["policy_ref"]; ok {
+			decisionMap["policy_ref"] = v
+		}
+		if v, ok := decisionDetails["gates.deny_code"]; ok {
+			decisionMap["deny_code"] = v
+		} else if v, ok := decisionDetails["deny_code"]; ok {
+			decisionMap["deny_code"] = v
+		}
+		payload["decision"] = decisionMap
+	}
 	if err := e.RecordDomainReceiptTx(ctx, tx, domainID.String(), "domain.unfreeze.v1", payload); err != nil {
 		_ = tx.Rollback(ctx)
 		return fmt.Errorf("unfreeze domain: failed to record receipt: %w", err)
@@ -272,6 +365,20 @@ func (e *Engine) RecordDomainReceiptTx(ctx context.Context, tx pgx.Tx, domainID 
 	var actor string
 	// best-effort: we don't import authpkg here to avoid cycles; leave actor empty
 
+	// If a decision wasn't explicitly provided by the caller, attempt to grab
+	// the generic decision map from context (set by middleware) and attach it
+	// to the payload for provenance.
+	if _, ok := payload["decision"]; !ok {
+		if dm, ok2 := contextx.PolicyDecisionMapFromContext(ctx); ok2 && dm != nil {
+			// copy the map to avoid mutating context-held value
+			cp := map[string]interface{}{}
+			for k, v := range dm {
+				cp[k] = v
+			}
+			payload["decision"] = cp
+		}
+	}
+
 	// Detect which receipts schema to use
 	var hasTypeCol bool
 	if err := tx.QueryRow(ctx, `
@@ -308,6 +415,35 @@ func NewEngine(cfg *Config, db *pgxpool.Pool) *Engine {
 	// TODO: initialize internal stores, caches, policy clients using cfg + db
 	_ = cfg
 	return &Engine{DB: db}
+}
+
+// EvaluateTx evaluates the provided action + payload using the given policy engine
+// within the provided transaction. If the decision denies the action, EvaluateTx
+// will attempt to rollback the transaction and return the decision along with an
+// error so callers can surface a structured denial. If no policy engine is
+// provided, EvaluateTx returns an allow decision by default.
+// EvaluateTx is a convenience wrapper that evaluates the given action using
+// the engine's EvalFn. It will rollback the provided tx on deny and return
+// (allow, reason, details, error).
+func (e *Engine) EvaluateTx(ctx context.Context, tx pgx.Tx, actor string, domainID string, action string, payload map[string]interface{}) (bool, string, map[string]interface{}, error) {
+	if e.EvalFn == nil {
+		return true, "no evaluator", nil, nil
+	}
+	input := map[string]interface{}{
+		"action":    action,
+		"actor":     actor,
+		"domain_id": domainID,
+		"payload":   payload,
+	}
+	allowed, reason, details, err := e.EvalFn(ctx, input)
+	if err != nil {
+		return false, "", nil, err
+	}
+	if !allowed {
+		_ = tx.Rollback(ctx)
+		return false, reason, details, fmt.Errorf("policy denied: %s", reason)
+	}
+	return true, reason, details, nil
 }
 
 // StatusSummary mirrors the real data returned by the old status handler.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	authpkg "dis-core/internal/auth"
+	"dis-core/internal/contextx"
 	dbstore "dis-core/internal/db"
 
 	"github.com/google/uuid"
@@ -269,6 +270,21 @@ func (e *Engine) RecordSeatReceipt(ctx context.Context, seatID string, typ strin
 	}
 	if identityID != "" {
 		pl["identity_id"] = identityID
+	}
+
+	// If a policy decision wasn't explicitly provided in payload, attempt to
+	// retrieve one from the context (set by enforcement middleware) and
+	// attach a minimal decision map for provenance/auditability.
+	if _, ok := pl["decision"]; !ok {
+		if dm, ok2 := contextx.PolicyDecisionMapFromContext(ctx); ok2 && dm != nil {
+			// ensure the map we attach is a fresh copy to avoid accidental
+			// mutation of the context-held map by callers.
+			copyMap := map[string]interface{}{}
+			for k, v := range dm {
+				copyMap[k] = v
+			}
+			pl["decision"] = copyMap
+		}
 	}
 
 	// Determine previous hash (if any)

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -13,6 +14,14 @@ import (
 // handleWhoAmI returns a minimal bound identity surface for Finagler integration
 // GET /api/whoami
 func (s *Server) handleWhoAmI(w http.ResponseWriter, r *http.Request) {
+	// Log incoming auth headers and cookies for debugging bridge vs direct calls
+	authz := r.Header.Get("Authorization")
+	var cookieVal string
+	if c, err := r.Cookie("dis_session"); err == nil {
+		cookieVal = c.Value
+	}
+	log.Printf("[whoami] incoming request from %s Authorization(len)=%d dis_session(len)=%d", r.RemoteAddr, len(authz), len(cookieVal))
+
 	user := auth.GetActiveUser(r)
 	// Accept either the canonical IsBound() (which relies on CorporealDomainID)
 	// or the session-bound path which sets CorporealDomainUID. Some auth

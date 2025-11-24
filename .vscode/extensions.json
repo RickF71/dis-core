@@ -1,0 +1,67 @@
+{
+  // === Core VS Code ===
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.rulers": [100],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "go.formatTool": "gofmt",
+  "go.useLanguageServer": true,
+
+  // === Copilot Integration ===
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": false
+  },
+
+  // Inline suggestions
+  "editor.inlineSuggest.enabled": true,
+  "editor.suggest.showInlineDetails": true,
+  "editor.suggest.showIcons": true,
+
+  // Copilot Chat
+  "github.copilot.chat.enabled": true,
+  "github.copilot.chat.showCodeActions": true,
+  "github.copilot.chat.showQuickFixes": true,
+
+  // Inline chat edit mode
+  "github.copilot.inlineChat.enabled": true,
+  "github.copilot.inlineChat.focusOnInlineChat": true,
+  "github.copilot.inlineChat.autoAcceptEdits": false,
+
+  // Copilot Chat model awareness
+  "github.copilot.chat.experimental.useProjectContext": true,
+  "github.copilot.chat.experimental.useEditorContext": true,
+
+  // === Keybindings / usability ===
+  "keybindings": [
+    {
+      "key": "ctrl+i",
+      "command": "workbench.action.copilot.inlineChat.start",
+      "when": "editorTextFocus"
+    },
+    {
+      "key": "ctrl+shift+i",
+      "command": "workbench.action.copilot.editCode",
+      "when": "editorTextFocus"
+    }
+  ],
+
+  // === Behavioral tweaks for DIS-Core ===
+  "editor.defaultFormatter": "golang.go",
+  "github.copilot.advanced": {
+    "inlineSuggestionsInLargeFiles": true,
+    "maxFileSizeKb": 800,
+    "maxTokens": 4096
+  },
+
+  // Always trust your workspace so Copilot can use full context
+  "security.workspace.trust.enabled": true,
+  "security.workspace.trust.startupPrompt": "never",
+
+  // === Optional for readability ===
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.iconTheme": "vs-seti",
+  "terminal.integrated.defaultProfile.linux": "bash"
+}

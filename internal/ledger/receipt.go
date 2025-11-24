@@ -2,13 +2,13 @@ package ledger
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -59,7 +59,14 @@ func (r *Receipt) Insert(ctx context.Context, tx pgx.Tx) error {
 		INSERT INTO receipts (id, type, actor, target, domain, payload, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err := tx.Exec(ctx, q, r.ID, r.Type, r.Actor, r.Target, r.Domain, r.Payload, r.CreatedAt)
+	var domainVal interface{}
+	if r.Domain == "" {
+		domainVal = nil
+	} else {
+		domainVal = r.Domain
+	}
+
+	_, err := tx.Exec(ctx, q, r.ID, r.Type, r.Actor, r.Target, domainVal, r.Payload, r.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("insert receipt: %w", err)
 	}
@@ -68,12 +75,11 @@ func (r *Receipt) Insert(ctx context.Context, tx pgx.Tx) error {
 
 // generateReceiptID creates a cryptographically derived ID without filesystem dependency.
 func generateReceiptID() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	hash := sha256.Sum256(buf)
-	return "rcpt-" + base64.RawURLEncoding.EncodeToString(hash[:8]), nil
+	// Use UUIDs for receipt IDs so they are compatible with the
+	// bootstrap schema which defines receipts.id as UUID. Keep the
+	// function signature compatible with earlier callers.
+	id := uuid.New()
+	return id.String(), nil
 }
 
 // VerifyHash creates a short hash summary of the payload for integrity auditing.

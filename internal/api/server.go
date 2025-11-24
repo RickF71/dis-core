@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"reflect"
+	"runtime"
 
 	"dis-core/internal/api/middleware"
 	"dis-core/internal/auth"
@@ -121,6 +124,22 @@ func NewWithPolicy(db *pgxpool.Pool, led *ledger.Ledger, policyEngine policy.Pol
 
 	s.RegisterAllRoutes()
 
+	// Debug: print registered routes at startup to help diagnose runtime router issues
+	// This duplicates the behavior of the /debug/routes handler but ensures routes
+	// are visible in startup logs for live processes.
+	_ = chi.Walk(s.router, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		// Try to resolve a human-friendly handler name when possible.
+		name := fmt.Sprintf("%T", handler)
+		if hf, ok := handler.(http.HandlerFunc); ok {
+			ptr := reflect.ValueOf(hf).Pointer()
+			if f := runtime.FuncForPC(ptr); f != nil {
+				name = f.Name()
+			}
+		}
+		s.logger.Printf("ROUTE: %s %s -> %s", method, route, name)
+		return nil
+	})
+
 	// Install format consistency checker
 	s.InstallFormatConsistencyCheck()
 
@@ -215,6 +234,48 @@ func (s *Server) handleAuthorityIntrospect(w http.ResponseWriter, r *http.Reques
 // handleAuthorityLogs is a placeholder for authority logs endpoint
 func (s *Server) handleAuthorityLogs(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusNotImplemented, map[string]any{"error": "authority logs not implemented"})
+}
+
+// --- AT reflection handlers (displays AT-series state and decisions)
+
+// handleATState returns a JSON-only representation of the current AT phase,
+// available rules and last decision. This is a lightweight reflection endpoint
+// and does not execute any AT logic.
+func (s *Server) handleATState(w http.ResponseWriter, r *http.Request) {
+	// Minimal structured response; implementations may enrich using policy engine.
+	resp := map[string]any{
+		"phase":  0,
+		"policy": map[string]any{},
+		"rules":  []any{},
+		"last_decision": map[string]any{
+			"allow":      true,
+			"reason":     "",
+			"deny_code":  "",
+			"policy_ref": "",
+			"details":    map[string]any{},
+		},
+	}
+	JSON(w, http.StatusOK, resp)
+}
+
+// handleATDecisions returns recent structured decisions (deny/allow) for AT
+func (s *Server) handleATDecisions(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]any{
+		"decisions": []any{},
+	}
+	JSON(w, http.StatusOK, resp)
+}
+
+// handleATRunPhase accepts a POST to request running an AT phase. This endpoint
+// only acknowledges the request and returns the requested phase id; execution
+// is out of scope for this reflection layer.
+func (s *Server) handleATRunPhase(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		JSONError(w, http.StatusBadRequest, "phase id required")
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"started": true, "phase": id})
 }
 
 // handleAuthorityLineage handles /api/authority/lineage/{domain_id}

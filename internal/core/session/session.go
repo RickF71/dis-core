@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Session represents a persisted actor session
@@ -106,4 +107,24 @@ func ListActiveSessionsForSeatDomainTx(ctx context.Context, tx pgx.Tx, seatID, d
 		return nil, fmt.Errorf("rows error: %w", rows.Err())
 	}
 	return out, nil
+}
+
+// Create is a convenience wrapper that opens a transaction and creates a
+// session row using CreateSessionTx. It returns the generated token.
+func Create(ctx context.Context, pool *pgxpool.Pool, actorID, domainID, seatID string) (string, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, token, err := CreateSessionTx(ctx, tx, actorID, domainID, seatID, 7*24*time.Hour)
+	if err != nil {
+		return "", fmt.Errorf("create session tx: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("commit tx: %w", err)
+	}
+	return token, nil
 }

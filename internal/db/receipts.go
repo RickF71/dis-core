@@ -79,8 +79,14 @@ func ListReceipts(ctx context.Context, pool *pgxpool.Pool, limit int, offset int
 	var out []Receipt
 	for rows.Next() {
 		var r Receipt
-		if err := rows.Scan(&r.ID, &r.Type, &r.Actor, &r.Target, &r.Domain, &r.Payload, &r.CreatedAt); err != nil {
+		var domainPtr *string
+		if err := rows.Scan(&r.ID, &r.Type, &r.Actor, &r.Target, &domainPtr, &r.Payload, &r.CreatedAt); err != nil {
 			return nil, err
+		}
+		if domainPtr != nil {
+			r.Domain = *domainPtr
+		} else {
+			r.Domain = ""
 		}
 		out = append(out, r)
 	}

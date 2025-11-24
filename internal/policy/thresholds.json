@@ -3,7 +3,7 @@
   "thresholds": {
     "policy_evaluation": {
       "max_depth": 10,
-      "timeout_ms": 5000,
+      "timeout_ms": 300,
       "max_rules": 100
     },
     "domain_operations": {

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
@@ -17,6 +18,14 @@ type WhoAmIResponse struct {
 // HandleWhoAmI returns the current user's sovereign identity status
 // Endpoint: GET /api/whoami
 func HandleWhoAmI(w http.ResponseWriter, r *http.Request) {
+	// Log incoming auth headers and cookies for debugging bridge vs direct calls
+	authz := r.Header.Get("Authorization")
+	var cookieVal string
+	if c, err := r.Cookie("dis_session"); err == nil {
+		cookieVal = c.Value
+	}
+	log.Printf("[auth.whoami] incoming request from %s Authorization(len)=%d dis_session(len)=%d", r.RemoteAddr, len(authz), len(cookieVal))
+
 	user := GetActiveUser(r)
 
 	var response WhoAmIResponse

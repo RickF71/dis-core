@@ -6,6 +6,7 @@ import (
 	authorityapi "dis-core/internal/api/authority"
 	"dis-core/internal/api/handlers"
 	"dis-core/internal/auth"
+	dbg "dis-core/internal/debug"
 )
 
 // RegisterAllRoutes wires all endpoint groups into the server router with format-aware support.
@@ -15,6 +16,9 @@ func (s *Server) RegisterAllRoutes() {
 
 	// Phase 10I: Apply CSS validation middleware to all routes (MUST be before routes)
 	r.Use(CSSValidationMiddleware)
+
+	// Debug: expose a route to dump the registered route tree for diagnostics
+	r.Get("/debug/routes", dbg.DebugRoutesHandler(r))
 
 	// Phase K-1: Know Thyself atomic invite accept endpoint
 	// Place invite accept AFTER middleware registration to avoid Chi panic
@@ -31,6 +35,10 @@ func (s *Server) RegisterAllRoutes() {
 	// MX-K4: Persistent Session Establishment
 	// POST /api/login/establish - create a persistent session token (TTL 8h)
 	r.Post("/api/login/establish", s.handleLoginEstablish)
+
+	// MX-K5: Programmatic login by identity (login-by-id)
+	// POST /api/login/with-id - create a session given an existing identity id
+	r.Post("/api/login/with-id", s.handleLoginWithID)
 
 	// MX-K6: Session revocation (logout)
 	// POST /api/logout - revoke the current session token
@@ -109,6 +117,11 @@ func (s *Server) RegisterAllRoutes() {
 	// Phase 8 Authority Console introspection routes
 	r.Get("/api/authority/introspect", s.handleAuthorityIntrospect)
 	r.Get("/api/authority/logs", s.handleAuthorityLogs)
+
+	// ATX: Cross-domain AT reflection endpoints (JSON-only)
+	r.Get("/api/at/state", s.handleATState)
+	r.Get("/api/at/decisions", s.handleATDecisions)
+	r.Post("/api/at/phase/{id}/run", s.handleATRunPhase)
 
 	// Phase 9B Authority Console live routes (direct mounting instead of subrouter)
 	r.Get("/api/authority/decision/{id}", authorityapi.HandleGetDecision)

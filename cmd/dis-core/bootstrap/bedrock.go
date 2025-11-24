@@ -11,6 +11,7 @@ import (
 
 	identity "dis-core/internal/core/identity"
 	discapsule "dis-core/internal/discapsule"
+	"dis-core/internal/envx"
 )
 
 // NewCapsule creates a Capsule. Tests may override this to inject a mock.
@@ -64,10 +65,19 @@ func RunBedrockBootstrap(ctx context.Context, db *pgxpool.Pool) error {
 	}
 
 	// 4) Call capsule for human approval. Use NewCapsule so tests can inject a mock.
-	capsule := NewCapsule()
-	grant, err := capsule.PerformBedrockAuth(ch)
-	if err != nil {
-		return fmt.Errorf("bedrock: not authorized by capsule/human: %w", err)
+	var grant discapsule.BedrockGrant
+	if envx.InTestBootstrap() {
+		// Non-interactive test bootstrap: auto-approve the grant so tests and
+		// CI won't block on stdin prompts.
+		log.Println("   ℹ️  DIS_TEST_BOOTSTRAP=1 detected; auto-approving Bedrock grant (non-interactive)")
+		grant = discapsule.BedrockGrant{GrantID: uuid.NewString(), Approved: true}
+	} else {
+		capsule := NewCapsule()
+		var err error
+		grant, err = capsule.PerformBedrockAuth(ch)
+		if err != nil {
+			return fmt.Errorf("bedrock: not authorized by capsule/human: %w", err)
+		}
 	}
 
 	// 5) Run the bedrock creation atomic sequence
