@@ -213,6 +213,8 @@ func (s *Server) RegisterAllRoutes() {
 	r.Get("/api/domain/list", s.handleDomainListChi)
 	r.Get("/api/domain/list/json", s.handleDomainListChi)
 	r.Get("/api/domain/list/file", s.handleDomainListChi)
+	// Expose canonical domain spine (ordered entries + DB ids/parents + pseat stub)
+	r.Get("/api/domain/spine", s.handleDomainSpine)
 	s.RegisterFormatAwareRoute(r, http.MethodGet, "/api/domains", s.handleDomainListChi, []Format{FormatJSON, FormatFile})
 
 	// Domain routes with format support (wildcard pattern must come AFTER specific paths)
@@ -292,6 +294,9 @@ func (s *Server) RegisterAllRoutes() {
 
 	// Phase 0-R.5: Atomic Corporeal + Actor-Domain Bootstrap
 	r.Handle("/api/corporeal/bootstrap", handlers.CreateCorporealBootstrap(s.corporealBootstrapper))
+
+	// Root pseat claim endpoint (Phase: bootstrap/sovereignty)
+	r.Post("/api/root/pseat/claim", s.handleClaimRootPSeat)
 
 	// Phase 10G: Cross-Domain Proof Synchronization and Verification
 	r.Post("/api/receipts/proof/sync", s.handleProofSync)

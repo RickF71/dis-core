@@ -96,16 +96,37 @@ func CreateSchema(db *sql.DB) error {
 
 // SeedDefaults inserts baseline domains for the DIS network.
 func SeedDefaults(db *sql.DB) error {
+	// Insert aether between null and terra where possible, and ensure baseline domains exist.
 	_, err := db.Exec(`
 	INSERT INTO domains (id, name, parent_id, payload, created_at)
 	VALUES
-		('domain.null', 'domain.null', NULL, '{}'::jsonb, now()),
-		('domain.terra', 'domain.terra', NULL, '{}'::jsonb, now()),
+		('domain.null', 'domain.null', NULL, '{}'::jsonb, now())
+	ON CONFLICT (id) DO NOTHING;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Ensure aether exists as child of null (if not already present)
+	_, err = db.Exec(`
+	INSERT INTO domains (id, name, parent_id, payload, created_at)
+	VALUES (gen_random_uuid(), 'aether', (SELECT id FROM domains WHERE name = 'domain.null' OR name = 'null' LIMIT 1), '{}'::jsonb, now())
+	ON CONFLICT (name) DO NOTHING;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Ensure terra exists and is parented under aether when possible
+	_, err = db.Exec(`
+	INSERT INTO domains (id, name, parent_id, payload, created_at)
+	VALUES
+		('domain.terra', 'domain.terra', (SELECT id FROM domains WHERE name = 'aether' OR name = 'domain.aether' LIMIT 1), '{}'::jsonb, now()),
 		('domain.virtual.usa', 'domain.virtual.usa', NULL, '{}'::jsonb, now())
 	ON CONFLICT (id) DO NOTHING;
 	`)
 	if err == nil {
-		fmt.Println("🌱 Seeded baseline domains: domain.null, domain.terra, domain.virtual.usa")
+		fmt.Println("🌱 Seeded baseline domains: domain.null, aether, domain.terra, domain.virtual.usa")
 	}
 	return err
 }

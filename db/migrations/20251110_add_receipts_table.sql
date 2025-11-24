@@ -1,6 +1,4 @@
--- Migration for Phase 9C: Receipt Verification & Provenance Continuity
--- File: db/migrations/20251110_add_receipts_table.sql
-
+-- Migration: Add receipts table for Phase 9C
 CREATE TABLE IF NOT EXISTS receipts (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     receipt_type    TEXT NOT NULL,
@@ -10,7 +8,8 @@ CREATE TABLE IF NOT EXISTS receipts (
     issued_by       TEXT,
     issued_at       TIMESTAMPTZ DEFAULT now(),
     verified        BOOLEAN DEFAULT FALSE,
-    metadata        JSONB DEFAULT '{}'::jsonb
+    metadata        JSONB DEFAULT '{}'::jsonb,
+    created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_receipts_event_id ON receipts(event_id);

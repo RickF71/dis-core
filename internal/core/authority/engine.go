@@ -134,10 +134,12 @@ func (e *Engine) FreezeDomain(ctx context.Context, domainID uuid.UUID, scope str
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Build intended action payload for policy evaluation
+	attrs := map[string]interface{}{"corrupt": false}
 	evalPayload := map[string]interface{}{
 		"domain_id": domainID.String(),
 		"scope":     scope,
 		"reason":    reason,
+		"context":   map[string]interface{}{"attrs": attrs},
 	}
 	// Evaluate policy and capture decision details for inclusion in receipt
 	var decisionReason string
@@ -149,6 +151,10 @@ func (e *Engine) FreezeDomain(ctx context.Context, domainID uuid.UUID, scope str
 		}
 		decisionReason = reasonStr
 		decisionDetails = details
+		// Propagate decision details into context for downstream emitters
+		if decisionDetails != nil {
+			ctx = contextx.WithPolicyDecisionMap(ctx, decisionDetails)
+		}
 		if !allowed {
 			return uuid.Nil, fmt.Errorf("freeze domain: denied by policy: %s", reasonStr)
 		}
@@ -177,6 +183,16 @@ func (e *Engine) FreezeDomain(ctx context.Context, domainID uuid.UUID, scope str
 		decisionMap := map[string]any{
 			"allow":  true,
 			"reason": decisionReason,
+		}
+		// If AT-1 provided an explicit allow, surface it
+		if v, ok := decisionDetails["at1.allow"]; ok {
+			decisionMap["allow"] = v
+		}
+		if v, ok := decisionDetails["at1.policy"]; ok {
+			decisionMap["policy"] = v
+		} else {
+			// set common identifier when present
+			decisionMap["policy"] = "dis.policy.at1_corruption"
 		}
 		// propagate common policy identifiers if present
 		if v, ok := decisionDetails["gates.policy_ref"]; ok {
@@ -219,10 +235,12 @@ func (e *Engine) UnfreezeDomain(ctx context.Context, domainID uuid.UUID, scope s
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Build intended action payload for policy evaluation and capture decision
+	attrs := map[string]interface{}{"corrupt": false}
 	evalPayload := map[string]interface{}{
 		"domain_id": domainID.String(),
 		"scope":     scope,
 		"reason":    reason,
+		"context":   map[string]interface{}{"attrs": attrs},
 	}
 	var decisionReason string
 	var decisionDetails map[string]interface{}
@@ -233,6 +251,9 @@ func (e *Engine) UnfreezeDomain(ctx context.Context, domainID uuid.UUID, scope s
 		}
 		decisionReason = reasonStr
 		decisionDetails = details
+		if decisionDetails != nil {
+			ctx = contextx.WithPolicyDecisionMap(ctx, decisionDetails)
+		}
 		if !allowed {
 			return fmt.Errorf("unfreeze domain: denied by policy: %s", reasonStr)
 		}
@@ -250,6 +271,14 @@ func (e *Engine) UnfreezeDomain(ctx context.Context, domainID uuid.UUID, scope s
 		decisionMap := map[string]any{
 			"allow":  true,
 			"reason": decisionReason,
+		}
+		if v, ok := decisionDetails["at1.allow"]; ok {
+			decisionMap["allow"] = v
+		}
+		if v, ok := decisionDetails["at1.policy"]; ok {
+			decisionMap["policy"] = v
+		} else {
+			decisionMap["policy"] = "dis.policy.at1_corruption"
 		}
 		if v, ok := decisionDetails["gates.policy_ref"]; ok {
 			decisionMap["policy_ref"] = v
@@ -426,6 +455,10 @@ func NewEngine(cfg *Config, db *pgxpool.Pool) *Engine {
 // the engine's EvalFn. It will rollback the provided tx on deny and return
 // (allow, reason, details, error).
 func (e *Engine) EvaluateTx(ctx context.Context, tx pgx.Tx, actor string, domainID string, action string, payload map[string]interface{}) (bool, string, map[string]interface{}, error) {
+	// Feature flag: if AT-1 policy evaluation is disabled, skip policy eval
+	if !envx.PolicyAT1Enabled() {
+		return true, "policy.at1.disabled", nil, nil
+	}
 	if e.EvalFn == nil {
 		return true, "no evaluator", nil, nil
 	}

@@ -134,6 +134,13 @@ func KnowThyselfAtomic(
 			return nil, fmt.Errorf("know_thyself: created domain id invalid: %w", err)
 		}
 
+		// Bind bootstrap actor if not already set. This ensures the first
+		// corporeal identity created during bootstrap becomes the canonical
+		// bootstrap actor for policy rules that gate root operations.
+		if err := db.SetBootstrapActorIDTx(ctx, tx, actorID.String()); err != nil {
+			return nil, fmt.Errorf("know_thyself: set bootstrap actor id: %w", err)
+		}
+
 		return &KnowThyselfResult{
 			IdentityID: actorID,
 			DomainID:   nullDomainID,

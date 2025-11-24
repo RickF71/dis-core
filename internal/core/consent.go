@@ -58,11 +58,26 @@ func PerformConsentAction(pool *pgxpool.Pool, by string, scope string, providedN
 	sig := crypto.Sign(action, id, by, scope, nonce, bridge.CanonicalTime(ts), polSum)
 
 	// Construct receipt record
+	// Build standardized panels for consent receipt
+	actionPanel := map[string]any{
+		"type":  "consent.grant.v1",
+		"scope": scope,
+	}
+	domainPanel := map[string]any{
+		"origin_id": by,
+	}
+
 	r := &dbpkg.Receipt{
-		ID:        fmt.Sprintf("rcpt-%s", nonce[:8]),
-		Type:      "bridge-receipt-template.v0",
-		Payload:   map[string]any{"content": fmt.Sprintf("Consent granted by %s for scope '%s'. Sig=%s", by, scope, sig[:16])},
-		CreatedAt: ts,
+		ID:               fmt.Sprintf("rcpt-%s", nonce[:8]),
+		Type:             "bridge-receipt-template.v0",
+		Actor:            by,
+		Domain:           by,
+		OriginDomainID:   by,
+		OriginDomainName: "",
+		Payload:          map[string]any{"content": fmt.Sprintf("Consent granted by %s for scope '%s'. Sig=%s", by, scope, sig[:16])},
+		ActionPanel:      actionPanel,
+		DomainPanel:      domainPanel,
+		CreatedAt:        ts,
 	}
 
 	err := dbpkg.SaveReceipt(context.Background(), pool, r)

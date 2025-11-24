@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"dis-core/internal/contextx"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -32,6 +34,18 @@ func EmitRootSovereignEstablished(ctx context.Context, tx pgx.Tx, r RootSovereig
 		"pactor_id":           r.PactorID,
 		"issued_by":           r.IssuedBy,
 		"created_at":          r.CreatedAt,
+	}
+
+	// Attach any policy decision present on the context to the payload so
+	// provenance includes AT-1 / policy metadata when available.
+	if _, ok := payload["decision"]; !ok {
+		if dm, ok2 := contextx.PolicyDecisionMapFromContext(ctx); ok2 && dm != nil {
+			cp := map[string]interface{}{}
+			for k, v := range dm {
+				cp[k] = v
+			}
+			payload["decision"] = cp
+		}
 	}
 
 	// detect receipts schema variant

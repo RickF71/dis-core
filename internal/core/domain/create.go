@@ -22,11 +22,38 @@ func CreateCorporealDomainFromSubject(ctx context.Context, tx pgx.Tx, subject st
 		return existing, nil
 	}
 
-	// Find terra parent id
+	// Prefer lima parent for corporeal domains per canonical spine.
 	var parentID string
-	_ = tx.QueryRow(ctx, `SELECT id FROM domains WHERE id = 'domain.terra' LIMIT 1`).Scan(&parentID)
+	// Try explicit domain.lima first, then lima, then fall back to domain.terra for old seeds.
+	_ = tx.QueryRow(ctx, `SELECT id FROM domains WHERE name = 'domain.lima' LIMIT 1`).Scan(&parentID)
 	if parentID == "" {
+		_ = tx.QueryRow(ctx, `SELECT id FROM domains WHERE name = 'lima' LIMIT 1`).Scan(&parentID)
+	}
+	if parentID == "" {
+		// legacy fallback
 		_ = tx.QueryRow(ctx, `SELECT id FROM domains WHERE name = 'domain.terra' LIMIT 1`).Scan(&parentID)
+		if parentID == "" {
+			_ = tx.QueryRow(ctx, `SELECT id FROM domains WHERE name = 'terra' LIMIT 1`).Scan(&parentID)
+		}
+	}
+
+	// If we found a parent, try to infer its dimension and validate spine transition
+	if parentID != "" {
+		// helper to query parent domain_type and name
+		queryParent := func(ctx context.Context) (string, string, bool) {
+			var parentType string
+			var parentName string
+			if err := tx.QueryRow(ctx, `SELECT COALESCE(domain_type,'') , COALESCE(name,'') FROM domains WHERE id = $1 LIMIT 1`, parentID).Scan(&parentType, &parentName); err != nil {
+				return "", "", false
+			}
+			return parentType, parentName, true
+		}
+		parentDim, err := InferParentDimension(ctx, queryParent)
+		if err == nil {
+			if verr := ValidateSpineTransition(parentDim, DimensionCorporeal); verr != nil {
+				return "", fmt.Errorf("spine validation failed: %w", verr)
+			}
+		}
 	}
 
 	id := uuid.NewString()

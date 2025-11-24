@@ -20,6 +20,7 @@ type OPAEngine struct {
 	gatesRego  *rego.PreparedEvalQuery
 	riskRego   *rego.PreparedEvalQuery
 	freezeRego *rego.PreparedEvalQuery
+	at1Rego    *rego.PreparedEvalQuery
 	// modules holds the source text for loaded modules so helpers can re-evaluate
 	// detail queries without needing to read files from disk (avoids WD issues
 	// in tests).
@@ -40,7 +41,7 @@ type PolicyEngine interface {
 // LoadLocalModules reads local .rego files under internal/policy/.
 func LoadLocalModules() (map[string]string, error) {
 	base := "internal/policy"
-	files := []string{"gates.rego", "risk.rego", "freeze.rego"}
+	files := []string{"gates.rego", "risk.rego", "freeze.rego", "rules/at1_example.rego", "rules/at1_corruption.rego", "rules/dimension_invariants.rego"}
 	modules := map[string]string{}
 
 	for _, f := range files {
@@ -90,10 +91,24 @@ func NewEngine(modules map[string]string) (*OPAEngine, error) {
 		return nil, fmt.Errorf("prepare freeze: %w", err)
 	}
 
+	// --- AT-1 corruption policy (simple allow/deny)
+	var aq *rego.PreparedEvalQuery
+	if src, ok := modules["rules/at1_corruption.rego"]; ok {
+		aqp, aerr := rego.New(
+			rego.Query("data.dis.policy.at1_corruption.allow"),
+			rego.Module("rules/at1_corruption.rego", src),
+		).PrepareForEval(ctx)
+		if aerr != nil {
+			return nil, fmt.Errorf("prepare at1_corruption: %w", aerr)
+		}
+		aq = &aqp
+	}
+
 	return &OPAEngine{
 		gatesRego:  &gq,
 		riskRego:   &rq,
 		freezeRego: &fq,
+		at1Rego:    aq,
 		modules:    modules,
 	}, nil
 }
@@ -197,6 +212,20 @@ func (e *OPAEngine) EvaluateAction(ctx context.Context, input map[string]interfa
 			}
 		}
 		evalDetails(ctx, "freeze.rego", "data.freeze.details", e.getModule("freeze.rego"), input, "freeze", details)
+	}
+
+	// --- AT-1 corruption check (simple package-level allow)
+	if e.at1Rego != nil {
+		rs, err := e.at1Rego.Eval(ctx, rego.EvalInput(input))
+		if err == nil && len(rs) > 0 && len(rs[0].Expressions) > 0 {
+			if b, ok := rs[0].Expressions[0].Value.(bool); ok {
+				details["at1.allow"] = b
+				details["at1.policy"] = "dis.policy.at1_corruption"
+				if !b {
+					allow = false
+				}
+			}
+		}
 	}
 
 	// Build a clearer reason string when denied. Prefer explicit deny codes

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dis-core/internal/core/authority"
+	"dis-core/internal/core/domain/spineconfig"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,11 @@ func BedrockBootstrapAtomic(ctx context.Context, tx pgx.Tx) error {
 	// insert null root
 	if _, err := tx.Exec(ctx, `INSERT INTO domains (id, name, parent_id, payload, created_at) VALUES ($1,$2,NULL,'{}'::jsonb,$3) ON CONFLICT (name) DO NOTHING`, uuid.New().String(), "null", now); err != nil {
 		return fmt.Errorf("bedrock: insert null: %w", err)
+	}
+
+	// ensure aether exists as a direct child of null (idempotent)
+	if _, err := tx.Exec(ctx, `INSERT INTO domains (id, name, parent_id, payload, created_at) VALUES (gen_random_uuid(), 'aether', (SELECT id FROM domains WHERE name = 'null' OR name = 'domain.null' LIMIT 1), '{}', $1) ON CONFLICT (name) DO NOTHING`, now); err != nil {
+		return fmt.Errorf("bedrock: insert aether: %w", err)
 	}
 
 	// resolve current parent id (starts with null)
@@ -83,7 +89,12 @@ func BedrockBootstrapAtomic(ctx context.Context, tx pgx.Tx) error {
 	if err := tx.QueryRow(ctx, `SELECT id FROM domains WHERE name = 'null' OR name = 'domain.null' LIMIT 1`).Scan(&nullDomainID); err != nil {
 		return fmt.Errorf("bedrock: resolve null for receipt: %w", err)
 	}
-	payload := map[string]any{"spine": []string{"null", "void", "terra", "numen", "lima"}}
+	// Build spine array from canonical spineconfig
+	spine := make([]string, 0, len(spineconfig.CanonicalSpine()))
+	for _, e := range spineconfig.CanonicalSpine() {
+		spine = append(spine, e.Name)
+	}
+	payload := map[string]any{"spine": spine}
 	if _, err := authority.RecordAuthorityReceiptTx(ctx, tx, nullDomainID, "ci.call.bedrock.init.v1", payload); err != nil {
 		return fmt.Errorf("bedrock: record receipt: %w", err)
 	}

@@ -315,15 +315,43 @@ func (e *Engine) RecordSeatReceipt(ctx context.Context, seatID string, typ strin
 		actor = au.CorporealDomainUID
 	}
 
-	// Persist via generic SaveReceipt
+	// Build standardized panels
+	actionPanel := map[string]any{
+		"type":      typ,
+		"seat_id":   seatID,
+		"prev_hash": prevHash,
+		"hash":      hashStr,
+	}
+	policyPanel := map[string]any{}
+	if dm, ok := contextx.PolicyDecisionMapFromContext(ctx); ok && dm != nil {
+		for k, v := range dm {
+			policyPanel[k] = v
+		}
+	}
+	identityPanel := map[string]any{}
+	if identityID != "" {
+		identityPanel["identity_id"] = identityID
+	}
+	domainPanel := map[string]any{}
+	if domainID != "" {
+		domainPanel["origin_id"] = domainID
+	}
+
+	// Persist via generic SaveReceipt using panel-aware fields
 	rcpt := &dbstore.Receipt{
-		ID:        uuid.NewString(),
-		Type:      typ,
-		Actor:     actor,
-		Target:    seatID,
-		Domain:    domainID,
-		Payload:   pl,
-		CreatedAt: time.Now().UTC(),
+		ID:               uuid.NewString(),
+		Type:             typ,
+		Actor:            actor,
+		Target:           seatID,
+		Domain:           domainID,
+		OriginDomainID:   domainID,
+		OriginDomainName: "",
+		Payload:          pl,
+		ActionPanel:      actionPanel,
+		PolicyPanel:      policyPanel,
+		IdentityPanel:    identityPanel,
+		DomainPanel:      domainPanel,
+		CreatedAt:        time.Now().UTC(),
 	}
 	if err := dbstore.SaveReceipt(ctx, e.DB, rcpt); err != nil {
 		// Some installations use a different receipts schema (receipt_type / metadata, etc.).
@@ -367,6 +395,18 @@ func (e *Engine) RecordSeatReceiptTx(ctx context.Context, tx pgx.Tx, seatID stri
 	}
 	if identityID != "" {
 		payload["identity_id"] = identityID
+	}
+
+	// If caller did not attach a decision map, pick it up from context so
+	// it becomes part of the seat receipt payload for provenance continuity.
+	if _, ok := payload["decision"]; !ok {
+		if dm, ok2 := contextx.PolicyDecisionMapFromContext(ctx); ok2 && dm != nil {
+			cp := map[string]interface{}{}
+			for k, v := range dm {
+				cp[k] = v
+			}
+			payload["decision"] = cp
+		}
 	}
 
 	// Determine previous hash via tx. First detect receipts schema safely to
@@ -461,25 +501,53 @@ func (e *Engine) RecordSeatReceiptTx(ctx context.Context, tx pgx.Tx, seatID stri
 		return fmt.Errorf("record seat receipt tx: failed to inspect receipts schema for type column: %w", err)
 	}
 
-	id := uuid.NewString()
-	if hasTypeCol {
-		_, err = tx.Exec(ctx, `
-			INSERT INTO receipts (id, type, actor, target, domain, payload, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, id, typ, actor, seatID, domainID, payload, time.Now().UTC())
-		if err != nil {
-			return fmt.Errorf("record seat receipt tx: failed to insert receipt (type schema): %w", err)
+	// Build standardized panels for the receipt
+	actionPanel := map[string]any{
+		"type":      typ,
+		"seat_id":   seatID,
+		"prev_hash": prevHash,
+		"hash":      payload["hash"],
+	}
+	policyPanel := map[string]any{}
+	if dm, ok := contextx.PolicyDecisionMapFromContext(ctx); ok && dm != nil {
+		for k, v := range dm {
+			policyPanel[k] = v
 		}
-		return nil
+	}
+	identityPanel := map[string]any{}
+	if identityID != "" {
+		identityPanel["identity_id"] = identityID
+	}
+	domainPanel := map[string]any{}
+	if domainID != "" {
+		domainPanel["origin_id"] = domainID
 	}
 
-	// Use alternate schema
-	_, err = tx.Exec(ctx, `
-		INSERT INTO receipts (id, receipt_type, issued_by, event_id, policy_ref, metadata, issued_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, id, typ, actor, seatID, payload["policy_ref"], payload, time.Now().UTC())
-	if err != nil {
-		return fmt.Errorf("record seat receipt tx: failed to insert receipt (alt schema): %w", err)
+	rcpt := &dbstore.Receipt{
+		ID:               uuid.NewString(),
+		Type:             typ,
+		Actor:            actor,
+		Target:           seatID,
+		Domain:           domainID,
+		OriginDomainID:   domainID,
+		OriginDomainName: "",
+		Payload:          payload,
+		ActionPanel:      actionPanel,
+		PolicyPanel:      policyPanel,
+		IdentityPanel:    identityPanel,
+		DomainPanel:      domainPanel,
+		CreatedAt:        time.Now().UTC(),
+	}
+
+	if err := dbstore.SaveReceiptTx(ctx, tx, rcpt); err != nil {
+		// Fallback to alternate legacy schema if needed
+		_, err2 := tx.Exec(ctx, `
+			INSERT INTO receipts (id, receipt_type, issued_by, event_id, policy_ref, metadata, issued_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, rcpt.ID, typ, rcpt.Actor, rcpt.Target, payload["policy_ref"], payload, rcpt.CreatedAt)
+		if err2 != nil {
+			return fmt.Errorf("record seat receipt tx: failed to save receipt (tx saveerror: %v, fallback: %v)", err, err2)
+		}
 	}
 	return nil
 }

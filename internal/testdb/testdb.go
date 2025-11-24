@@ -226,8 +226,10 @@ func SetupTestDB(tb testing.TB) *pgxpool.Pool {
 	// Seed canonical domains expected by GOV-8 tests. We insert after truncation
 	// so each caller receives the same deterministic domain fixtures.
 	seedInserts := []string{
-		"INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES ('4daf928e-e58c-454e-8395-f3dedd103dde', 'terra', NULL, 'terra', '{\"meta\": {\"governance\": \"human_sovereign\"}}'::jsonb, now(), now())",
-		"INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES ('a1111111-1111-1111-1111-111111111111', 'terra.numen.lima.corporeal', '4daf928e-e58c-454e-8395-f3dedd103dde', 'corporeal', '{\"meta\": {\"governance\": \"human_sovereign\"}}'::jsonb, now(), now())",
+		// Insert aether as child of null when present, then ensure terra is parented under aether.
+		"INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES (gen_random_uuid(), 'aether', (SELECT id FROM domains WHERE name='null' OR name='domain.null' LIMIT 1), 'aether', '{}'::jsonb, now(), now()) ON CONFLICT (name) DO NOTHING",
+		"INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES ('4daf928e-e58c-454e-8395-f3dedd103dde', 'terra', (SELECT id FROM domains WHERE name='aether' OR name='domain.aether' LIMIT 1), 'terra', '{\"meta\": {\"governance\": \"human_sovereign\"}}'::jsonb, now(), now())",
+		"INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES ('a1111111-1111-1111-1111-111111111111', 'terra.numen.lima.corporeal', (SELECT id FROM domains WHERE name='terra' OR name='domain.terra' LIMIT 1), 'corporeal', '{\"meta\": {\"governance\": \"human_sovereign\"}}'::jsonb, now(), now())",
 	}
 
 	for _, s := range seedInserts {
@@ -246,4 +248,53 @@ func MustHaveDB(tb testing.TB, pool *pgxpool.Pool) {
 	if pool == nil {
 		tb.Skip("Skipping test: DIS_TEST_DB_DSN not set or DB unavailable")
 	}
+}
+
+// SeedCanonicalSpine inserts the canonical spine domains in order (void, null, aether, terra, numen, lima, corporeal).
+// It is idempotent and uses ON CONFLICT DO NOTHING so tests can call it repeatedly.
+func SeedCanonicalSpine(pool *pgxpool.Pool) error {
+	ctx := context.Background()
+	// Insert in order so parent lookups succeed
+	inserts := []struct {
+		Name   string
+		Parent string // empty means NULL
+		Type   string
+	}{
+		{Name: "void", Parent: "", Type: "void"},
+		{Name: "null", Parent: "void", Type: "null"},
+		{Name: "aether", Parent: "null", Type: "aether"},
+		{Name: "terra", Parent: "aether", Type: "terra"},
+		{Name: "numen", Parent: "terra", Type: "numen"},
+		{Name: "lima", Parent: "numen", Type: "lima"},
+		{Name: "corporeal", Parent: "lima", Type: "corporeal"},
+	}
+
+	for _, it := range inserts {
+		if it.Parent == "" {
+			if _, err := pool.Exec(ctx, `INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES (gen_random_uuid(), $1, NULL, $2, '{}'::jsonb, now(), now()) ON CONFLICT (name) DO NOTHING`, it.Name, it.Type); err != nil {
+				return err
+			}
+		} else {
+			if _, err := pool.Exec(ctx, `INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at) VALUES (gen_random_uuid(), $1, (SELECT id FROM domains WHERE name = $2 OR name = ('domain.'||$2) LIMIT 1), $3, '{}'::jsonb, now(), now()) ON CONFLICT (name) DO NOTHING`, it.Name, it.Parent, it.Type); err != nil {
+				return err
+			}
+		}
+	}
+	// Ensure parent_id relationships are fixed for any existing rows that
+	// were inserted earlier without parents (seed order or prior seeds).
+	for _, it := range inserts {
+		if it.Parent == "" {
+			continue
+		}
+		if _, err := pool.Exec(ctx, `
+			UPDATE domains SET parent_id = (
+				SELECT id FROM domains WHERE name = $1 OR name = ('domain.'||$1) LIMIT 1
+			)
+			WHERE name = $2 AND (parent_id IS NULL)
+		`, it.Parent, it.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

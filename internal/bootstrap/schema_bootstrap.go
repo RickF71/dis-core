@@ -188,6 +188,22 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_receipts_9c_event_id ON receipts_9c(event_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_receipts_9c_policy_ref ON receipts_9c(policy_ref);`,
 		`CREATE INDEX IF NOT EXISTS idx_receipts_9c_redaction_ref ON receipts_9c(redaction_ref);`,
+		// GOV-9: authority_receipts ledger (hash-linked governance receipts)
+		`CREATE TABLE IF NOT EXISTS authority_receipts (
+			id TEXT PRIMARY KEY,
+			domain_id UUID NOT NULL,
+			action TEXT NOT NULL,
+			prev_id TEXT,
+			payload JSONB,
+			hash TEXT NOT NULL,
+			policy_digest TEXT,
+			created_at TIMESTAMPTZ DEFAULT now(),
+			CONSTRAINT fk_domain FOREIGN KEY (domain_id) REFERENCES domains(id),
+			CONSTRAINT fk_prev FOREIGN KEY (prev_id) REFERENCES authority_receipts(id)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_authority_receipts_domain ON authority_receipts(domain_id, created_at DESC);`,
+		`CREATE INDEX IF NOT EXISTS idx_authority_receipts_action ON authority_receipts(action);`,
+		`CREATE INDEX IF NOT EXISTS idx_authority_receipts_prev ON authority_receipts(prev_id);`,
 
 		// Phase 10F: Continuity Lineage Proofs - Fix Receipts Table
 		`CREATE TABLE IF NOT EXISTS fix_receipts (
@@ -323,8 +339,12 @@ func BootstrapAllTables(dbConn *pgxpool.Pool) error {
 	// terra: 4daf928e-e58c-454e-8395-f3dedd103dde
 	// corporeal: a1111111-1111-1111-1111-111111111111 (parent -> terra)
 	seedSQL := []string{
+		// Ensure aether exists as part of canonical spine (inserted before terra)
 		`INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at)
-		 VALUES ('4daf928e-e58c-454e-8395-f3dedd103dde', 'terra', NULL, 'terra', '{"meta": {"governance": "human_sovereign"}}'::jsonb, now(), now())
+		 VALUES (gen_random_uuid(), 'aether', (SELECT id FROM domains WHERE name = 'null' OR name = 'domain.null' LIMIT 1), 'aether', '{}'::jsonb, now(), now())
+		 ON CONFLICT (name) DO NOTHING;`,
+		`INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at)
+		 VALUES ('4daf928e-e58c-454e-8395-f3dedd103dde', 'terra', (SELECT id FROM domains WHERE name = 'aether' OR name = 'domain.aether' LIMIT 1), 'terra', '{"meta": {"governance": "human_sovereign"}}'::jsonb, now(), now())
 		 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, payload = EXCLUDED.payload, updated_at = now();`,
 		`INSERT INTO domains (id, name, parent_id, domain_type, payload, created_at, updated_at)
 		 VALUES ('a1111111-1111-1111-1111-111111111111', 'terra.numen.lima.corporeal', '4daf928e-e58c-454e-8395-f3dedd103dde', 'corporeal', '{"meta": {"governance": "human_sovereign"}}'::jsonb, now(), now())

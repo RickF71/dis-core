@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	authpkg "dis-core/internal/auth"
+	contextx "dis-core/internal/contextx"
 	dbstore "dis-core/internal/db"
 
 	"github.com/google/uuid"
@@ -51,6 +52,22 @@ func (e *Engine) CanInstantiateSeat(ctx context.Context, domainID, identityID, c
 		if mid, ok := s["identity_id"].(string); ok && mid != "" {
 			if mid == usr.CorporealDomainUID {
 				if st, ok := s["kind"].(string); ok && (st == "root" || st == "member") {
+					// Evaluate AT-1 example policy via engine EvalFn callback before allowing
+					if e.EvalFn != nil {
+						attrs := map[string]interface{}{"context": map[string]interface{}{"attrs": map[string]interface{}{"corrupt": false}}}
+						allowed, _, details, err := e.EvalFn(ctx, attrs)
+						if err != nil {
+							return false, fmt.Errorf("policy eval error: %w", err)
+						}
+						// Propagate policy decision details into the context so
+						// downstream receipt emitters can pick them up for provenance.
+						if details != nil {
+							ctx = contextx.WithPolicyDecisionMap(ctx, details)
+						}
+						if !allowed {
+							return false, nil
+						}
+					}
 					return true, nil
 				}
 			}

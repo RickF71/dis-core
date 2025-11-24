@@ -3,9 +3,12 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"dis-core/internal/core/domain"
 )
 
 // DomainInput is what the client sends in JSON
@@ -38,6 +41,19 @@ func (s *Server) handleCreateDomain(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// AI domain placement enforcement: names containing ".ai." must be
+	// created under a user domain which itself is under a corporeal domain.
+	if strings.Contains(input.Name, ".ai.") {
+		if input.ParentID == nil {
+			http.Error(w, "ai domains must be children of a user domain", http.StatusBadRequest)
+			return
+		}
+		if err := domain.ValidateAIDomainPlacementPool(ctx, db, input.ParentID.String()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}

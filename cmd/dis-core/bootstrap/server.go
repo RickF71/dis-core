@@ -41,6 +41,14 @@ func InitializeHTTPServer(database *pgxpool.Pool, ledger *ledger.Ledger, config 
 		log.Println("✅ API server initialized without policy engine")
 	}
 
+	// Placeholder: Domain Engine DI (uncomment and wire when implemented)
+	// Example:
+	// domainEngine := domain.NewEngine(
+	//     dbStore,       // implements types.DBStore
+	//     policyEngine,  // implements types.PolicyEngine
+	//     receiptsStore, // implements types.ReceiptsStore
+	// )
+
 	// Wrap with CORS middleware
 	handler := server.WithCORS(srv.Handler())
 

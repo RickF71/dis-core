@@ -1,0 +1,21 @@
+{
+  "phase": "9C",
+  "name": "Authority Receipts Integration",
+  "repo": "dis-core",
+  "status": "completed",
+  "migrations": ["db/migrations/20251110_add_receipts_table.sql"],
+  "api_endpoints": [
+    "GET /api/receipts/verify/{id}"
+  ],
+  "tests": {
+    "command": "go test ./... -v -count=1",
+    "result": "pass"
+  },
+  "artifacts": {
+    "schema": ["internal/schema/schema.json (authority receipts extension)"],
+    "logs": ["phases/phase_9c.log"]
+  },
+  "cleanup": ["20251110_add_receipts_table.sql (duplicate SQL removed)"],
+  "tests_added": ["internal/receipts/authority_receipt_test.go", "internal/api/authority_receipt_handler_test.go"],
+  "notes": "Authority decisions now have explicit receipt linkage for Authority Console."
+}

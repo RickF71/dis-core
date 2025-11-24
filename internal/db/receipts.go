@@ -17,6 +17,16 @@ type Receipt struct {
 	Domain    string         `json:"domain"`
 	Payload   map[string]any `json:"payload"` // JSONB in DB
 	CreatedAt time.Time      `json:"created_at"`
+	// Optional origin fields
+	OriginDomainID   string `json:"origin_domain_id"`
+	OriginDomainName string `json:"origin_domain_name"`
+	// Panel columns for ReceiptEnvelope
+	ActionPanel    map[string]any `json:"action_panel"`
+	PolicyPanel    map[string]any `json:"policy_panel"`
+	IdentityPanel  map[string]any `json:"identity_panel"`
+	DimensionPanel map[string]any `json:"dimension_panel"`
+	LineagePanel   map[string]any `json:"lineage_panel"`
+	DomainPanel    map[string]any `json:"domain_panel"`
 }
 
 // EnsureReceiptsSchema creates the receipts table if missing (safety net for dev/test).
@@ -29,7 +39,15 @@ func EnsureReceiptsSchema(ctx context.Context, pool *pgxpool.Pool) error {
 		target TEXT,
 		domain TEXT,
 		payload JSONB,
-		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		origin_domain_id TEXT,
+		origin_domain_name TEXT,
+		action_panel JSONB,
+		policy_panel JSONB,
+		identity_panel JSONB,
+		dimension_panel JSONB,
+		lineage_panel JSONB,
+		domain_panel JSONB
 	);
 	CREATE INDEX IF NOT EXISTS idx_receipts_created_at ON receipts(created_at);
 	`
@@ -43,15 +61,28 @@ func EnsureReceiptsSchema(ctx context.Context, pool *pgxpool.Pool) error {
 
 // SaveReceipt inserts a new receipt into the receipts table.
 func SaveReceipt(ctx context.Context, pool *pgxpool.Pool, r *Receipt) error {
+	if pool == nil {
+		return fmt.Errorf("SaveReceipt: db pool is nil")
+	}
+
 	if r.CreatedAt.IsZero() {
 		r.CreatedAt = time.Now().UTC()
 	}
-	_, err := pool.Exec(ctx, `
-		INSERT INTO receipts (id, type, actor, target, domain, payload, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7);
-	`, r.ID, r.Type, r.Actor, r.Target, r.Domain, r.Payload, r.CreatedAt)
+
+	tx, err := pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to insert receipt: %w", err)
+		return fmt.Errorf("SaveReceipt: begin tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if err := SaveReceiptTx(ctx, tx, r); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("SaveReceipt: commit tx: %w", err)
 	}
 	return nil
 }

@@ -8,16 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// VerifyReceipt loads a receipt by id and performs simple continuity checks.
 func VerifyReceipt(ctx context.Context, pool *pgxpool.Pool, id string) (VerificationResult, error) {
 	var r Receipt
 	var result VerificationResult
 
 	err := pool.QueryRow(ctx, `
-		SELECT id, receipt_type, event_id,
-		       COALESCE(policy_ref, '') as policy_ref,
-		       COALESCE(redaction_ref, '') as redaction_ref,
-		       issued_by, issued_at, verified
-		FROM receipts WHERE id = $1
+		SELECT id, receipt_type, event_id, COALESCE(policy_ref, ''), COALESCE(redaction_ref, ''), issued_by, issued_at, verified
+		FROM receipts_9c WHERE id = $1
 	`, id).Scan(&r.ID, &r.ReceiptType, &r.EventID, &r.PolicyRef, &r.RedactionRef, &r.IssuedBy, &r.IssuedAt, &r.Verified)
 	if err != nil {
 		return result, fmt.Errorf("receipt not found: %w", err)
