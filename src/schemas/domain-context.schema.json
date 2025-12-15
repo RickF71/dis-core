@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dis.system/schema/domain-context.json",
+  "title": "DIS Domain Context",
+  "description": "Resolved domain context supplied to presentation layers (e.g. Finagler)",
+  "type": "object",
+  "required": ["domain", "bootstrap"],
+  "properties": {
+    "domain": {
+      "type": "object",
+      "required": ["id", "layer"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Canonical domain identifier"
+        },
+        "layer": {
+          "type": "string",
+          "enum": [
+            "nullus",
+            "aether",
+            "terra",
+            "numen",
+            "lima",
+            "corporeal"
+          ],
+          "description": "Primary layer of the domain"
+        },
+        "parent": {
+          "type": ["string", "null"],
+          "description": "Optional parent domain id"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "bootstrap": {
+      "type": "object",
+      "required": ["colors", "layers"],
+      "properties": {
+        "colors": {
+          "type": "object",
+          "description": "Resolved canonical color palette",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "layers": {
+          "type": "object",
+          "description": "Layer-to-color binding",
+          "properties": {
+            "nullus": { "type": "string" },
+            "aether": { "type": "string" },
+            "terra": { "type": "string" },
+            "numen": { "type": "string" },
+            "lima": { "type": "string" },
+            "corporeal": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "projection": {
+      "type": "object",
+      "description": "Optional presentation hints (non-authoritative)",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["cube", "matrix", "graph"],
+          "description": "Suggested projection type"
+        },
+        "axes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "nullus",
+              "aether",
+              "terra",
+              "numen",
+              "lima",
+              "corporeal"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 6
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

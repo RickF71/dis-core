@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "colors": {
+    "void":    { "hex": "#0B0E11" },
+    "cobalt":  { "hex": "#1F3A5F" },
+    "text":    { "hex": "#D1D5DB" },
+    "emerald": { "hex": "#2ECC71" },
+    "violet":  { "hex": "#7C5CFF" },
+    "rose":    { "hex": "#E2557A" }
+  }
+}
+

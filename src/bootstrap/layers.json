@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "layers": {
+    "nullus":     "void",
+    "aether":     "cobalt",
+    "terra":      "text",
+    "numen":      "emerald",
+    "lima":       "violet",
+    "corporeal":  "rose"
+  }
+}
