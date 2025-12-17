@@ -1,6 +1,6 @@
 // src/api/grid.rs
 
-use dis_spine::spine::Layer6;
+use dis_core::spine::Layer6;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]

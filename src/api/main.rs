@@ -7,7 +7,7 @@ mod context;
 
 #[tokio::main]
 async fn main() {
-    println!("dis_spine runtime starting on http://localhost:8787");
+    println!("dis_core runtime starting on http://localhost:8787");
 
     let cors = cors()
         .allow_any_origin()

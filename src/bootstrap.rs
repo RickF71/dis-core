@@ -1,10 +1,20 @@
 use std::fs;
-use serde::Deserialize;
+use std::collections::HashMap;
+use serde::{Serialize,Deserialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ColorDef {
+    pub hex: String,
+}
+
 
 #[derive(Debug, Deserialize)]
 pub struct BootstrapColors {
-    pub colors: std::collections::HashMap<String, String>,
+    #[allow(dead_code)]
+    pub version: String,
+    pub colors: HashMap<String, ColorDef>,
 }
+
 
 #[derive(Debug, Deserialize)]
 pub struct BootstrapLayers {

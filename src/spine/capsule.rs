@@ -30,4 +30,17 @@ impl<T> Capsule<T> {
         self.to = to;
         self
     }
+
+}
+
+impl Capsule<()> {
+    /// Convenience constructor for API / test bring-up.
+    pub fn empty() -> Self {
+        Capsule {
+            payload: (),
+            from: Layer6::Nullus,
+            to: Layer6::Nullus,
+            tick: 0,
+        }
+    }
 }

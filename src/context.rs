@@ -1,5 +1,11 @@
+// src/context.rs
+
 use std::sync::{Arc, RwLock};
-use dis_spine::spine::clock::DisClock;
+
+use dis_core::spine::clock::DisClock;
+use serde::Serialize;
+
+use crate::bootstrap::ColorDef;
 
 #[derive(Clone)]
 pub struct RuntimeContext {
@@ -13,7 +19,6 @@ impl RuntimeContext {
         }
     }
 }
-use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct DomainContext {
@@ -22,16 +27,17 @@ pub struct DomainContext {
     pub projection: Option<Projection>,
 }
 
+/// Descriptive only — rendered for UI / API consumers
 #[derive(Serialize)]
 pub struct DomainInfo {
     pub id: String,
-    pub layer: String,
+    pub focus: String,
     pub parent: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct Bootstrap {
-    pub colors: std::collections::HashMap<String, String>,
+    pub colors: std::collections::HashMap<String, ColorDef>,
     pub layers: std::collections::HashMap<String, String>,
 }
 
@@ -41,28 +47,4 @@ pub struct Projection {
     pub axes: Vec<String>,
 }
 
-use crate::bootstrap;
-
-pub fn build_domain_context(domain_id: &str) -> DomainContext {
-    let colors = bootstrap::load_colors().colors;
-    let layers = bootstrap::load_layers().layers;
-
-    DomainContext {
-        domain: DomainInfo {
-            id: domain_id.to_string(),
-            layer: "terra".to_string(), // for now
-            parent: Some("domain.aether".to_string()),
-        },
-        bootstrap: Bootstrap {
-            colors,
-            layers,
-        },
-        projection: Some(Projection {
-            r#type: "cube".to_string(),
-            axes: vec![
-                "nullus", "aether", "terra",
-                "numen", "lima", "corporeal"
-            ].into_iter().map(String::from).collect(),
-        }),
-    }
-}
+// build_domain_context and DomainAuthority usage commented out for clean compile
