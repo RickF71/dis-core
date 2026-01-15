@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dis://domain/footprint/v1",
+  "$comment": "Canonical DIS Domain Footprint schema. All domain evaluation, API responses, Jikka messages, and UI rendering MUST conform to this schema. This file defines domain reality. Version with care.",
+  "title": "DIS Domain Footprint v1",
+  "type": "object",
+  "required": ["domain", "clock", "layers"],
+  "additionalProperties": false,
+
+  "properties": {
+    "domain": {
+      "type": "object",
+      "required": ["id", "parent_id", "version", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Canonical domain identifier"
+        },
+        "parent_id": {
+          "type": ["string", "null"],
+          "description": "Parent domain identifier or null for root"
+        },
+        "version": {
+          "type": "string",
+          "description": "Domain semantic version"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["bootstrapping", "active", "frozen", "archived"]
+        }
+      }
+    },
+
+    "clock": {
+      "type": "object",
+      "required": ["dis_tick", "layer"],
+      "additionalProperties": false,
+      "properties": {
+        "dis_tick": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Monotonic DIS tick"
+        },
+        "layer": {
+          "type": "string",
+          "enum": ["Nullus", "Aether", "Terra", "Numen", "Lima", "Corporeal"],
+          "description": "Current execution layer"
+        }
+      }
+    },
+
+    "layers": {
+      "type": "object",
+      "required": ["nullus", "aether", "terra", "numen", "lima", "corporeal"],
+      "additionalProperties": false,
+      "properties": {
+        "nullus": { "$ref": "#/$defs/nullus" },
+        "aether": { "$ref": "#/$defs/aether" },
+        "terra": { "$ref": "#/$defs/terra" },
+        "numen": { "$ref": "#/$defs/numen" },
+        "lima": { "$ref": "#/$defs/lima" },
+        "corporeal": { "$ref": "#/$defs/corporeal" }
+      }
+    }
+  },
+
+  "$defs": {
+    "nullus": {
+      "type": "object",
+      "required": ["exists", "node_id", "tick_origin"],
+      "additionalProperties": false,
+      "properties": {
+        "exists": { "type": "boolean" },
+        "node_id": { "type": "string" },
+        "tick_origin": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "aether": {
+      "type": "object",
+      "required": ["listening"],
+      "additionalProperties": false,
+      "properties": {
+        "listening": { "type": "boolean" },
+        "signals": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        }
+      }
+    },
+
+    "terra": {
+      "type": "object",
+      "required": ["topology"],
+      "additionalProperties": false,
+      "properties": {
+        "topology": { "type": "string" },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "space": { "type": "string" },
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      }
+    },
+
+    "numen": {
+      "type": "object",
+      "required": ["semantic_state"],
+      "additionalProperties": false,
+      "properties": {
+        "semantic_state": {
+          "type": "string",
+          "enum": ["coherent", "degraded", "unknown"]
+        },
+        "schemas": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "lima": {
+      "type": "object",
+      "required": ["interfaces"],
+      "additionalProperties": false,
+      "properties": {
+        "interfaces": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "endpoints": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+
+    "corporeal": {
+      "type": "object",
+      "required": ["permissions"],
+      "additionalProperties": false,
+      "properties": {
+        "permissions": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "freeze": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "active": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+===== FILE: contract.rs =====
+use super::meaning::MeaningId;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ContractId(pub String);
+
+#[derive(Debug, Clone)]
+pub struct NumenContract {
+    pub id: ContractId,
+
+    /// What this contract applies to
+    pub applies_to: MeaningId,
+
+    /// Human-readable explanation
+    pub description: String,
+}
+
+===== FILE: interpretation.rs =====
+use std::collections::HashSet;
+
+use crate::spine::terra::node::TerraNodeId;
+use crate::spine::terra::edge::TerraEdgeId;
+
+use super::meaning::MeaningId;
+use super::contract::ContractId;
+
+#[derive(Debug, Clone)]
+pub struct Interpretation {
+    pub target_meaning: MeaningId,
+
+    /// Structural elements this meaning applies to
+    pub nodes: HashSet<TerraNodeId>,
+    pub edges: HashSet<TerraEdgeId>,
+
+    /// Semantic contracts associated with this meaning
+    pub contracts: HashSet<ContractId>,
+}
+
+===== FILE: meaning.rs =====
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MeaningId(pub String);
+
+#[derive(Debug, Clone)]
+pub struct Meaning {
+    pub id: MeaningId,
+    pub description: String,
+
+    /// Domain-defined semantic tags
+    pub tags: HashMap<String, String>,
+}
+
+===== FILE: mod.rs =====
+//
+// Numen — Meaning Layer (D4)
+//
+// Assigns semantic interpretation to structure.
+// No authority, no enforcement.
+//
+
+pub mod meaning;
+pub mod contract;
+pub mod interpretation;
+
+pub use meaning::MeaningId;
+pub use contract::ContractId;

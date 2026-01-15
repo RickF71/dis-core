@@ -1,36 +1,45 @@
+use std::sync::Arc;
 use warp::Filter;
 
-use crate::kernel::Kernel;
-
-mod bootstrap;
-mod context;
-mod api;
-mod kernel;
+use triad::context::RuntimeContext;
+use triad::store::Store;
+use triad::api;
+use triad::ws;
 
 #[tokio::main]
 async fn main() {
-    println!("dis_core runtime starting on http://localhost:8787");
+    println!("BOOT: starting DIS server on 127.0.0.1:8710");
 
-    // -------------------------
-    // Kernel = authority boundary
-    // -------------------------
-    let kernel = Kernel::new();
+    // -------------------------------------------------
+    // Persistent store
+    // -------------------------------------------------
+    let store = Store::open()
+        .await
+        .expect("Store::open failed");
 
-    // -------------------------
-    // API routes
-    // -------------------------
-    let commit_routes = api::commit::routes(kernel.clone());
+    // -------------------------------------------------
+    // Runtime context (process-local)
+    // -------------------------------------------------
+    let runtime = Arc::new(RuntimeContext::new(store));
 
-    // You can add more routes here later:
-    // let status_routes = api::status::routes();
-    // let domain_routes = api::domain::routes(kernel.clone());
+    // -------------------------------------------------
+    // HTTP API routes (chat, domain, observe, etc.)
+    // -------------------------------------------------
+    let api_routes = api::routes(runtime.clone());
 
-    let routes = commit_routes;
+    // -------------------------------------------------
+    // WebSocket routes (/ws/observe, /ws/command, /ws/totem)
+    // -------------------------------------------------
+    let ws_routes = ws::ws_routes(runtime.clone());
 
-    // -------------------------
-    // Server
-    // -------------------------
+    // -------------------------------------------------
+    // Root routes
+    // -------------------------------------------------
+    let routes = api_routes
+        .or(ws_routes)
+        .or(warp::path("ping").map(|| "pong"));
+
     warp::serve(routes)
-        .run(([127, 0, 0, 1], 8787))
+        .run(([127, 0, 0, 1], 8710))
         .await;
 }

@@ -1,0 +1,472 @@
+===== FILE: context.rs =====
+// src/spine/05_lima/context.rs
+use std::collections::{HashMap, HashSet};
+
+use crate::spine::lima::types::*;
+use crate::spine::lima::transition::Transition;
+
+//
+// Views (interfaces) that Lima evaluates against.
+// These keep Lima orthogonal: it depends on *contracts* of information,
+// not concrete storage or domain implementations.
+//
+
+pub trait TerraView {
+    /// True if `from -> to` is structurally reachable (however your Terra defines it).
+    /// Minimal baseline: direct adjacency.
+    fn has_edge(&self, from: &TerraNodeId, to: &TerraNodeId) -> bool;
+
+    /// Optional: allow domains to model richer reachability (paths).
+    fn has_path(&self, from: &TerraNodeId, to: &TerraNodeId) -> bool {
+        self.has_edge(from, to)
+    }
+}
+
+pub trait NumenView {
+    /// True if the meaning is applicable to this transition.
+    /// Example: “diagonal” meaning only applies when move is diagonal.
+    fn meaning_applies(&self, t: &Transition) -> bool;
+
+    /// Contracts that are associated with this meaning (if you want Lima to check them).
+    /// If you don’t need this yet, return empty.
+    fn contracts_for_meaning(&self, _meaning: &MeaningId) -> HashSet<ContractId> {
+        HashSet::new()
+    }
+
+    /// Optional: contract precondition check. Domains can implement.
+    fn contract_satisfied(&self, _contract: &ContractId, _t: &Transition) -> bool {
+        true
+    }
+}
+
+/// Domain-specific constraint hook (optional).
+/// Keep it small: it should *refine* decisions, not replace Lima.
+pub trait DomainRules {
+    /// Called after baseline checks pass. Return Some(DenyReason) to deny.
+    fn additional_checks(&self, _t: &Transition) -> Option<crate::spine::lima::reasons::DenyReason> {
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AetherBindings {
+    /// seat_id -> current occupant actor_id
+    pub seat_occupant: HashMap<SeatId, ActorId>,
+}
+
+impl AetherBindings {
+    pub fn new() -> Self {
+        Self { seat_occupant: HashMap::new() }
+    }
+
+    pub fn bind(&mut self, seat: SeatId, actor: ActorId) {
+        self.seat_occupant.insert(seat, actor);
+    }
+
+    pub fn unbind(&mut self, seat: &SeatId) {
+        self.seat_occupant.remove(seat);
+    }
+
+    pub fn occupant(&self, seat: &SeatId) -> Option<&ActorId> {
+        self.seat_occupant.get(seat)
+    }
+}
+
+/// Minimal turn state: which seat currently has the move (domain-defined).
+#[derive(Debug, Clone)]
+pub struct TurnState {
+    pub active_seat: Option<SeatId>,
+}
+
+impl TurnState {
+    pub fn none() -> Self { Self { active_seat: None } }
+}
+
+/// Freeze is modeled as a set of active deny scopes.
+/// (You can later attach TTL, break-glass receipts, etc.)
+#[derive(Debug, Clone)]
+pub struct FreezeState {
+    pub active_scopes: HashSet<FreezeScopeId>,
+}
+
+impl FreezeState {
+    pub fn none() -> Self { Self { active_scopes: HashSet::new() } }
+
+    pub fn is_frozen(&self) -> bool {
+        !self.active_scopes.is_empty()
+    }
+}
+
+pub struct LimaContext<'a> {
+    pub domain: DomainId,
+
+    pub aether: &'a AetherBindings,
+    pub terra: &'a dyn TerraView,
+    pub numen: &'a dyn NumenView,
+
+    pub turn: TurnState,
+    pub freeze: FreezeState,
+
+    /// Optional domain-specific rules.
+    pub domain_rules: Option<&'a dyn DomainRules>,
+}
+
+impl<'a> LimaContext<'a> {
+    pub fn new(
+        domain: DomainId,
+        aether: &'a AetherBindings,
+        terra: &'a dyn TerraView,
+        numen: &'a dyn NumenView,
+    ) -> Self {
+        Self {
+            domain,
+            aether,
+            terra,
+            numen,
+            turn: TurnState::none(),
+            freeze: FreezeState::none(),
+            domain_rules: None,
+        }
+    }
+}
+
+===== FILE: decision.rs =====
+// src/spine/05_lima/decision.rs
+use crate::spine::lima::reasons::DenyReason;
+
+#[derive(Debug, Clone)]
+pub enum Decision {
+    Allow,
+    Deny { reason: DenyReason },
+}
+
+impl Decision {
+    pub fn deny(reason: DenyReason) -> Self {
+        Decision::Deny { reason }
+    }
+}
+
+===== FILE: evaluator.rs =====
+// src/spine/05_lima/evaluator.rs
+
+use crate::spine::lima::{
+    Transition,
+    LimaContext,
+    Decision,
+    DenyReason,
+};
+
+use crate::spine::SpineLayer;
+
+use super::receipt::TransitionReceipt;
+
+pub struct LimaEvaluator;
+
+impl LimaEvaluator {
+    pub fn evaluate(t: &Transition, ctx: &LimaContext) -> Decision {
+        // --- 0) Domain sanity
+        if t.domain != ctx.domain {
+            return Decision::deny(DenyReason::Other {
+                code: "deny:lima:domain_mismatch".into(),
+                detail: "transition domain != context domain".into(),
+            });
+        }
+
+        // --- 1) Freeze ribbon
+        if ctx.freeze.is_frozen() {
+            let scope = ctx
+                .freeze
+                .active_scopes
+                .iter()
+                .next()
+                .cloned()
+                .unwrap_or_else(|| crate::spine::lima::types::FreezeScopeId("unknown".into()));
+
+            return Decision::deny(DenyReason::Frozen { scope });
+        }
+
+        // --- 2) Aether: seat binding
+        match ctx.aether.occupant(&t.seat) {
+            None => return Decision::deny(DenyReason::SeatNotBound { seat: t.seat.clone() }),
+            Some(occ) if *occ != t.actor => {
+                return Decision::deny(DenyReason::ActorNotOccupant {
+                    seat: t.seat.clone(),
+                    actor: t.actor.clone(),
+                })
+            }
+            Some(_) => {}
+        }
+
+        // --- 3) Terra
+        if !ctx.terra.has_path(&t.from, &t.to) {
+            return Decision::deny(DenyReason::NoStructuralPath {
+                from: t.from.clone(),
+                to: t.to.clone(),
+            });
+        }
+
+        // --- 4) Numen
+        if !ctx.numen.meaning_applies(t) {
+            return Decision::deny(DenyReason::MeaningNotApplicable {
+                meaning: t.meaning.clone(),
+            });
+        }
+
+        // --- 5) Contracts
+        for c in ctx.numen.contracts_for_meaning(&t.meaning) {
+            if !ctx.numen.contract_satisfied(&c, t) {
+                return Decision::deny(DenyReason::ContractNotSatisfied { contract: c });
+            }
+        }
+
+        // --- 6) Turn
+        if let Some(active) = &ctx.turn.active_seat {
+            if *active != t.seat {
+                return Decision::deny(DenyReason::NotYourTurn { seat: t.seat.clone() });
+            }
+        }
+
+        // --- 7) Domain rules
+        if let Some(rules) = ctx.domain_rules {
+            if let Some(reason) = rules.additional_checks(t) {
+                return Decision::deny(reason);
+            }
+        }
+
+        Decision::Allow
+    }
+}
+
+// ------------------------------------------------------------
+// Receipt emission (PURE WRAPPER — no authority change)
+// ------------------------------------------------------------
+
+pub fn evaluate_with_receipt(
+    t: &Transition,
+    ctx: &LimaContext,
+) -> TransitionReceipt {
+    let decision = LimaEvaluator::evaluate(t, ctx);
+
+    TransitionReceipt {
+        domain: t.domain.clone(),
+        actor: t.actor.clone(),
+        seat: t.seat.clone(),
+        from: t.from.clone(),
+        to: t.to.clone(),
+        meaning: t.meaning.clone(),
+        tick: t.tick,
+        layer: SpineLayer::Lima,
+        decision,
+    }
+}
+
+===== FILE: mod.rs =====
+// src/spine/05_lima/mod.rs
+//
+// Lima — Constraint / Commitment Layer (D5)
+//
+// Evaluates proposed transitions (hypotheses) against coherence constraints.
+// NO state mutation.
+// NO rendering.
+// NO receipt writing.
+//
+// Lima consumes:
+// - Aether (presence / bindings)
+// - Terra (structure / adjacency)
+// - Numen (meaning / contracts)
+// - Time ribbon (ticks)
+// - Freeze ribbon (deny scopes)
+//
+// Lima produces:
+// - Decision (Allow / Deny + reason)
+//
+// NOTE: This module is intentionally domain-agnostic.
+// Domains plug in via the TerraView / NumenView traits and optional DomainRules.
+
+pub mod types;
+pub mod transition;
+pub mod decision;
+pub mod reasons;
+pub mod context;
+pub mod evaluator;
+pub mod receipt;
+
+
+pub use types::*;
+pub use transition::*;
+pub use decision::*;
+pub use reasons::*;
+pub use context::*;
+pub use evaluator::*;
+pub use receipt::TransitionReceipt;
+
+
+
+===== FILE: reasons.rs =====
+// src/spine/05_lima/reasons.rs
+use crate::spine::lima::types::*;
+
+#[derive(Debug, Clone)]
+pub enum DenyReason {
+    // --------------------------------
+    // Aether / presence
+    // --------------------------------
+    SeatNotBound { seat: SeatId },
+    ActorNotOccupant { seat: SeatId, actor: ActorId },
+
+    // --------------------------------
+    // Terra / structure
+    // --------------------------------
+    NoStructuralPath { from: TerraNodeId, to: TerraNodeId },
+
+    // --------------------------------
+    // Numen / meaning
+    // --------------------------------
+    MeaningNotApplicable { meaning: MeaningId },
+
+    // Optional: contracts not satisfied (Numen describes them; Lima checks preconditions)
+    ContractNotSatisfied { contract: ContractId },
+
+    // --------------------------------
+    // Time / turn / sequencing
+    // --------------------------------
+    NotYourTurn { seat: SeatId },
+
+    // --------------------------------
+    // Freeze ribbon
+    // --------------------------------
+    Frozen { scope: FreezeScopeId },
+
+    // --------------------------------
+    // Catch-all
+    // --------------------------------
+    Other { code: String, detail: String },
+}
+
+===== FILE: receipt.rs =====
+//
+// Lima — Transition Receipt
+//
+// Immutable record that a Lima evaluation occurred.
+// Receipts prove authority was exercised; they do not grant authority.
+//
+
+use crate::spine::{
+    SpineLayer,
+    terra::TerraNodeId,
+    numen::MeaningId,
+    ActorId,
+    DomainId,
+    SeatId,
+};
+
+use super::{
+    Decision,
+    TickId,
+};
+
+/// Receipt emitted by Lima after evaluating a transition.
+#[derive(Debug, Clone)]
+pub struct TransitionReceipt {
+    pub domain: DomainId,
+    pub actor: ActorId,
+    pub seat: SeatId,
+
+    pub from: TerraNodeId,
+    pub to: TerraNodeId,
+    pub meaning: MeaningId,
+
+    pub tick: TickId,
+    pub layer: SpineLayer,
+
+    pub decision: Decision,
+}
+
+impl TransitionReceipt {
+    pub fn from_decision(
+        t: &super::Transition,
+        decision: Decision,
+    ) -> Self {
+        Self {
+            domain: t.domain.clone(),
+            actor: t.actor.clone(),
+            seat: t.seat.clone(),
+            from: t.from.clone(),
+            to: t.to.clone(),
+            meaning: t.meaning.clone(),
+            tick: t.tick,
+            layer: SpineLayer::Lima,
+            decision,
+        }
+    }
+}
+
+===== FILE: transition.rs =====
+// src/spine/05_lima/transition.rs
+use crate::spine::lima::types::*;
+
+//
+// A proposed transition (a hypothesis).
+// “Suppose this actor, in this seat, attempts this meaningful structural move at this time.”
+// Lima evaluates this without mutating anything.
+//
+
+#[derive(Debug, Clone)]
+pub struct Transition {
+    pub domain: DomainId,
+
+    pub actor: ActorId,
+    pub seat: SeatId,
+
+    /// Structural move in Terra space.
+    pub from: TerraNodeId,
+    pub to: TerraNodeId,
+
+    /// Semantic intent (Numen meaning applied to this transition).
+    pub meaning: MeaningId,
+
+    /// Time ribbon sample (used for turn-taking, TTLs, freeze windows, etc.)
+    pub tick: TickId,
+}
+
+impl Transition {
+    pub fn new(
+        domain: DomainId,
+        actor: ActorId,
+        seat: SeatId,
+        from: TerraNodeId,
+        to: TerraNodeId,
+        meaning: MeaningId,
+        tick: TickId,
+    ) -> Self {
+        Self { domain, actor, seat, from, to, meaning, tick }
+    }
+}
+
+===== FILE: types.rs =====
+// src/spine/05_lima/types.rs
+//
+// Centralizes type aliases to keep Lima stable.
+// Adjust the module paths here if your Terra/Numen modules use different names/paths.
+
+/// --- Projection IDs ---
+pub type ActorId = crate::spine::projection::triad::ActorId;
+pub type DomainId = crate::spine::projection::triad::DomainId;
+pub type SeatId  = crate::spine::projection::triad::SeatId;
+
+/// --- Terra IDs (adjust these paths to match your Terra module) ---
+/// e.g. crate::spine::03_terra::node::TerraNodeId
+pub type TerraNodeId = crate::spine::terra::node::TerraNodeId;
+pub type TerraEdgeId = crate::spine::terra::edge::TerraEdgeId;
+
+/// --- Numen IDs (adjust these paths to match your Numen module) ---
+pub type MeaningId   = crate::spine::numen::meaning::MeaningId;
+pub type ContractId  = crate::spine::numen::contract::ContractId;
+
+/// --- Lima-local IDs ---
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TickId(pub u64);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct FreezeScopeId(pub String);
+

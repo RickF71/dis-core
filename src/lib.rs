@@ -1,29 +1,60 @@
-// src/lib.rs
+//! TRIAD
+//! Core structural reality of DIS.
 
-pub mod domain;
+// ============================================================
+// CORE — Authority & Truth
+// ============================================================
+
+// Structural spine (no behavior)
 pub mod spine;
 
-#[cfg(test)]
-mod tests {
-    //use super::*; // brings `domain` and `spine` into scope
+// Process-local runtime state (no authority)
+pub mod context;
 
-    use crate::spine::Layer6;
-    use crate::spine::payload::{PayloadRef, PayloadId};
-    use crate::spine::node::{Node, NodeId};
+// Identity & continuity
+pub mod identity;
 
-    #[test]
-    fn builds_node() {
-        let id = NodeId::generate();
+// Sealed capability containers
+pub mod capsule;
 
-        let node = Node {
-            id,
-            domain: id, // self-domain
-            payload: PayloadRef {
-                domain: Layer6::Nullus,
-                id: PayloadId([0u8; 32]),
-            },
-        };
+// Policy evaluation (non-authoritative)
+pub mod policy;
 
-        let _ = node;
-    }
-}
+// Persistent storage substrate
+pub mod store;
+
+// Domain ontology & artifacts
+pub mod domain;
+
+// Canonical ID types
+pub mod id;
+
+// ============================================================
+// OBSERVER — Awareness & Witness
+// ============================================================
+
+// Projection & observation layer
+pub mod taiji;
+pub mod chat;
+
+
+// ============================================================
+// RUNTIME — Process Composition (No Authority)
+// ============================================================
+
+// Binary entry composition
+pub mod app;
+
+
+// ============================================================
+// NODE-FACING ADAPTERS (Translation Only)
+// ============================================================
+
+// Read-only HTTP views
+pub mod api;
+
+// WebSocket adapters (observe / command / totem)
+pub mod ws;
+
+// Transport overlays (e.g. JikkaPipe)
+pub mod runtime;

@@ -1,4 +1,4 @@
-use crate::domain::domain_id::DomainId;
+use crate::id::DomainId;
 
 #[derive(Debug, Clone)]
 pub struct ParentLink {

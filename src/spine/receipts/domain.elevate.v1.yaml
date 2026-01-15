@@ -1,0 +1,19 @@
+# schema: domain.elevate.v1
+# status: FROZEN
+# purpose: Domain genesis + initial continuity anchoring
+
+type: domain.elevate.v1
+
+receipt:
+  id: rcpt-uuid            # globally unique, immutable
+  tick: dis-tick           # monotonic DIS clock value
+
+actor:
+  id: actor-id             # Nullus identity performing elevation
+
+domain:
+  id: domain-id            # newly created domain
+  parent: null | domain-id # optional parent domain
+
+spine:
+  layer: nullus            # elevation originates at identity

@@ -1,8 +1,10 @@
-// src/spine/storage_key.rs
-use crate::spine::Layer6;
+use crate::domain::lattice_axis::LatticeAxis;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StorageKey {
-    pub layer: Layer6,
+    /// Lattice axis this storage is bound to
+    pub axis: LatticeAxis,
+
+    /// Opaque material discriminator (hash, salt, etc.)
     pub material: [u8; 32],
 }
