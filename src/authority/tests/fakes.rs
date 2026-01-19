@@ -131,3 +131,21 @@ impl ReceiptWriter for SharedBackend {
         Ok(())
     }
 }
+
+
+use crate::authority::gate::ReceiptIdMint;
+use crate::authority::types::ReceiptRef;
+
+#[derive(Default)]
+pub struct TestReceiptMinter {
+    next: u64,
+}
+
+impl ReceiptIdMint for TestReceiptMinter {
+    fn mint_receipt_id(&mut self) -> ReceiptRef {
+        self.next += 1;
+        ReceiptRef {
+            id: format!("rcpt-{}", self.next),
+        }
+    }
+}

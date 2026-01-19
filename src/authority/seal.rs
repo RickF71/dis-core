@@ -1,8 +1,13 @@
 // ============================================================
 // FILE: src/authority/seal.rs
 // ============================================================
-
-use std::sync::atomic::{AtomicU64, Ordering};
+//
+// Phase 3.2 canonical form:
+// - NO receipt ID minting
+// - NO globals
+// - NO authority
+// - Assembly only
+//
 
 use super::types::{
     Receipt,
@@ -16,17 +21,13 @@ use super::types::{
     ProvenanceRef,
 };
 
-// -----------------------------------------------------------------------------
-// Receipt identity — deterministic, monotonic, no clocks, no entropy
-// -----------------------------------------------------------------------------
-static NEXT_RECEIPT_ID: AtomicU64 = AtomicU64::new(1);
-
-// This is the capability token — MUST exist
+// Capability token — cannot be constructed outside authority module
 pub(crate) struct Sealed;
 
-// This is the function receipt.rs imports — MUST match name exactly
+// Assembly-only function — receipt ID MUST be supplied by authority
 pub(crate) fn seal_receipt(
     _sealed: Sealed,
+    id: ReceiptRef,
     actor: ActorRef,
     domain: DomainRef,
     scope: Scope,
@@ -34,12 +35,6 @@ pub(crate) fn seal_receipt(
     policy: PolicyRef,
     provenance: ProvenanceRef,
 ) -> Receipt {
-    let n = NEXT_RECEIPT_ID.fetch_add(1, Ordering::Relaxed);
-
-    let id = ReceiptRef {
-        id: format!("rcpt-{}", n),
-    };
-
     Receipt {
         id,
         kind: ReceiptKind::CiCallV1,

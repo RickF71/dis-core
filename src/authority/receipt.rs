@@ -1,6 +1,12 @@
 // ============================================================
 // FILE: src/authority/receipt.rs
 // ============================================================
+//
+// Phase 3.2 canonical form:
+// - ReceiptMint does NOT mint IDs
+// - ReceiptRef is supplied by authority (gate.rs)
+// - This module formats receipts only
+//
 
 use super::seal::{Sealed, seal_receipt};
 use super::types::*;
@@ -10,6 +16,7 @@ pub(crate) struct ReceiptMint;
 
 impl ReceiptMint {
     pub(crate) fn allowed(
+        id: ReceiptRef,
         actor: ActorRef,
         domain: DomainRef,
         scope: Scope,
@@ -18,6 +25,7 @@ impl ReceiptMint {
     ) -> Receipt {
         seal_receipt(
             Sealed,
+            id,
             actor,
             domain,
             scope,
@@ -28,6 +36,7 @@ impl ReceiptMint {
     }
 
     pub(crate) fn denied(
+        id: ReceiptRef,
         actor: ActorRef,
         domain: DomainRef,
         scope: Scope,
@@ -45,6 +54,7 @@ impl ReceiptMint {
 
         seal_receipt(
             Sealed,
+            id,
             actor,
             domain,
             scope,
@@ -55,6 +65,7 @@ impl ReceiptMint {
     }
 
     pub(crate) fn error(
+        id: ReceiptRef,
         actor: ActorRef,
         domain: DomainRef,
         scope: Scope,
@@ -62,7 +73,6 @@ impl ReceiptMint {
         policy: PolicyRef,
         provenance: ProvenanceRef,
     ) -> Receipt {
-        // Keep error codes stable and boring
         let code = match err {
             AuthorityError::MissingIdentityBinding => "err:missing_identity",
             AuthorityError::NonBypassViolation => "err:non_bypass",
@@ -71,10 +81,12 @@ impl ReceiptMint {
             AuthorityError::InvalidProvenanceRef => "err:invalid_provenance_ref",
             AuthorityError::KernelMisconfiguration => "err:kernel_misconfig",
             AuthorityError::InternalInvariantFailed(_) => "err:invariant",
-        }.to_string();
+        }
+        .to_string();
 
         seal_receipt(
             Sealed,
+            id,
             actor,
             domain,
             scope,
@@ -84,4 +96,3 @@ impl ReceiptMint {
         )
     }
 }
-

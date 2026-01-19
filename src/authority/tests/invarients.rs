@@ -10,7 +10,10 @@ use crate::authority::*;
 use crate::authority::gate::*;
 use super::fakes::{FakeAuthorityBackend, SharedBackend};
 
-fn mk_kernel_with_backend() -> (AuthorityKernel<SharedBackend, SharedBackend>, SharedBackend) {
+fn mk_kernel_with_backend() -> (
+    AuthorityKernel<SharedBackend, SharedBackend, super::fakes::TestReceiptMinter>,
+    SharedBackend,
+) {
     let backend: SharedBackend = Rc::new(RefCell::new(
         FakeAuthorityBackend::default().with_actor("alice")
     ));
@@ -19,10 +22,12 @@ fn mk_kernel_with_backend() -> (AuthorityKernel<SharedBackend, SharedBackend>, S
         AuthorityKernelConfig { enforce_non_bypass: true },
         backend.clone(), // reader
         backend.clone(), // writer
+        super::fakes::TestReceiptMinter::default(),
     );
 
     (kernel, backend)
 }
+
 
 fn receipt_count(backend: &SharedBackend) -> usize {
     backend.borrow().receipts.len()

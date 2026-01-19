@@ -19,7 +19,9 @@ fn freeze_denies_commit() {
         AuthorityKernelConfig { enforce_non_bypass: true },
         backend.clone(), // reader
         backend.clone(), // writer
+        super::fakes::TestReceiptMinter::default(),
     );
+
 
     // Freeze
     let freeze = AuthorityRequest::Freeze {
@@ -85,3 +87,5 @@ fn freeze_denies_commit() {
     assert_eq!(receipt.provenance.id, "prov.ok");
 
 }
+
+
