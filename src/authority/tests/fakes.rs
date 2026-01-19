@@ -149,3 +149,12 @@ impl ReceiptIdMint for TestReceiptMinter {
         }
     }
 }
+
+use crate::authority::gate::ReceiptParentReader;
+
+impl ReceiptParentReader for SharedBackend {
+    fn get_receipt(&self, id: &ReceiptRef) -> Result<Option<Receipt>, AuthorityError> {
+        let b = self.borrow();
+        Ok(b.receipts.iter().find(|r| &r.id == id).cloned())
+    }
+}

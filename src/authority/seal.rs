@@ -2,11 +2,12 @@
 // FILE: src/authority/seal.rs
 // ============================================================
 //
-// Phase 3.2 canonical form:
+// Phase 3.4+ canonical form:
 // - NO receipt ID minting
 // - NO globals
 // - NO authority
 // - Assembly only
+// - Lineage accepted, not decided
 //
 
 use super::types::{
@@ -24,13 +25,14 @@ use super::types::{
 // Capability token — cannot be constructed outside authority module
 pub(crate) struct Sealed;
 
-// Assembly-only function — receipt ID MUST be supplied by authority
+// Assembly-only function — receipt ID AND parent MUST be supplied by authority
 pub(crate) fn seal_receipt(
     _sealed: Sealed,
     id: ReceiptRef,
     actor: ActorRef,
     domain: DomainRef,
     scope: Scope,
+    parent: Option<ReceiptRef>,
     outcome: ReceiptOutcome,
     policy: PolicyRef,
     provenance: ProvenanceRef,
@@ -41,6 +43,7 @@ pub(crate) fn seal_receipt(
         actor,
         domain,
         scope,
+        parent,
         outcome,
         policy,
         provenance,

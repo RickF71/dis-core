@@ -4,27 +4,6 @@
 // Constraints: Phase-2 quarantine (no clocks, no runtime leakage, no transport leakage)
 // ============================================================
 //
-// Recommended crate layout additions:
-//
-// src/
-//   authority/
-//     mod.rs
-//     prelude.rs
-//     types.rs
-//     errors.rs
-//     seal.rs
-//     gate.rs
-//     freeze.rs
-//     commit.rs
-//     receipt.rs
-//   lib.rs  (re-export only what is intended)
-// tests/
-//   authority_freeze.rs
-//   authority_commit.rs
-//
-// NOTE: This is a skeleton: compile-first, wire-later.
-// No storage implementation required here; define traits only.
-//
 // ============================================================
 // FILE: src/authority/mod.rs
 // ============================================================
@@ -32,6 +11,7 @@
 pub mod prelude;
 pub mod types;
 pub mod errors;
+pub mod receipt_envelope;
 
 mod seal;
 mod gate;
@@ -47,6 +27,10 @@ pub use types::{
     AuthorityOutcome,
     Receipt,
     ReceiptRef,
+    ReceiptKind,
+    ReceiptOutcome,
+    ReceiptSeal,
+    WitnessRef,
     ActorRef,
     DomainRef,
     Scope,
@@ -58,6 +42,7 @@ pub use types::{
     ProvenanceRef,
 };
 pub use errors::{AuthorityError, DenyReason};
+pub use receipt_envelope::ReceiptEnvelopeBuilder;
 
 
 

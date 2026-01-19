@@ -1,13 +1,11 @@
 // ============================================================
 // FILE: src/authority/tests/invariants.rs
-// New file
 // ============================================================
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::authority::*;
-use crate::authority::gate::*;
 use super::fakes::{FakeAuthorityBackend, SharedBackend};
 
 fn mk_kernel_with_backend() -> (
@@ -19,7 +17,7 @@ fn mk_kernel_with_backend() -> (
     ));
 
     let kernel = AuthorityKernel::new(
-        AuthorityKernelConfig { enforce_non_bypass: true },
+        AuthorityKernelConfig { enforce_non_bypass: true, max_parent_hops: 64 },
         backend.clone(), // reader
         backend.clone(), // writer
         super::fakes::TestReceiptMinter::default(),
@@ -27,7 +25,6 @@ fn mk_kernel_with_backend() -> (
 
     (kernel, backend)
 }
-
 
 fn receipt_count(backend: &SharedBackend) -> usize {
     backend.borrow().receipts.len()
@@ -45,7 +42,7 @@ fn assert_receipt_appended_exactly_one(
     let receipt_ref = match after_outcome {
         AuthorityOutcome::Allowed { receipt, .. } => receipt,
         AuthorityOutcome::Denied { receipt, .. } => receipt,
-        AuthorityOutcome::Error(_) => return, // Error outcome doesn't carry ReceiptRef in your current types
+        AuthorityOutcome::Error(_) => return, // your AuthorityOutcome::Error currently doesn't carry ReceiptRef
     };
 
     let b = backend.borrow();
@@ -73,6 +70,7 @@ fn every_apply_emits_exactly_one_receipt() {
         },
         policy: PolicyRef { id: "policy.ok".into() },
         provenance: ProvenanceRef { id: "prov.ok".into() },
+        parent: None,
     });
     assert_receipt_appended_exactly_one(&backend, before, &out);
 
@@ -89,6 +87,7 @@ fn every_apply_emits_exactly_one_receipt() {
         },
         policy: PolicyRef { id: "policy.ok".into() },
         provenance: ProvenanceRef { id: "prov.ok".into() },
+        parent: None,
     });
     assert_receipt_appended_exactly_one(&backend, before, &out);
 
@@ -104,6 +103,7 @@ fn every_apply_emits_exactly_one_receipt() {
         },
         policy: PolicyRef { id: "policy.ok".into() },
         provenance: ProvenanceRef { id: "prov.ok".into() },
+        parent: None,
     });
     assert_receipt_appended_exactly_one(&backend, before, &out);
 }

@@ -14,7 +14,7 @@ pub struct ActorRef {
     pub id: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)] 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DomainRef {
     // Terra anchor (scope root).
     pub id: String,
@@ -56,9 +56,9 @@ pub struct ProvenanceRef {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FreezeOp {
-    Freeze,        // domain.freeze.v1
-    Unfreeze,      // domain.unfreeze.v1
-    BreakGlass,    // domain.freeze.override.v1
+    Freeze,     // domain.freeze.v1
+    Unfreeze,   // domain.unfreeze.v1
+    BreakGlass, // domain.freeze.override.v1
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -87,25 +87,28 @@ pub struct CommitIntent {
 // -----------------------------
 // Requests / Outcomes
 // -----------------------------
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthorityRequest {
     Freeze {
-        // Corporeal actor performing the act
         actor: ActorRef,
-        // Numen/Lima expressed request (canonicalized)
         intent: FreezeIntent,
-        // Mandatory provenance references
         policy: PolicyRef,
         provenance: ProvenanceRef,
+
+        // Phase 3.5: optional lineage input
+        parent: Option<ReceiptRef>,
     },
     Commit {
         actor: ActorRef,
         intent: CommitIntent,
         policy: PolicyRef,
         provenance: ProvenanceRef,
+
+        // Phase 3.5: optional lineage input
+        parent: Option<ReceiptRef>,
     },
 }
+
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AuthorityOutcome {
@@ -145,6 +148,10 @@ pub struct Receipt {
     pub actor: ActorRef,
     pub domain: DomainRef,
     pub scope: Scope,
+
+    // Optional lineage pointer (Phase 3.5)
+    pub parent: Option<ReceiptRef>,
+
     pub outcome: ReceiptOutcome,
     // References only — never embed sensitive data by default.
     pub policy: PolicyRef,
@@ -171,4 +178,112 @@ impl fmt::Display for ReceiptRef {
     }
 }
 
+// ============================================================
+// Phase 3.3 — Receipt sealing boundary (types)
+// Additive: introduces Envelope + Seal without changing kernel logic yet
+// ============================================================
 
+/// A signature/seal applied to a Receipt *outside* the authority kernel.
+///
+/// IMPORTANT:
+/// - Authority kernel does NOT create these.
+/// - Transport does NOT interpret them.
+/// - They are opaque bytes + metadata to support future verification.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReceiptSeal {
+    /// e.g. "ed25519", "p256", "domain.sig.v1"
+    pub scheme: String,
+
+    /// key identifier or reference (NOT the key itself)
+    pub key_id: String,
+
+    /// signature bytes (opaque)
+    pub sig: Vec<u8>,
+}
+
+/// Optional witness references to attach to an envelope later.
+/// (CI runs, SAT chains, external attestations, etc.)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WitnessRef {
+    pub id: String,
+}
+
+/// ReceiptEnvelope is the *signed/attested* form of a receipt.
+/// The authority kernel produces `Receipt` (core) only.
+/// External layers may wrap it with seals and witnesses.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReceiptEnvelope {
+    pub core: Receipt,
+    pub seals: Vec<ReceiptSeal>,
+    pub witnesses: Vec<WitnessRef>,
+}
+
+/// Canonical, deterministic signable form.
+///
+/// No crypto yet. No hashing yet.
+/// This is purely “what bytes would be signed”.
+///
+/// Rules:
+/// - Must be stable.
+/// - Must not include anything that can vary by transport.
+/// - Must not include `seals`/`witnesses` (those belong to the envelope).
+impl Receipt {
+    pub fn signable_string_v1(&self) -> String {
+        let outcome_str = match &self.outcome {
+            ReceiptOutcome::Allowed => "allowed".to_string(),
+            ReceiptOutcome::Denied { code } => format!("denied:{}", code),
+            ReceiptOutcome::Error { code } => format!("error:{}", code),
+        };
+
+        let parent_str = match &self.parent {
+            None => "none".to_string(),
+            Some(p) => p.id.clone(),
+        };
+
+        // NOTE: signatures wrap the receipt; the receipt does not contain them.
+        format!(
+            "receipt.signable.v1|id={}|parent={}|kind={:?}|actor={}|domain={}|scope={}|outcome={}|policy={}|prov={}",
+            self.id.id,
+            parent_str,
+            self.kind,
+            self.actor.id,
+            self.domain.id,
+            self.scope.key,
+            outcome_str,
+            self.policy.id,
+            self.provenance.id,
+        )
+    }
+}
+
+// Add this BELOW your existing signable_string_v1() impl block
+
+impl Receipt {
+    /// Phase 3.8: lineage-binding signable form (includes parent).
+    /// This is intentionally additive (v1 remains stable).
+    pub fn signable_string_v2(&self) -> String {
+        let outcome_str = match &self.outcome {
+            ReceiptOutcome::Allowed => "allowed".to_string(),
+            ReceiptOutcome::Denied { code } => format!("denied:{}", code),
+            ReceiptOutcome::Error { code } => format!("error:{}", code),
+        };
+
+        let parent_str = match &self.parent {
+            Some(p) => p.id.as_str(),
+            None => "",
+        };
+
+        format!(
+            "receipt.signable.v2|id={}|parent={}|kind={:?}|actor={}|domain={}|scope={}|outcome={}|policy={}|prov={}",
+            self.id.id,
+            parent_str,
+            self.kind,
+            self.actor.id,
+            self.domain.id,
+            self.scope.key,
+            outcome_str,
+            self.policy.id,
+            self.provenance.id,
+        )
+    }
+}

@@ -2,10 +2,7 @@
 // FILE: src/authority/receipt.rs
 // ============================================================
 //
-// Phase 3.2 canonical form:
-// - ReceiptMint does NOT mint IDs
-// - ReceiptRef is supplied by authority (gate.rs)
-// - This module formats receipts only
+// Phase 3.7: error code mapping includes lineage validation errors
 //
 
 use super::seal::{Sealed, seal_receipt};
@@ -20,6 +17,7 @@ impl ReceiptMint {
         actor: ActorRef,
         domain: DomainRef,
         scope: Scope,
+        parent: Option<ReceiptRef>,
         policy: PolicyRef,
         provenance: ProvenanceRef,
     ) -> Receipt {
@@ -29,6 +27,7 @@ impl ReceiptMint {
             actor,
             domain,
             scope,
+            parent,
             ReceiptOutcome::Allowed,
             policy,
             provenance,
@@ -40,6 +39,7 @@ impl ReceiptMint {
         actor: ActorRef,
         domain: DomainRef,
         scope: Scope,
+        parent: Option<ReceiptRef>,
         reason: &DenyReason,
         policy: PolicyRef,
         provenance: ProvenanceRef,
@@ -58,6 +58,7 @@ impl ReceiptMint {
             actor,
             domain,
             scope,
+            parent,
             ReceiptOutcome::Denied { code },
             policy,
             provenance,
@@ -69,6 +70,7 @@ impl ReceiptMint {
         actor: ActorRef,
         domain: DomainRef,
         scope: Scope,
+        parent: Option<ReceiptRef>,
         err: &AuthorityError,
         policy: PolicyRef,
         provenance: ProvenanceRef,
@@ -81,6 +83,11 @@ impl ReceiptMint {
             AuthorityError::InvalidProvenanceRef => "err:invalid_provenance_ref",
             AuthorityError::KernelMisconfiguration => "err:kernel_misconfig",
             AuthorityError::InternalInvariantFailed(_) => "err:invariant",
+
+            // Phase 3.7
+            AuthorityError::ParentNotFound => "err:parent_not_found",
+            AuthorityError::ParentDomainMismatch => "err:parent_domain_mismatch",
+            AuthorityError::ParentCycleDetected => "err:parent_cycle",
         }
         .to_string();
 
@@ -90,6 +97,7 @@ impl ReceiptMint {
             actor,
             domain,
             scope,
+            parent,
             ReceiptOutcome::Error { code },
             policy,
             provenance,

@@ -1,5 +1,9 @@
-use std::rc::Rc;
+// ============================================================
+// FILE: src/authority/tests/freeze.rs
+// ============================================================
+
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::authority::*;
 use crate::authority::types::ReceiptOutcome;
@@ -16,12 +20,11 @@ fn freeze_denies_commit() {
     ));
 
     let mut kernel = AuthorityKernel::new(
-        AuthorityKernelConfig { enforce_non_bypass: true },
+        AuthorityKernelConfig { enforce_non_bypass: true, max_parent_hops: 64 },
         backend.clone(), // reader
         backend.clone(), // writer
         super::fakes::TestReceiptMinter::default(),
     );
-
 
     // Freeze
     let freeze = AuthorityRequest::Freeze {
@@ -35,6 +38,7 @@ fn freeze_denies_commit() {
         },
         policy: PolicyRef { id: "policy.ok".into() },
         provenance: ProvenanceRef { id: "prov.ok".into() },
+        parent: None,
     };
 
     let out = kernel.apply(freeze);
@@ -51,6 +55,7 @@ fn freeze_denies_commit() {
         },
         policy: PolicyRef { id: "policy.ok".into() },
         provenance: ProvenanceRef { id: "prov.ok".into() },
+        parent: None,
     };
 
     let out = kernel.apply(commit);
@@ -85,7 +90,4 @@ fn freeze_denies_commit() {
     // 5. Policy & provenance preserved
     assert_eq!(receipt.policy.id, "policy.ok");
     assert_eq!(receipt.provenance.id, "prov.ok");
-
 }
-
-

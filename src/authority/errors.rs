@@ -12,6 +12,11 @@ pub enum AuthorityError {
     InvalidProvenanceRef,
     KernelMisconfiguration,
     InternalInvariantFailed(&'static str),
+
+    // Phase 3.7 — lineage validation
+    ParentNotFound,
+    ParentDomainMismatch,
+    ParentCycleDetected,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,3 +28,4 @@ pub enum DenyReason {
     ScopeNotAdopted,
     Other { code: String },
 }
+

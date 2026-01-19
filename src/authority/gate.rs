@@ -6,7 +6,10 @@ use super::types::*;
 use super::errors::*;
 use super::receipt::ReceiptMint;
 
-// Injected traits (implemented elsewhere) — still quarantined.
+// -----------------------------------------------------------------------------
+// Injected traits (implemented elsewhere) — authority boundaries
+// -----------------------------------------------------------------------------
+
 pub trait FreezeStateReader {
     fn is_frozen(&self, domain: &DomainRef, scope: &Scope) -> Result<bool, AuthorityError>;
 }
@@ -18,7 +21,7 @@ pub trait FreezeStateWriter {
         scope: &Scope,
         op: FreezeOp,
         ttl_hint_seconds: Option<u64>,
-    ) -> Result<String, AuthorityError>; // returns FreezeStateRef
+    ) -> Result<String, AuthorityError>;
 }
 
 pub trait CommitWriter {
@@ -28,7 +31,7 @@ pub trait CommitWriter {
         scope: &Scope,
         intent: &Intent,
         target: &str,
-    ) -> Result<String, AuthorityError>; // returns CommitRef
+    ) -> Result<String, AuthorityError>;
 }
 
 pub trait ReceiptWriter {
@@ -36,23 +39,32 @@ pub trait ReceiptWriter {
 }
 
 pub trait IdentityBinder {
-    // Validates that actor exists in Nullus and is eligible to act as Corporeal.
     fn validate_actor(&self, actor: &ActorRef) -> Result<(), AuthorityError>;
 }
 
-// Phase 3.2: receipt identity is an explicit authority capability.
+// Phase 3.3 — explicit authority to mint receipt identities
 pub trait ReceiptIdMint {
     fn mint_receipt_id(&mut self) -> ReceiptRef;
 }
 
+// Phase 3.7 — parent lookup for lineage validation
+pub trait ReceiptParentReader {
+    fn get_receipt(&self, id: &ReceiptRef) -> Result<Option<Receipt>, AuthorityError>;
+}
+
+// -----------------------------------------------------------------------------
+// Authority Kernel
+// -----------------------------------------------------------------------------
+
 pub struct AuthorityKernelConfig {
-    // Placeholder: add toggles only if strictly needed.
     pub enforce_non_bypass: bool,
+
+    // Phase 3.7 — bounded lineage walk (no unbounded recursion)
+    pub max_parent_hops: usize,
 }
 
 pub struct AuthorityKernel<R, W, M> {
     cfg: AuthorityKernelConfig,
-    // Readers/writers are injected to keep authority pure and bounded.
     pub reader: R,
     pub writer: W,
     pub minter: M,
@@ -60,7 +72,7 @@ pub struct AuthorityKernel<R, W, M> {
 
 impl<R, W, M> AuthorityKernel<R, W, M>
 where
-    R: FreezeStateReader + IdentityBinder,
+    R: FreezeStateReader + IdentityBinder + ReceiptParentReader,
     W: FreezeStateWriter + CommitWriter + ReceiptWriter,
     M: ReceiptIdMint,
 {
@@ -68,14 +80,13 @@ where
         Self { cfg, reader, writer, minter }
     }
 
-    // The only public entry: evaluate + commit + receipt.
     pub fn apply(&mut self, req: AuthorityRequest) -> AuthorityOutcome {
         match req {
-            AuthorityRequest::Freeze { actor, intent, policy, provenance } => {
-                self.apply_freeze(actor, intent, policy, provenance)
+            AuthorityRequest::Freeze { actor, intent, policy, provenance, parent } => {
+                self.apply_freeze(actor, intent, policy, provenance, parent)
             }
-            AuthorityRequest::Commit { actor, intent, policy, provenance } => {
-                self.apply_commit(actor, intent, policy, provenance)
+            AuthorityRequest::Commit { actor, intent, policy, provenance, parent } => {
+                self.apply_commit(actor, intent, policy, provenance, parent)
             }
         }
     }
@@ -86,49 +97,34 @@ where
         intent: FreezeIntent,
         policy: PolicyRef,
         provenance: ProvenanceRef,
+        parent: Option<ReceiptRef>,
     ) -> AuthorityOutcome {
-        // Nullus ↔ Corporeal closure (validate actor)
         if let Err(e) = self.reader.validate_actor(&actor) {
-            let rid = self.minter.mint_receipt_id();
-            let receipt = ReceiptMint::error(
-                rid.clone(),
-                actor.clone(),
-                intent.domain.clone(),
-                intent.scope.clone(),
-                &e,
+            return self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance);
+        }
+
+        if intent.domain.id.is_empty() || intent.scope.key.is_empty() {
+            return self.emit_error(
+                actor,
+                intent.domain,
+                intent.scope,
+                parent,
+                AuthorityError::InvalidScope,
                 policy,
                 provenance,
             );
-            let _ = self.writer.append_receipt(&receipt);
-            return AuthorityOutcome::Error(e);
         }
 
-        // Terra ↔ Numen validity: scope/domain basic checks
-        if intent.scope.key.is_empty() || intent.domain.id.is_empty() {
-            let e = AuthorityError::InvalidScope;
-            let rid = self.minter.mint_receipt_id();
-            let receipt = ReceiptMint::error(
-                rid.clone(),
-                actor.clone(),
-                intent.domain.clone(),
-                intent.scope.clone(),
-                &e,
-                policy,
-                provenance,
-            );
-            let _ = self.writer.append_receipt(&receipt);
-            return AuthorityOutcome::Error(e);
+        if let Err(e) = self.validate_parent(&intent.domain, &parent) {
+            return self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance);
         }
 
-        // Apply the freeze op (authoritative)
-        let apply_res = self.writer.apply_freeze_op(
+        match self.writer.apply_freeze_op(
             &intent.domain,
             &intent.scope,
-            intent.op.clone(),
+            intent.op,
             intent.ttl_hint_seconds,
-        );
-
-        match apply_res {
+        ) {
             Ok(freeze_ref) => {
                 let rid = self.minter.mint_receipt_id();
                 let receipt = ReceiptMint::allowed(
@@ -136,29 +132,18 @@ where
                     actor.clone(),
                     intent.domain.clone(),
                     intent.scope.clone(),
+                    parent,
                     policy,
                     provenance,
                 );
                 let _ = self.writer.append_receipt(&receipt);
+
                 AuthorityOutcome::Allowed {
                     receipt: rid,
                     sealed: SealedOutcomeData::FreezeStateRef(freeze_ref),
                 }
             }
-            Err(e) => {
-                let rid = self.minter.mint_receipt_id();
-                let receipt = ReceiptMint::error(
-                    rid.clone(),
-                    actor.clone(),
-                    intent.domain.clone(),
-                    intent.scope.clone(),
-                    &e,
-                    policy,
-                    provenance,
-                );
-                let _ = self.writer.append_receipt(&receipt);
-                AuthorityOutcome::Error(e)
-            }
+            Err(e) => self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance),
         }
     }
 
@@ -168,24 +153,28 @@ where
         intent: CommitIntent,
         policy: PolicyRef,
         provenance: ProvenanceRef,
+        parent: Option<ReceiptRef>,
     ) -> AuthorityOutcome {
-        // Nullus ↔ Corporeal closure
         if let Err(e) = self.reader.validate_actor(&actor) {
-            let rid = self.minter.mint_receipt_id();
-            let receipt = ReceiptMint::error(
-                rid.clone(),
-                actor.clone(),
-                intent.domain.clone(),
-                intent.scope.clone(),
-                &e,
+            return self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance);
+        }
+
+        if intent.domain.id.is_empty() || intent.scope.key.is_empty() {
+            return self.emit_error(
+                actor,
+                intent.domain,
+                intent.scope,
+                parent,
+                AuthorityError::InvalidScope,
                 policy,
                 provenance,
             );
-            let _ = self.writer.append_receipt(&receipt);
-            return AuthorityOutcome::Error(e);
         }
 
-        // Freeze gate (minimal authority surface)
+        if let Err(e) = self.validate_parent(&intent.domain, &parent) {
+            return self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance);
+        }
+
         match self.reader.is_frozen(&intent.domain, &intent.scope) {
             Ok(true) => {
                 let reason = DenyReason::FreezeActive { scope: intent.scope.key.clone() };
@@ -196,6 +185,7 @@ where
                     actor.clone(),
                     intent.domain.clone(),
                     intent.scope.clone(),
+                    parent,
                     &reason,
                     policy,
                     provenance,
@@ -204,58 +194,100 @@ where
 
                 AuthorityOutcome::Denied { receipt: rid, reason }
             }
-            Ok(false) => {
-                // commit acceptance
-                match self.writer.accept_commit(&intent.domain, &intent.scope, &intent.intent, &intent.target) {
-                    Ok(commit_ref) => {
-                        let rid = self.minter.mint_receipt_id();
-                        let receipt = ReceiptMint::allowed(
-                            rid.clone(),
-                            actor.clone(),
-                            intent.domain.clone(),
-                            intent.scope.clone(),
-                            policy,
-                            provenance,
-                        );
-                        let _ = self.writer.append_receipt(&receipt);
 
-                        AuthorityOutcome::Allowed {
-                            receipt: rid,
-                            sealed: SealedOutcomeData::CommitRef(commit_ref),
-                        }
-                    }
-                    Err(e) => {
-                        let rid = self.minter.mint_receipt_id();
-                        let receipt = ReceiptMint::error(
-                            rid.clone(),
-                            actor.clone(),
-                            intent.domain.clone(),
-                            intent.scope.clone(),
-                            &e,
-                            policy,
-                            provenance,
-                        );
-                        let _ = self.writer.append_receipt(&receipt);
+            Ok(false) => match self.writer.accept_commit(
+                &intent.domain,
+                &intent.scope,
+                &intent.intent,
+                &intent.target,
+            ) {
+                Ok(commit_ref) => {
+                    let rid = self.minter.mint_receipt_id();
+                    let receipt = ReceiptMint::allowed(
+                        rid.clone(),
+                        actor.clone(),
+                        intent.domain.clone(),
+                        intent.scope.clone(),
+                        parent,
+                        policy,
+                        provenance,
+                    );
+                    let _ = self.writer.append_receipt(&receipt);
 
-                        AuthorityOutcome::Error(e)
+                    AuthorityOutcome::Allowed {
+                        receipt: rid,
+                        sealed: SealedOutcomeData::CommitRef(commit_ref),
                     }
                 }
-            }
-            Err(e) => {
-                let rid = self.minter.mint_receipt_id();
-                let receipt = ReceiptMint::error(
-                    rid.clone(),
-                    actor.clone(),
-                    intent.domain.clone(),
-                    intent.scope.clone(),
-                    &e,
-                    policy,
-                    provenance,
-                );
-                let _ = self.writer.append_receipt(&receipt);
+                Err(e) => self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance),
+            },
 
-                AuthorityOutcome::Error(e)
+            Err(e) => self.emit_error(actor, intent.domain, intent.scope, parent, e, policy, provenance),
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase 3.7 — parent validation (bounded)
+    // -------------------------------------------------------------------------
+    fn validate_parent(
+        &self,
+        current_domain: &DomainRef,
+        parent: &Option<ReceiptRef>,
+    ) -> Result<(), AuthorityError> {
+        let Some(mut cursor) = parent.clone() else {
+            return Ok(());
+        };
+
+        // hop-bounded walk; detect cycles by repeats
+        let mut seen: std::collections::HashSet<ReceiptRef> = std::collections::HashSet::new();
+
+        for _ in 0..self.cfg.max_parent_hops {
+            if !seen.insert(cursor.clone()) {
+                return Err(AuthorityError::ParentCycleDetected);
+            }
+
+            let Some(r) = self.reader.get_receipt(&cursor)? else {
+                return Err(AuthorityError::ParentNotFound);
+            };
+
+            if r.domain != *current_domain {
+                return Err(AuthorityError::ParentDomainMismatch);
+            }
+
+            match r.parent.clone() {
+                Some(next) => cursor = next,
+                None => return Ok(()),
             }
         }
+
+        Err(AuthorityError::ParentCycleDetected)
+    }
+
+    // -------------------------------------------------------------------------
+    // Receipt helpers
+    // -------------------------------------------------------------------------
+    fn emit_error(
+        &mut self,
+        actor: ActorRef,
+        domain: DomainRef,
+        scope: Scope,
+        parent: Option<ReceiptRef>,
+        err: AuthorityError,
+        policy: PolicyRef,
+        provenance: ProvenanceRef,
+    ) -> AuthorityOutcome {
+        let rid = self.minter.mint_receipt_id();
+        let receipt = ReceiptMint::error(
+            rid.clone(),
+            actor,
+            domain,
+            scope,
+            parent,
+            &err,
+            policy,
+            provenance,
+        );
+        let _ = self.writer.append_receipt(&receipt);
+        AuthorityOutcome::Error(err)
     }
 }
