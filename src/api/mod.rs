@@ -17,5 +17,7 @@ use crate::context::RuntimeContext;
 pub fn routes(
     runtime: Arc<RuntimeContext>,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    chat::routes(runtime)
+    node::routes()
+        .or(domain::routes(runtime.clone()))
+        .or(chat::routes(runtime))
 }

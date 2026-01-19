@@ -1,21 +1,22 @@
 use std::sync::Arc;
 use warp::Filter;
 
+
+use triad::api;
 use triad::context::RuntimeContext;
 use triad::store::Store;
-use triad::api;
 use triad::ws;
 
 #[tokio::main]
 async fn main() {
-    println!("BOOT: starting DIS server on 127.0.0.1:8710");
+    eprintln!("[BOOT] initializing");
 
     // -------------------------------------------------
     // Persistent store
     // -------------------------------------------------
-    let store = Store::open()
-        .await
-        .expect("Store::open failed");
+    eprintln!("[BOOT] opening store");
+    let store = Store::open().await.expect("Store::open failed");
+    eprintln!("[BOOT] store ready");
 
     // -------------------------------------------------
     // Runtime context (process-local)
@@ -35,11 +36,23 @@ async fn main() {
     // -------------------------------------------------
     // Root routes
     // -------------------------------------------------
-    let routes = api_routes
-        .or(ws_routes)
-        .or(warp::path("ping").map(|| "pong"));
+    let routes = api_routes.or(ws_routes).or(warp::path("ping").map(|| "pong"));
 
-    warp::serve(routes)
-        .run(([127, 0, 0, 1], 8710))
-        .await;
+    let addr = ([127, 0, 0, 1], 8710);
+
+    eprintln!("[BOOT] binding http listener {}:{}", addr.0[0], addr.1);
+
+    // Bind now, log AFTER it succeeds, and shutdown cleanly on Ctrl-C.
+    let (bound_addr, server) = warp::serve(routes).bind_with_graceful_shutdown(addr, async {
+        // Wait for Ctrl-C
+        let _ = tokio::signal::ctrl_c().await;
+        eprintln!("[BOOT] shutdown requested (Ctrl-C)");
+    });
+
+    eprintln!("[BOOT] listener ready on http://{}", bound_addr);
+    eprintln!("[BOOT] idle");
+
+    server.await;
+
+    eprintln!("[BOOT] shutdown complete");
 }

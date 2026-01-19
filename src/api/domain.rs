@@ -1,4 +1,9 @@
 // src/api/domain.rs
+// NOTE:
+// This module is an API adapter.
+// It is NOT domain ontology.
+// Authority-bearing endpoints here are Phase 3+ and
+// will be gated by policy later.
 
 use warp::Filter;
 use serde::{Serialize, Deserialize};

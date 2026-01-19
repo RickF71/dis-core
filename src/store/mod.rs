@@ -1,3 +1,4 @@
+// src/store/mod.rs
 pub mod artifact;
 
 use std::path::{Path, PathBuf};
@@ -28,7 +29,7 @@ impl Store {
         self.dir.join("artifacts.ndjson")
     }
 
-    pub async fn append(&self, a: &Artifact) -> std::io::Result<()> {
+    pub async fn record(&self, a: &Artifact) -> std::io::Result<()> {
         let mut f = OpenOptions::new()
             .create(true)
             .append(true)

@@ -1,19 +1,14 @@
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Coord6 {
-    pub n: u64,
-    pub a: u64,
-    pub t: u64,
-    pub nu: u64,
-    pub l: u64,
-    pub c: u64,
-}
+use crate::runtime::coord6::Coord6;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Artifact {
     pub id: String,          // art-<ulid>
-    pub ts: String,          // RFC3339
+
+    // Actor-asserted observation time.
+    // DIS-core does not interpret or trust this value.
+
+    pub observed_at: Option<String>, // actor-asserted RFC3339
 
     pub domain: String,      // domain.shared.world
     pub store: String,       // store token id

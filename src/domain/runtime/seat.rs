@@ -1,3 +1,8 @@
+// src/domain/runtime/seat.rs
+// NOTE:
+// This file contains runtime behavior and authority-adjacent logic.
+// It is intentionally quarantined from Phase-2 domain ontology.
+// Do not import this from structural domain code.
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 

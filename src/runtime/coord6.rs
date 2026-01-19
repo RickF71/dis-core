@@ -1,6 +1,7 @@
+// src/runtime/coord6.rs
 use crate::runtime::commit::CommitKind;
 
-#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Coord6 {
     pub n: u64,
     pub a: u64,

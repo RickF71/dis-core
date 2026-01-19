@@ -1,5 +1,7 @@
+// src/domain/artifact/artifact.rs
+
 use crate::domain::lattice::DomainLattice;
-use uuid::Uuid;
+use crate::id::{ArtifactId, SeatId};
 
 #[derive(Debug, Clone)]
 pub struct Artifact {
@@ -8,9 +10,3 @@ pub struct Artifact {
     pub created_at: DomainLattice,
     pub content: String,
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ArtifactId(pub Uuid);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SeatId(pub Uuid);

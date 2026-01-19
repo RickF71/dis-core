@@ -17,9 +17,6 @@ pub mod identity;
 // Sealed capability containers
 pub mod capsule;
 
-// Policy evaluation (non-authoritative)
-pub mod policy;
-
 // Persistent storage substrate
 pub mod store;
 
