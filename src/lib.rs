@@ -14,9 +14,6 @@ pub mod context;
 // Identity & continuity
 pub mod identity;
 
-// Sealed capability containers
-pub mod capsule;
-
 // Persistent storage substrate
 pub mod store;
 
@@ -55,3 +52,6 @@ pub mod ws;
 
 // Transport overlays (e.g. JikkaPipe)
 pub mod runtime;
+
+
+pub mod authority;
